@@ -42,7 +42,7 @@ export interface ItemRow {
   gearTier?: number;
   /** Weapon perk columns, in socket order. */
   perks?: PerkOption[][];
-  /** Armor stats by stat name (e.g. Health, Grenade). */
+  /** Armor stats (e.g. Health, Grenade) or weapon stats (e.g. Range, Stability), by name. */
   stats?: Record<string, number>;
 }
 
@@ -160,13 +160,14 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     return columns;
   };
 
-  const armorStats = (instanceId: string): Record<string, number> | undefined => {
+  const itemStatValues = (instanceId: string): Record<string, number> | undefined => {
     const s = itemStats[instanceId]?.stats;
     if (!s) return undefined;
     const out: Record<string, number> = {};
     for (const st of Object.values(s)) {
       const name = manifest.stats[st.statHash]?.displayProperties.name;
-      if (name) out[name] = st.value;
+      // Attack/Defense is the power level, already shown elsewhere.
+      if (name && name !== 'Attack' && name !== 'Defense' && name !== 'Power') out[name] = st.value;
     }
     return out;
   };
@@ -196,7 +197,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       locked: (item.state & STATE_LOCKED) !== 0,
       gearTier: inst?.gearTier || undefined,
       perks: item.itemInstanceId && def?.itemType === WEAPON ? weaponPerks(item.itemInstanceId) : undefined,
-      stats: item.itemInstanceId && def?.itemType === ARMOR ? armorStats(item.itemInstanceId) : undefined,
+      stats: item.itemInstanceId && (def?.itemType === ARMOR || def?.itemType === WEAPON) ? itemStatValues(item.itemInstanceId) : undefined,
     };
   };
 

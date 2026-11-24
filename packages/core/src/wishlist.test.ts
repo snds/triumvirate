@@ -39,6 +39,7 @@ test('a roll with every listed perk is a god roll when tagged so', () => {
   assert.equal(a.verdict, 'god');
   assert.equal(a.pve, true);
   assert.equal(a.notes, 'Great for clearing adds.');
+  assert.ok(a.wishedPerks?.includes('Rampage'));
 });
 
 test('missing one listed perk means no match', () => {

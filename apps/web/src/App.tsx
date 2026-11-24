@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { fetchInventory, logout, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
@@ -12,6 +12,8 @@ import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './components/CharacterColumn.tsx';
 import { SLOT_ORDER } from './inventory.ts';
 import { usePref } from './prefs.ts';
+import { HoverContext, type HoverApi } from './hover.ts';
+import { ItemHovercard } from './components/ItemHovercard.tsx';
 
 type State =
   | { status: 'loading' }
@@ -36,6 +38,22 @@ export function App() {
   const [collapsed, setCollapsed] = usePref('charactersCollapsed', false);
   const [tileScale, setTileScale] = usePref('tileScale', 1);
   const [, tick] = useState(0);
+  const [hovered, setHovered] = useState<{ item: AppraisedItem; anchor: DOMRect } | null>(null);
+  const [ask, setAsk] = useState<{ id: number; text: string }>();
+
+  // Hovercard: a short delay so sweeping the mouse across the grid doesn't flash cards.
+  const closeDetail = useCallback(() => setSelected(null), []);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const hoverApi = useMemo<HoverApi>(() => ({
+    enter: (item, anchor) => {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = setTimeout(() => setHovered({ item, anchor }), 350);
+    },
+    leave: () => {
+      clearTimeout(hoverTimer.current);
+      setHovered(null);
+    },
+  }), []);
 
   const load = useCallback(async (refresh: boolean) => {
     setSyncing(true);
@@ -102,6 +120,7 @@ export function App() {
   const signOut = async () => { await logout(); setState({ status: 'signed-out' }); };
 
   return (
+    <HoverContext.Provider value={hoverApi}>
     <div className={`app${agentOpen ? ' app--chat' : ''}`}>
       <header className="topbar">
         <h1 className="brand">Triumvirate</h1>
@@ -172,11 +191,13 @@ export function App() {
         </div>
       </header>
 
-      <main className="main">
+      <main className="main" onScroll={hovered ? hoverApi.leave : undefined}>
         {view === 'inventory' ? (
-          <div className={`inventory${collapsed ? ' inventory--collapsed' : ''}`}>
-            <div className="columns">
-              {shown.map((c) => (
+          <div
+            className={`inventory${collapsed ? ' inventory--collapsed' : ''}`}
+            style={{ '--character-count': shown.length } as React.CSSProperties}
+          >
+            {shown.map((c) => (
                 <CharacterColumn
                   key={c.id}
                   character={c}
@@ -184,8 +205,7 @@ export function App() {
                   postmaster={inv.items.filter((i) => i.owner === c.id && isPostmaster(i))}
                   onSelect={setSelected}
                 />
-              ))}
-            </div>
+            ))}
             <VaultSection
               items={vaultItems}
               account={inv.account}
@@ -203,8 +223,16 @@ export function App() {
         )}
       </main>
 
-      <AgentPanel enabled={inv.agentEnabled} open={agentOpen} onClose={() => setAgentOpen(false)} />
-      {selected && <ItemDetail item={selected} onClose={() => setSelected(null)} />}
+      <AgentPanel enabled={inv.agentEnabled} open={agentOpen} onClose={() => setAgentOpen(false)} ask={ask} />
+      {selected && (
+        <ItemDetail
+          item={selected}
+          onClose={closeDetail}
+          onAsk={(text) => { setAgentOpen(true); setSelected(null); setAsk((a) => ({ id: (a?.id ?? 0) + 1, text })); }}
+        />
+      )}
+      {hovered && !selected && <ItemHovercard item={hovered.item} anchor={hovered.anchor} />}
     </div>
+    </HoverContext.Provider>
   );
 }

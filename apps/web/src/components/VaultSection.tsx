@@ -19,7 +19,7 @@ const fmt = new Intl.NumberFormat('en-US');
 export function VaultSection({ items, account, collapsed, onToggleCollapsed, postmasterNotes, onSelect }: Props) {
   const groups = groupBySlot(items, true);
   return (
-    <section className="vault" aria-label="Vault">
+    <section className="column vault" aria-label="Vault">
       <header className="vault__header">
         <button
           className="icon-button"
@@ -28,15 +28,18 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
           title={collapsed ? 'Show all characters' : 'Collapse other characters into the vault'}
           aria-label={collapsed ? 'Show all characters' : 'Collapse other characters into the vault'}
         >
+          {/* Points the way the characters will move. */}
           <Icon name={collapsed ? 'chevronsRight' : 'chevronsLeft'} />
         </button>
-        <h2 className="vault__title">Vault</h2>
-        {account && (
-          <span className="vault__count">
-            {fmt.format(account.vault.used)}/{fmt.format(account.vault.capacity)}
-          </span>
-        )}
-        {collapsed && <span className="vault__count">Includes other characters' gear</span>}
+        <span className="vault__name">
+          <h2 className="vault__title">Vault</h2>
+          {account && (
+            <span className="vault__count">
+              {fmt.format(account.vault.used)}/{fmt.format(account.vault.capacity)}
+              {collapsed && ' · includes other characters\' gear'}
+            </span>
+          )}
+        </span>
         {account && account.currencies.length > 0 && (
           <ul className="currencies" aria-label="Currencies">
             {account.currencies.map((c) => (
@@ -48,6 +51,7 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
           </ul>
         )}
       </header>
+      <div className="vault__body">
       {postmasterNotes.length > 0 && <p className="postmaster__note">Postmaster: {postmasterNotes.join(', ')}</p>}
       {groups.length === 0 && <p className="empty">Nothing in the vault matches.</p>}
       {groups.map((g) => (
@@ -60,6 +64,7 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
           </div>
         </div>
       ))}
+      </div>
     </section>
   );
 }

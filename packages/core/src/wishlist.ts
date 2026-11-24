@@ -64,6 +64,8 @@ export interface Appraisal {
   notes?: string;
   /** How many curated rolls exist for this weapon. */
   rollCount: number;
+  /** Names of perks that appear in any recommended roll for this weapon, for highlighting. */
+  wishedPerks?: string[];
 }
 
 const NOTE_LIMIT = 600;
@@ -78,6 +80,8 @@ export function appraise(
   const rolls = list.get(itemHash) ?? [];
   if (rolls.length === 0) return { verdict: 'unrated', pve: false, pvp: false, rollCount: 0 };
   const nameOf = (h: number) => manifest.items[h]?.displayProperties.name;
+  const wishedPerks = [...new Set(rolls.filter((r) => !r.trash).flatMap((r) => r.perks.map(nameOf)))]
+    .filter((n): n is string => !!n);
   const matching = rolls.filter((r) =>
     r.perks.every((h) => {
       const name = nameOf(h);
@@ -85,9 +89,9 @@ export function appraise(
       return !name || manifest.items[h]?.itemTypeDisplayName?.includes('Masterwork') || perkNames.has(name);
     }),
   );
-  if (matching.some((r) => r.trash)) return { verdict: 'trash', pve: false, pvp: false, rollCount: rolls.length };
+  if (matching.some((r) => r.trash)) return { verdict: 'trash', pve: false, pvp: false, rollCount: rolls.length, wishedPerks };
   const good = matching.filter((r) => !r.trash);
-  if (good.length === 0) return { verdict: 'meh', pve: false, pvp: false, rollCount: rolls.length };
+  if (good.length === 0) return { verdict: 'meh', pve: false, pvp: false, rollCount: rolls.length, wishedPerks };
   const tags = new Set(good.flatMap((r) => r.tags));
   const best = good.find((r) => r.tags.some((t) => t.includes('god'))) ?? good[0]!;
   const notes = best.notes && best.notes.length > NOTE_LIMIT ? `${best.notes.slice(0, NOTE_LIMIT)}…` : best.notes;
@@ -97,5 +101,6 @@ export function appraise(
     pvp: [...tags].some((t) => t.startsWith('pvp')),
     notes,
     rollCount: rolls.length,
+    wishedPerks,
   };
 }

@@ -74,7 +74,8 @@ body {
 
 /* App shell: top bar, scrolling main area, and the docked chat panel on the right. */
 /* The page itself never scrolls; .main and the chat log do. */
-html, body, #root { height: 100%; overflow: hidden; }
+/* clip (not hidden) so nothing, including scrollIntoView, can scroll the page. */
+html, body, #root { height: 100%; overflow: clip; }
 .app {
   height: 100%;
   display: grid;
@@ -83,7 +84,7 @@ html, body, #root { height: 100%; overflow: hidden; }
 }
 .app--chat { grid-template-columns: minmax(0, 1fr) min(var(--agent-width), 40vw); }
 .app > .topbar { grid-column: 1 / -1; }
-.main { overflow: auto; }
+.main { position: relative; overflow: auto; } /* positioned, so visually hidden text stays inside it */
 
 /* Top bar */
 .topbar {
@@ -169,24 +170,17 @@ html, body, #root { height: 100%; overflow: hidden; }
 }
 .segmented__option.is-selected { background: var(--surface-hover); color: var(--text-primary); }
 
-/* Inventory layout. Expanded: characters in a row, vault below.
-   Collapsed (like DIM): the current character on the left, a wide vault beside it. */
-.inventory--collapsed {
+/* Inventory layout, like DIM: characters and the vault side by side as peers.
+   Collapsed: only the current character, so the vault gets the room. */
+.inventory {
   display: grid;
-  /* + left padding of .columns, so the column itself gets its full minimum width */
-  grid-template-columns: calc(var(--column-min-width) + var(--space-6)) minmax(0, 1fr);
-  align-items: start;
-}
-.inventory--collapsed .columns { grid-template-columns: 1fr; padding-right: 0; }
-.inventory--collapsed .vault { padding-top: var(--space-4); padding-left: var(--space-4); }
-
-/* Character columns */
-.columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(var(--column-min-width), 1fr));
+  grid-template-columns: repeat(var(--character-count, 3), var(--column-min-width)) minmax(var(--vault-min-width), 1fr);
   gap: var(--space-4);
+  align-items: start;
   padding: var(--space-4) var(--space-6);
 }
+
+
 .column { background: var(--surface-panel); border-radius: var(--radius-md); overflow: hidden; }
 .character__banner {
   display: flex;
@@ -229,12 +223,20 @@ html, body, #root { height: 100%; overflow: hidden; }
 }
 .slot__carried { display: flex; flex-wrap: wrap; gap: var(--tile-gap); align-content: start; }
 
-/* Vault */
-.vault { padding: 0 var(--space-6) var(--space-6); }
-.vault__header { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: var(--space-2) 0; }
-.vault__header .icon-button { margin-left: calc(-1 * var(--space-2)); }
+/* Vault: a column card like the characters, with a header the same height as their banners. */
+.vault__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-raised);
+}
+.vault__name { display: grid; line-height: 1.15; }
 .vault__title { font-size: 16px; margin: 0; }
-.currencies { display: flex; flex-wrap: wrap; gap: var(--space-3); margin: 0 0 0 auto; padding: 0; list-style: none; }
+.vault__body { padding: 0 var(--space-3) var(--space-3); }
+.currencies { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0 0 0 auto; padding: 0; list-style: none; }
 .currency { display: flex; align-items: center; gap: var(--space-1); font-size: 13px; font-weight: 600; }
 .currency img { width: 18px; height: 18px; }
 .vault__slot { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin: var(--space-4) 0 var(--space-2); }
@@ -256,10 +258,12 @@ html, body, #root { height: 100%; overflow: hidden; }
   overflow: hidden;
 }
 .tile--lg { --s: calc(var(--tile-scale) * var(--tile-equipped-ratio)); }
-.tile.tier-exotic { --tile-tier: var(--tier-exotic); }
-.tile.tier-legendary { --tile-tier: var(--tier-legendary); }
-.tile.tier-rare { --tile-tier: var(--tier-rare); }
-.tile.tier-uncommon { --tile-tier: var(--tier-uncommon); }
+/* Any element with a tier class gets --tile-tier: tiles, the hovercard, and the item panel. */
+.tier-exotic { --tile-tier: var(--tier-exotic); }
+.tier-legendary { --tile-tier: var(--tier-legendary); }
+.tier-rare { --tile-tier: var(--tier-rare); }
+.tier-uncommon { --tile-tier: var(--tier-uncommon); }
+.tier-common { --tile-tier: var(--tier-common); }
 .tile__icon, .tile__watermark { position: absolute; inset: 0; width: 100%; height: 100%; }
 .tile__power {
   position: absolute;
@@ -298,24 +302,35 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .tile__badge--good { color: var(--verdict-good); }
 .tile__badge--meh, .tile__badge--trash { color: var(--verdict-bad); }
 
-/* Item detail drawer */
+/* Item panel (peek) */
 .drawer {
   position: fixed;
   inset: 0 0 0 auto;
   z-index: 3;
   width: min(var(--drawer-width), 100vw);
-  overflow-y: auto;
-  padding: var(--space-4);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   background: var(--surface-panel);
   border-left: 1px solid var(--border-subtle);
   box-shadow: -8px 0 24px var(--overlay-scrim);
 }
-.drawer__header { display: flex; gap: var(--space-3); align-items: flex-start; }
-.drawer__header p { margin: 2px 0; font-size: 12px; }
-.drawer__icon { width: 64px; height: 64px; border-radius: var(--radius-sm); }
-.drawer__title { margin: 0; font-size: 18px; }
-.drawer__close { margin-left: auto; }
-.drawer__section { font-size: 13px; color: var(--text-secondary); margin: var(--space-4) 0 var(--space-2); }
+.drawer__header {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  /* Tier band, like the game's item header. */
+  background: color-mix(in srgb, var(--tile-tier) 70%, var(--surface-page));
+}
+.drawer__icon { width: 64px; height: 64px; border-radius: var(--radius-sm); border: 2px solid var(--tile-tier); }
+.drawer__heading { min-width: 0; }
+.drawer__title { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 0.02em; }
+.drawer__meta { margin: 2px 0 0; font-size: 12px; color: var(--text-primary); opacity: 0.85; }
+.drawer__close { margin-left: auto; align-self: flex-start; color: var(--text-primary); }
+.drawer__body { overflow-y: auto; padding: var(--space-4); }
+.drawer__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.drawer__section { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin: var(--space-6) 0 var(--space-2); padding-bottom: var(--space-1); border-bottom: 1px solid var(--border-subtle); }
+.drawer__legend { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; font-size: 12px; color: var(--text-secondary); }
 
 .verdict {
   margin-top: var(--space-4);
@@ -328,26 +343,90 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .verdict--good { border-left-color: var(--verdict-good); }
 .verdict--meh, .verdict--trash { border-left-color: var(--verdict-bad); }
 .verdict__notes { margin: var(--space-2) 0 0; font-size: 12px; color: var(--text-secondary); }
+.verdict-line { margin: 0; font-size: 13px; color: var(--text-secondary); }
+.verdict-line--god strong { color: var(--verdict-god); }
+.verdict-line--good strong { color: var(--verdict-good); }
+.verdict-line--meh strong, .verdict-line--trash strong { color: var(--verdict-bad); }
 
-.perks { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-.perks__column { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); align-content: start; }
-.perk {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2) 2px 2px;
-  border-radius: 999px;
-  font-size: 12px;
-  color: var(--text-secondary);
+/* Perk grid: one column per socket, selected perk on top. */
+.perk-grid { display: flex; gap: var(--space-2); }
+.perk-grid--named { flex-wrap: wrap; gap: var(--space-3); }
+.perk-grid__column { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); align-content: start; }
+.perk-cell { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; color: var(--text-muted); }
+.perk-cell.is-active { color: var(--text-primary); }
+.perk-cell__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border: 1px solid transparent;
+  border-radius: 50%;
+  opacity: 0.55;
 }
-.perk img { width: 22px; height: 22px; border-radius: 50%; }
-.perk--active { background: var(--surface-hover); color: var(--text-primary); }
+.perk-cell.is-active .perk-cell__icon { opacity: 1; background: var(--perk-active-fill); border-color: var(--perk-active-border); }
+.perk-cell.is-wished .perk-cell__icon { opacity: 1; }
+.perk-cell__icon img { width: 100%; height: 100%; border-radius: 50%; }
+.perk-cell__wish {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 13px;
+  height: 13px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--verdict-good);
+  color: var(--on-accent);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+}
+.perk-cell__wish--inline { position: static; }
+.perk-grid--named { flex-direction: column; gap: var(--space-2); }
+/* In the panel each socket is a row: the selected perk first, its alternatives after. */
+.perk-grid--named .perk-grid__column { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border-subtle); }
+.perk-grid--named .perk-cell:first-child { min-width: 170px; }
 
 .stats { margin: 0; display: grid; gap: var(--space-1); }
-.stats__row { display: grid; grid-template-columns: 90px 1fr; align-items: center; font-size: 12px; }
-.stats__row dt { color: var(--text-secondary); }
+.stats__row { display: grid; grid-template-columns: 130px 1fr; align-items: center; font-size: 12px; }
+.stats__row dt { color: var(--text-secondary); text-align: right; padding-right: var(--space-3); }
 .stats__row dd { margin: 0; display: flex; align-items: center; gap: var(--space-2); }
-.stats__bar { height: 6px; border-radius: 3px; background: var(--accent); }
+.stats__track { flex: 1; max-width: 160px; height: 8px; background: var(--surface-hover); }
+.stats__bar { display: block; height: 100%; background: var(--text-secondary); }
+.stats__value { min-width: 2.5em; font-variant-numeric: tabular-nums; }
+.stats__row--total { margin-top: var(--space-1); font-weight: 600; }
+.stats--compact .stats__row { grid-template-columns: 110px 1fr; font-size: 11px; }
+.stats--compact .stats__track { height: 6px; }
+
+.details { margin: 0; display: grid; gap: var(--space-1); font-size: 13px; }
+.details__row { display: grid; grid-template-columns: 110px 1fr; }
+.details__row dt { color: var(--text-secondary); }
+.details__row dd { margin: 0; }
+
+/* Hovercard */
+.hovercard {
+  position: fixed;
+  z-index: 5;
+  width: var(--hovercard-width);
+  pointer-events: none;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px var(--overlay-scrim);
+  overflow: hidden;
+}
+.hovercard__header { display: grid; padding: var(--space-2) var(--space-3); background: color-mix(in srgb, var(--tile-tier) 70%, var(--surface-page)); }
+.hovercard__name { font-size: 15px; text-transform: uppercase; letter-spacing: 0.02em; }
+.hovercard__meta { font-size: 11px; opacity: 0.85; }
+.hovercard__body { display: grid; gap: var(--space-2); padding: var(--space-3); }
+.hovercard__power { display: flex; align-items: center; gap: var(--space-2); font-size: 18px; font-weight: 700; }
+.hovercard__power .muted { font-size: 12px; font-weight: 400; }
+.hovercard__power .tile__element { --s: 1.6; }
+.hovercard__where { margin-left: auto; }
+.hovercard .perk-cell__icon { width: 28px; height: 28px; }
+.hovercard__hint { margin: 0; font-size: 11px; color: var(--text-muted); }
 
 /* Cleanup view */
 .cleanup { padding: var(--space-4) var(--space-6); max-width: 960px; }

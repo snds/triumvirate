@@ -9,7 +9,11 @@ const STARTERS = [
 ];
 
 // Stays mounted while collapsed (just hidden) so the conversation survives toggling.
-export function AgentPanel({ enabled, open, onClose }: { enabled: boolean; open: boolean; onClose: () => void }) {
+export function AgentPanel({ enabled, open, onClose, ask }: {
+  enabled: boolean; open: boolean; onClose: () => void;
+  /** A question sent from elsewhere (e.g. an item panel); `id` changes on each new ask. */
+  ask?: { id: number; text: string };
+}) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -37,6 +41,14 @@ export function AgentPanel({ enabled, open, onClose }: { enabled: boolean; open:
       setBusy(false);
     }
   };
+
+  // Send questions handed in from outside once each.
+  const lastAsk = useRef(0);
+  useEffect(() => {
+    if (!ask || ask.id === lastAsk.current || !enabled) return;
+    lastAsk.current = ask.id;
+    void send(ask.text);
+  });
 
   return (
     <aside className="agent" aria-label="Ask Triumvirate" hidden={!open}>

@@ -1,3 +1,4 @@
+import { useHover } from '../hover.ts';
 import type { AppraisedItem, Verdict } from '@triumvirate/core';
 
 // Maps the item's rarity and element to semantic token names.
@@ -16,6 +17,7 @@ const BADGE: Partial<Record<Verdict, string>> = { god: '★', good: '✓', meh: 
 export function ItemTile({
   item, size = 'md', onSelect,
 }: { item: AppraisedItem; size?: 'md' | 'lg'; onSelect?: (i: AppraisedItem) => void }) {
+  const hover = useHover();
   const verdict = item.appraisal?.verdict;
   const label = [item.name, item.type, item.damage, item.power && `${item.power} power`,
     verdict && VERDICT_LABEL[verdict], item.locked && 'locked'].filter(Boolean).join(' · ');
@@ -23,9 +25,10 @@ export function ItemTile({
     <button
       type="button"
       className={`tile tile--${size} ${tierClass(item.tier)}`}
-      title={label}
       aria-label={label}
-      onClick={onSelect ? () => onSelect(item) : undefined}
+      onClick={onSelect ? () => { hover?.leave(); onSelect(item); } : undefined}
+      onPointerEnter={hover ? (e) => hover.enter(item, e.currentTarget.getBoundingClientRect()) : undefined}
+      onPointerLeave={hover ? () => hover.leave() : undefined}
     >
       {item.icon && <img className="tile__icon" src={item.icon} alt="" loading="lazy" />}
       {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" loading="lazy" />}

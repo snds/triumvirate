@@ -81,10 +81,15 @@
   --tile-gap: 6px;
   /* Equipped tile + three carried tiles per row. */
   --column-min-width: calc(var(--tile-size-equipped) + 3 * var(--tile-size) + 2 * var(--tile-gap) + 2 * var(--space-3) + var(--space-3) + 4px);
+  /* Vault fits at least four tiles across. */
+  --vault-min-width: calc(4 * var(--tile-size) + 3 * var(--tile-gap) + 2 * var(--space-3));
   --topbar-height: 60px;
   --icon-size: 20px;
   --avatar-size: 32px;
-  --drawer-width: 420px;
+  --drawer-width: 440px;
+  --hovercard-width: 320px;
+  --perk-active-fill: var(--blue-500);
+  --perk-active-border: var(--gray-100);
   --agent-width: 400px;
   /* Tile indicators, in px at scale 1; tiles multiply them by their own scale (--s). */
   --badge-size: 14px;
