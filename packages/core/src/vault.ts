@@ -89,6 +89,8 @@ export type AmmoType = 'Primary' | 'Special' | 'Heavy';
 export const AMMO_NAMES: Record<number, AmmoType> = { 1: 'Primary', 2: 'Special', 3: 'Heavy' };
 
 export interface PerkOption {
+  /** The plug's item hash. Optional so older cached views still load. */
+  hash?: number;
   name: string;
   icon?: string;
   /** True for the perk currently slotted in this column. */
@@ -243,7 +245,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
   const plugInfo = (hash: number, active: boolean): PerkOption | undefined => {
     const d = manifest.items[hash];
     if (!d?.displayProperties.name) return undefined;
-    const p: PerkOption = { name: d.displayProperties.name, icon: bungieUrl(d.displayProperties.icon), active };
+    const p: PerkOption = { hash, name: d.displayProperties.name, icon: bungieUrl(d.displayProperties.icon), active };
     if (d.displayProperties.description) p.description = d.displayProperties.description;
     if (/enhanced/i.test(d.itemTypeDisplayName ?? '')) p.enhanced = true;
     return p;

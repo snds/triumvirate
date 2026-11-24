@@ -25,6 +25,11 @@ const GLYPHS = {
   copies: 'filter_none',
   enhanced: 'keyboard_double_arrow_up',
   arrowRight: 'arrow_forward',
+  arrowUp: 'arrow_upward',
+  pve: 'shield',
+  pvp: 'swords',
+  both: 'star',
+  filter: 'filter_alt',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

@@ -110,3 +110,32 @@ test('rollup counts each copy once, folds enhanced perks, and scores lift over c
   assert.equal(r.from, '2026-11-24T20:00:00Z');
   assert.deepEqual(gun.roles.map((x) => x.role), ['pve-endgame', 'patrol']);
 });
+
+test('appraiseCommunity grades a roll, marks PvE/PvP perks, and spots a better option', async () => {
+  const { appraiseCommunity } = await import('./community.ts');
+  const at = '2026-11-24T20:00:00Z';
+  const s = (copy: string, role: Sample['role'], perks: number[]): Sample =>
+    ({ match: copy, at, role, itemHash: GUN, copy, perks, kills: 1, precisionKills: 0 });
+  const samples: Sample[] = [
+    // PvE loves Explosive Payload + Firefly; PvP loves Rewind + Firefly. Barrel 1 and mag 3 everywhere.
+    ...['a', 'b', 'c', 'd', 'e', 'f'].map((c) => s(c, 'pve-endgame', [1, 3, 5, 7])),
+    s('g', 'pve-endgame', [1, 3, 6, 8]),
+    ...['h', 'i', 'j', 'k', 'l'].map((c) => s(c, 'pvp-endgame', [1, 3, 6, 7])),
+  ];
+  const w = rollup(manifest, samples).weapons[GUN];
+  // A copy with Explosive Payload (enhanced) + Firefly: a PvE roll.
+  const pve = appraiseCommunity(manifest, w, GUN, [[{ hash: 1, active: true }], [{ hash: 3, active: true }], [{ hash: 56, active: true }], [{ hash: 7, active: true }]]);
+  assert.equal(pve.grade, 'S');
+  assert.equal(pve.usedFor, 'pve-endgame');
+  assert.equal(pve.rollType, 'pve');
+  assert.equal(pve.perks[2]![0]!.use, 'pve');
+  assert.equal(pve.perks[3]![0]!.use, 'both');
+  // A copy slotted with the unpopular barrel and Frenzy, but able to switch to Firefly.
+  const meh = appraiseCommunity(manifest, w, GUN, [[{ hash: 2, active: true }], [{ hash: 3, active: true }], [{ hash: 6, active: true }], [{ hash: 8, active: true }, { hash: 7, active: false }]]);
+  assert.ok(meh.grade && meh.bestGrade);
+  assert.equal(meh.betterPossible, true);
+  assert.equal(meh.perks[3]![0]!.better, true);
+  assert.equal(meh.perks[0]![0]!.rel, 0);
+  // No data: no grade.
+  assert.equal(appraiseCommunity(manifest, undefined, GUN, [[{ hash: 1, active: true }]]).grade, undefined);
+});

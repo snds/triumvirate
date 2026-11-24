@@ -322,3 +322,163 @@ function statLean(manifest: ManifestTables, list: Sample[], pools: number[][], s
     .filter((x) => x.delta !== 0 && manifest.stats[x.statHash]?.displayProperties.name)
     .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Appraisal: grades one copy against what the community runs, like a popularity roll appraiser.
+
+export type Grade = 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+export const GRADES: Grade[] = ['S', 'A', 'B', 'C', 'D', 'F'];
+export type UseGroup = 'pve' | 'pvp';
+const GROUP_ROLES: Record<UseGroup, Role[]> = { pve: ['pve-endgame', 'pve', 'patrol'], pvp: ['pvp-endgame', 'pvp'] };
+
+/** Fewer copies than this and a weapon (or role) gets no grade: too little to go on. */
+export const MIN_COPIES = 5;
+
+export interface PerkMark {
+  /** Where the community favors this perk on this weapon. */
+  use?: UseGroup | 'both';
+  /** Share of copies running it, in PvE and PvP (0 to 1). */
+  pve?: number;
+  pvp?: number;
+  /** How it ranks in its column overall: 1 = the most used choice, 0 = never seen. */
+  rel: number;
+  /** On the slotted perk: another option this copy can switch to is more popular. */
+  better?: boolean;
+}
+
+export interface CommunityAppraisal {
+  /** Popularity grade of the perks as slotted. Absent when there isn't enough data. */
+  grade?: Grade;
+  /** The grade with the most popular option picked in each column this copy can switch. */
+  bestGrade?: Grade;
+  betterPossible: boolean;
+  /** The activity type where this exact roll scores highest. */
+  usedFor?: Role;
+  /** Whether the slotted traits are favored for PvE, PvP, or both. */
+  rollType?: UseGroup | 'both';
+  /** Copies of this weapon behind the numbers. */
+  copies: number;
+  /** One entry per perk option, aligned with the item's perk columns. */
+  perks: PerkMark[][];
+}
+
+interface Bucket { copies: number; columns: Map<number, number>[] }
+
+/** Merges role rollups into one bucket: copies per base perk hash, per column. */
+function mergeRoles(roles: RoleUsage[]): Bucket {
+  const columns: Map<number, number>[] = [];
+  let copies = 0;
+  for (const r of roles) {
+    copies += r.copies;
+    r.columns.forEach((col, ci) => {
+      const m = (columns[ci] ??= new Map());
+      for (const p of col) m.set(p.hash, (m.get(p.hash) ?? 0) + p.copies);
+    });
+  }
+  return { copies, columns };
+}
+
+const toGrade = (score: number): Grade =>
+  score >= 0.9 ? 'S' : score >= 0.75 ? 'A' : score >= 0.55 ? 'B' : score >= 0.35 ? 'C' : score >= 0.15 ? 'D' : 'F';
+
+/**
+ * Grades a copy's perks (hashes per column, slotted first) against community usage.
+ * `perks` follows ItemRow.perks: one list per column, the slotted perk first, then alternatives.
+ */
+export function appraiseCommunity(
+  manifest: ManifestTables,
+  weapon: WeaponCommunity | undefined,
+  itemHash: number,
+  perks: { hash?: number; active: boolean }[][],
+): CommunityAppraisal {
+  const empty: CommunityAppraisal = { betterPossible: false, copies: 0, perks: perks.map((c) => c.map(() => ({ rel: 0 }))) };
+  if (!weapon) return empty;
+  const pools = columnPools(manifest, itemHash);
+  const bases = pools.map((p) => baseOf(manifest, p));
+  const traitCol = (ci: number) => pools[ci]?.some((h) => plugCat(manifest, h) === 'frames') ?? false;
+  /** Which rollup column a plug belongs to, and its base hash there. */
+  const locate = (hash: number): [number, number] | undefined => {
+    for (let ci = 0; ci < pools.length; ci++) {
+      if (pools[ci]!.includes(hash)) return [ci, bases[ci]!(hash)];
+    }
+    // Not in the current pool (a retired perk): match by name in any column.
+    for (let ci = 0; ci < pools.length; ci++) {
+      const b = bases[ci]!(hash);
+      if (b !== hash) return [ci, b];
+    }
+    return undefined;
+  };
+
+  const all = mergeRoles(weapon.roles);
+  const groups = { pve: mergeRoles(weapon.roles.filter((r) => GROUP_ROLES.pve.includes(r.role))), pvp: mergeRoles(weapon.roles.filter((r) => GROUP_ROLES.pvp.includes(r.role))) };
+  const rel = (b: Bucket, ci: number, base: number) => {
+    const col = b.columns[ci];
+    if (!col?.size) return 0;
+    return (col.get(base) ?? 0) / Math.max(...col.values());
+  };
+  const share = (b: Bucket, ci: number, base: number) => (b.copies ? (b.columns[ci]?.get(base) ?? 0) / b.copies : 0);
+  /** Favored: at least half as common as the column's top pick, and above luck. */
+  const favored = (b: Bucket, ci: number, base: number) =>
+    b.copies >= MIN_COPIES && rel(b, ci, base) >= 0.5 && share(b, ci, base) >= 1 / (new Set(pools[ci]!.map(bases[ci]!)).size || 1);
+
+  const located = perks.map((col) => col.map((p) => (p.hash ? locate(p.hash) : undefined)));
+  const marks: PerkMark[][] = located.map((col) => col.map((loc) => {
+    if (!loc) return { rel: 0 };
+    const [ci, base] = loc;
+    const m: PerkMark = { rel: rel(all, ci, base) };
+    if (groups.pve.copies) m.pve = share(groups.pve, ci, base);
+    if (groups.pvp.copies) m.pvp = share(groups.pvp, ci, base);
+    const e = favored(groups.pve, ci, base), v = favored(groups.pvp, ci, base);
+    if (e || v) m.use = e && v ? 'both' : e ? 'pve' : 'pvp';
+    return m;
+  }));
+
+  /** Score of a roll in a bucket: traits count double. `pick` chooses the option per column. */
+  const score = (b: Bucket, pick: (col: number) => number) => {
+    let total = 0, weight = 0;
+    located.forEach((col, i) => {
+      const loc = col[pick(i)];
+      if (!loc) return;
+      const w = traitCol(loc[0]) ? 2 : 1;
+      total += w * rel(b, loc[0], loc[1]);
+      weight += w;
+    });
+    return weight ? total / weight : 0;
+  };
+  const slotted = (i: number) => Math.max(0, perks[i]!.findIndex((p) => p.active));
+  const bestPick = (i: number) => {
+    let best = slotted(i), bestRel = -1;
+    marks[i]!.forEach((m, k) => { if (m.rel > bestRel) { bestRel = m.rel; best = k; } });
+    return best;
+  };
+  marks.forEach((col, i) => {
+    const s = col[slotted(i)];
+    if (s && col.some((m, k) => k !== slotted(i) && m.rel > s.rel)) s.better = true;
+  });
+
+  const out: CommunityAppraisal = { betterPossible: false, copies: all.copies, perks: marks };
+  if (all.copies < MIN_COPIES) return out;
+  out.grade = toGrade(score(all, slotted));
+  out.bestGrade = toGrade(score(all, bestPick));
+  out.betterPossible = GRADES.indexOf(out.bestGrade) < GRADES.indexOf(out.grade);
+
+  let bestRole: { role: Role; s: number; copies: number } | undefined;
+  for (const r of weapon.roles) {
+    if (r.copies < MIN_COPIES) continue;
+    const s = score(mergeRoles([r]), slotted);
+    if (!bestRole || s > bestRole.s || (s === bestRole.s && r.copies > bestRole.copies)) bestRole = { role: r.role, s, copies: r.copies };
+  }
+  if (bestRole) out.usedFor = bestRole.role;
+
+  // Roll type from the slotted traits: both only when every trait is favored in both.
+  const traitUses = located.map((col, i) => {
+    const loc = col[slotted(i)];
+    return loc && traitCol(loc[0]) ? marks[i]![slotted(i)]!.use : null;
+  }).filter((u) => u !== null);
+  if (traitUses.length && traitUses.every((u) => u)) {
+    if (traitUses.every((u) => u === 'both')) out.rollType = 'both';
+    else if (traitUses.every((u) => u === 'both' || u === 'pve')) out.rollType = 'pve';
+    else if (traitUses.every((u) => u === 'both' || u === 'pvp')) out.rollType = 'pvp';
+  }
+  return out;
+}

@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, CharacterRow, CleanupCandidate, RollOptions } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, CharacterRow, CleanupCandidate, CommunityAppraisal, RollOptions } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -142,3 +142,15 @@ export function fetchRolls(itemHash: number): Promise<RollOptions> {
   }
   return p;
 }
+
+export interface CommunityAppraisals {
+  builtAt?: string;
+  /** Samples in the 30-day window behind these grades. */
+  samples: number;
+  from?: string;
+  to?: string;
+  items: Record<string, CommunityAppraisal>;
+}
+
+/** Community grades for every weapon in the current inventory, keyed by instance id. */
+export const fetchCommunityAppraisals = async (): Promise<CommunityAppraisals> => json(await fetch('/api/community/appraisals'));

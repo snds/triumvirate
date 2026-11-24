@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { getDestinyEntityDefinition, getProfile, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyStep, appraise, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
+  applyStep, appraise, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
   type ManifestTables, type Tokens, type WishList,
 } from '@triumvirate/core';
@@ -286,6 +286,17 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return c.json(await community.status(), 202);
   });
   app.post('/api/community/stop', (c) => { community.stop(); return c.json({ ok: true }); });
+  // Community grades for every weapon in the last inventory view, keyed by instance id.
+  app.get('/api/community/appraisals', async (c) => {
+    const r = await community.rollup();
+    if (!lastView || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const items: Record<string, ReturnType<typeof appraiseCommunity>> = {};
+    for (const i of lastView.items) {
+      if (i.itemType !== 3 || !i.perks || !i.instanceId) continue;
+      items[i.instanceId] = appraiseCommunity(manifest, r?.weapons[i.itemHash], i.itemHash, i.perks);
+    }
+    return c.json({ builtAt: r?.builtAt, samples: r?.samples ?? 0, from: r?.from, to: r?.to, items });
+  });
   app.get('/api/community/items/:hash', async (c) => {
     const hash = Number(c.req.param('hash'));
     if (!Number.isInteger(hash) || hash <= 0) return c.json({ error: 'Bad item hash.' }, 400);
