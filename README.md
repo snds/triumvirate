@@ -28,8 +28,8 @@ The full product plan lives in the "Destiny Companion — Product Plan" doc in t
 1. Create an app at <https://www.bungie.net/en/Application>:
    - **OAuth Client Type:** Confidential
    - **Redirect URL:** `https://localhost:5443/auth/callback`
-   - **Scope:** "Read your Destiny vault and character inventory" (add "Move or equip Destiny gear" later for Step 5)
-   - **Origin Header:** `https://localhost:5443`
+   - **Scope:** the first three boxes (Destiny 2 read, Destiny 1 vendor read, move or equip). Leave clans and notifications off.
+   - **Origin Header:** leave blank (all calls go through the local server, not the browser)
 2. Copy `.env.example` to `.env` and paste in the API key, OAuth client_id, and client_secret.
 3. Install and run (needs Node 22+ and pnpm):
 
