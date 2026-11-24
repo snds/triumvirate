@@ -47,8 +47,9 @@ export function groupBySlot<T extends ItemRow>(items: T[], includeOther: boolean
     .map((slot) => ({
       slot,
       items: bySlot.get(slot)!.sort(
-        (a, b) => Number(b.equipped) - Number(a.equipped) || movedAt(b) - movedAt(a)
-          || (b.power ?? 0) - (a.power ?? 0) || a.name.localeCompare(b.name),
+        // Equipped status doesn't count: character columns show equipped items in their own spot,
+        // and in the collapsed vault they follow the same order as everything else.
+        (a, b) => movedAt(b) - movedAt(a) || (b.power ?? 0) - (a.power ?? 0) || a.name.localeCompare(b.name),
       ),
     }));
 }

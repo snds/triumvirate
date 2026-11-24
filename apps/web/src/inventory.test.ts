@@ -16,7 +16,7 @@ test('search needs every word, across name, type, and element', () => {
   assert.equal(matches({ ...sunshot, appraisal: { verdict: 'god', pve: true, pvp: false, rollCount: 3 } }, 'god', 'all'), true);
 });
 
-test('groups by slot in game order, equipped then power first', () => {
+test('groups by slot in game order, by power, ignoring equipped', () => {
   const groups = groupBySlot([
     item({ name: 'B', bucket: 'Power Weapons', power: 10 }),
     item({ name: 'A', bucket: 'Kinetic Weapons', power: 5 }),
@@ -25,7 +25,7 @@ test('groups by slot in game order, equipped then power first', () => {
     item({ name: 'Shader', bucket: 'Shaders' }),
   ], false);
   assert.deepEqual(groups.map((g) => g.slot), ['Kinetic Weapons', 'Power Weapons']);
-  assert.deepEqual(groups[0]?.items.map((i) => i.name), ['D', 'C', 'A']);
+  assert.deepEqual(groups[0]?.items.map((i) => i.name), ['C', 'A', 'D']);
 });
 
 test('keeps non-gear items under Other when asked', () => {
