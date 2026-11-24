@@ -5,11 +5,11 @@ import { dirname, join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { getDestinyEntityDefinition, getProfile, insertSocketPlugFree, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
+import { getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   applyStep, appraise, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
-  refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
+  refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList,
 } from '@triumvirate/core';
 import type { Store, Snapshot } from './store.ts';
@@ -342,6 +342,46 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       items[i.instanceId] = appraiseCommunity(manifest, r?.weapons[i.itemHash], i.itemHash, i.perks);
     }
     return c.json({ builtAt: r?.builtAt, samples: r?.samples ?? 0, from: r?.from, to: r?.to, items });
+  });
+  // Weapons your vendors sell right now, graded the same way. Offers change at daily and weekly
+  // resets, so one pull is reused for 15 minutes (or until ?refresh).
+  const vendorNames = new Map<number, string>();
+  let vendorCache: { at: number; key: string; rows: (VendorRow & { appraisal?: AppraisedItem['appraisal'] })[] } | undefined;
+  app.get('/api/community/vendors', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    if (!current || !lastView || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const key = `${current.membershipId}.${manifest.version}`;
+    if (!vendorCache || vendorCache.key !== key || c.req.query('refresh') || Date.now() - vendorCache.at > 15 * 60_000) {
+      const http = createHttpClient(cfg.apiKey, t.accessToken);
+      const responses = [];
+      for (const ch of lastView.characters) {
+        const { Response: vendors } = await getVendors(http, {
+          membershipType: current.membershipType, destinyMembershipId: current.membershipId, characterId: ch.id,
+          // Vendors, VendorSales, ItemInstances, ItemStats, ItemSockets, ItemReusablePlugs.
+          components: [400, 402, 300, 304, 305, 310] as never,
+        });
+        responses.push({ characterId: ch.id, vendors });
+      }
+      // Vendor names aren't in our item tables; look up each vendor once.
+      const hashes = new Set(responses.flatMap((r) => Object.keys(r.vendors.sales?.data ?? {}).map(Number)));
+      for (const h of hashes) {
+        if (vendorNames.has(h)) continue;
+        try {
+          const d = (await getDestinyEntityDefinition(http, { entityType: 'DestinyVendorDefinition', hashIdentifier: h })).Response as DestinyVendorDefinition;
+          vendorNames.set(h, d.displayProperties.name || 'Vendor');
+        } catch { vendorNames.set(h, 'Vendor'); }
+      }
+      const list = await deps.wishList();
+      const rows = vendorWeapons(responses, manifest, (h) => vendorNames.get(h) ?? 'Vendor').map((i) => ({
+        ...i, appraisal: i.perks ? appraise(i.itemHash, new Set(i.perks.flat().map((p) => p.name)), list, manifest!) : undefined,
+      }));
+      vendorCache = { at: Date.now(), key, rows };
+    }
+    const r = await community.rollup();
+    const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
+    for (const i of vendorCache.rows) if (i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest, r?.weapons[i.itemHash], i.itemHash, i.perks);
+    return c.json({ fetchedAt: new Date(vendorCache.at).toISOString(), items: vendorCache.rows, grades });
   });
   app.get('/api/community/items/:hash', async (c) => {
     const hash = Number(c.req.param('hash'));

@@ -170,3 +170,12 @@ export async function applyPerks(instanceId: string, plugs: { socketIndex: numbe
     return { error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+export interface VendorOffers {
+  fetchedAt: string;
+  /** Vendor weapons, shaped like inventory rows; location is the vendor's name. */
+  items: (AppraisedItem & { vendorHash: number; vendorName: string })[];
+  grades: Record<string, CommunityAppraisal>;
+}
+export const fetchVendorOffers = async (refresh = false): Promise<VendorOffers> =>
+  json(await fetch(`/api/community/vendors${refresh ? '?refresh=1' : ''}`), sameOriginImages);
