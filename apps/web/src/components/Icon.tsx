@@ -1,21 +1,30 @@
-// Small inline icon set (24px grid, stroke-based) so icons pick up currentColor.
-const PATHS = {
-  refresh: 'M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7',
-  chevronDown: 'M6 9l6 6 6-6',
-  chevronsLeft: 'M11 17l-5-5 5-5M18 17l-5-5 5-5',
-  chevronsRight: 'M13 17l5-5-5-5M6 17l5-5-5-5',
-  // A panel with its right side marked: the chat panel.
-  panelRight: 'M4 4h16v16H4zM15 4v16',
-  signOut: 'M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10',
-  close: 'M6 6l12 12M18 6L6 18',
+// UI icons from Google Material Symbols (Rounded), self-hosted via the material-symbols package.
+// Destiny-specific icons (elements, stats, currencies) come from Bungie's manifest instead.
+const GLYPHS = {
+  refresh: 'refresh',
+  chevronDown: 'expand_more',
+  chevronsLeft: 'keyboard_double_arrow_left',
+  chevronsRight: 'keyboard_double_arrow_right',
+  panelOpen: 'right_panel_open',
+  panelClose: 'right_panel_close',
+  signOut: 'logout',
+  close: 'close',
+  lock: 'lock',
+  star: 'star',
+  check: 'check',
+  cross: 'close',
+  power: 'diamond',
+  openExternal: 'open_in_new',
+  chat: 'forum',
 } as const;
 
-export type IconName = keyof typeof PATHS;
+export type IconName = keyof typeof GLYPHS;
 
-export function Icon({ name, className }: { name: IconName; className?: string }) {
+/** `filled` switches the font's FILL axis on, for solid glyphs like lock and star. */
+export function Icon({ name, className, filled }: { name: IconName; className?: string; filled?: boolean }) {
   return (
-    <svg className={`icon ${className ?? ''}`} viewBox="0 0 24 24" aria-hidden="true">
-      <path d={PATHS[name]} />
-    </svg>
+    <span className={`icon material-symbols-rounded${filled ? ' icon--filled' : ''} ${className ?? ''}`} aria-hidden="true">
+      {GLYPHS[name]}
+    </span>
   );
 }

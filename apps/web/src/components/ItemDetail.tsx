@@ -46,10 +46,10 @@ export function ItemDetail({ item, onClose, onAsk }: Props) {
       <div className="drawer__body">
         <div className="drawer__actions">
           <button className="button" onClick={() => onAsk(`Tell me about my ${item.name}${item.power ? ` (${item.power})` : ''}. Is it worth keeping, and what would I use it for?`)}>
-            Ask about this item
+            <Icon name="chat" /> Ask about this item
           </button>
           <a className="button button--quiet" href={`https://www.light.gg/db/items/${item.itemHash}/`} target="_blank" rel="noreferrer">
-            Open on light.gg
+            Open on light.gg <Icon name="openExternal" />
           </a>
         </div>
 
@@ -66,7 +66,7 @@ export function ItemDetail({ item, onClose, onAsk }: Props) {
             <h3 className="drawer__section">Perks</h3>
             <PerkGrid item={item} showNames />
             {(a?.wishedPerks?.length ?? 0) > 0 && (
-              <p className="drawer__legend"><span className="perk-cell__wish perk-cell__wish--inline" aria-hidden>✓</span> In a recommended roll</p>
+              <p className="drawer__legend"><span className="perk-cell__wish perk-cell__wish--inline"><Icon name="check" /></span> In a recommended roll</p>
             )}
           </section>
         )}

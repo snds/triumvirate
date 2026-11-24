@@ -54,7 +54,7 @@ export function AgentPanel({ enabled, open, onClose, ask }: {
     <aside className="agent" aria-label="Ask Triumvirate" hidden={!open}>
       <header className="agent__header">
         <strong>Ask Triumvirate</strong>
-        <button className="icon-button" onClick={onClose} aria-label="Collapse chat" title="Collapse chat"><Icon name="panelRight" /></button>
+        <button className="icon-button" onClick={onClose} aria-label="Collapse chat" title="Collapse chat"><Icon name="panelClose" /></button>
       </header>
       <div className="agent__log">
         {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}

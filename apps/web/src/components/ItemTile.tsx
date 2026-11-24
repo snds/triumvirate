@@ -1,4 +1,5 @@
 import { useHover } from '../hover.ts';
+import { Icon, type IconName } from './Icon.tsx';
 import type { AppraisedItem, Verdict } from '@triumvirate/core';
 
 // Maps the item's rarity and element to semantic token names.
@@ -12,7 +13,7 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   trash: 'Marked as trash',
   unrated: 'No wish list data',
 };
-const BADGE: Partial<Record<Verdict, string>> = { god: '★', good: '✓', meh: '✕', trash: '✕' };
+const BADGE: Partial<Record<Verdict, IconName>> = { god: 'star', good: 'check', meh: 'cross', trash: 'cross' };
 
 export function ItemTile({
   item, size = 'md', onSelect,
@@ -32,14 +33,16 @@ export function ItemTile({
     >
       {item.icon && <img className="tile__icon" src={item.icon} alt="" loading="lazy" />}
       {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" loading="lazy" />}
-      {verdict && BADGE[verdict] && <span className={`tile__badge tile__badge--${verdict}`}>{BADGE[verdict]}</span>}
+      {verdict && BADGE[verdict] && <span className={`tile__badge tile__badge--${verdict}`}><Icon name={BADGE[verdict]} filled /></span>}
       {item.power !== undefined && (
         <span className="tile__power">
-          {item.damage && <span className="tile__element" style={{ background: elementVar(item.damage) }} />}
+          {item.damageIcon
+            ? <img className="tile__element-icon" src={item.damageIcon} alt="" />
+            : item.damage && <span className="tile__element" style={{ background: elementVar(item.damage) }} />}
           {item.power}
         </span>
       )}
-      {item.locked && <span className="tile__lock" aria-hidden>🔒</span>}
+      {item.locked && <span className="tile__lock"><Icon name="lock" filled /></span>}
     </button>
   );
 }

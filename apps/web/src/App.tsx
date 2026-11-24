@@ -186,7 +186,7 @@ export function App() {
             aria-label={agentOpen ? 'Collapse chat' : 'Open chat'}
             title={agentOpen ? 'Collapse chat' : 'Open chat'}
           >
-            <Icon name="panelRight" />
+            <Icon name={agentOpen ? 'panelClose' : 'panelOpen'} />
           </button>
         </div>
       </header>

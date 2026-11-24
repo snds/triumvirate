@@ -37,6 +37,8 @@ export interface ItemRow {
   /** 0 Titan, 1 Hunter, 2 Warlock, 3 any. */
   classType: number;
   damage?: string;
+  /** Bungie's element icon (Kinetic, Arc, Solar, Void, Stasis, Strand). */
+  damageIcon?: string;
   locked: boolean;
   /** Armor 3.0 gear tier (1-5); absent on older gear. */
   gearTier?: number;
@@ -171,6 +173,11 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     }
     return out;
   };
+  const elementIcon = (hash?: number) => {
+    const d = hash ? manifest.damageTypes?.[hash] : undefined;
+    // The transparent version sits cleanly on tiles; fall back to the regular icon.
+    return bungieUrl(d?.transparentIconPath || d?.displayProperties.icon);
+  };
   const rows: ItemRow[] = [];
 
   const toRow = (item: DestinyItemComponent, location: string, owner: string, equipped: boolean): ItemRow => {
@@ -194,6 +201,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       itemType: def?.itemType ?? 0,
       classType: def?.classType ?? 3,
       damage: inst?.damageType ? DAMAGE_NAMES[inst.damageType] : undefined,
+      damageIcon: elementIcon(inst?.damageTypeHash),
       locked: (item.state & STATE_LOCKED) !== 0,
       gearTier: inst?.gearTier || undefined,
       perks: item.itemInstanceId && def?.itemType === WEAPON ? weaponPerks(item.itemInstanceId) : undefined,

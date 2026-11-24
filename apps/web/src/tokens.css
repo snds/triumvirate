@@ -95,6 +95,8 @@
   --badge-size: 14px;
   --tile-power-font: 10px;
   --tile-power-height: 14px;
-  --tile-lock-font: 9px;
+  --tile-lock-font: 10px;
+  --tile-element-icon: 11px;
+  --tile-chip: rgb(0 0 0 / 0.75);
   --tile-element-size: 7px;
 }

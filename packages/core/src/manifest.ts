@@ -8,6 +8,7 @@ import {
   type DestinyInventoryBucketDefinition,
   type DestinyInventoryItemLiteDefinition,
   type DestinyStatDefinition,
+  type DestinyDamageTypeDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 
@@ -16,12 +17,15 @@ export interface ManifestTables {
   items: Record<string, DestinyInventoryItemLiteDefinition>;
   buckets: Record<string, DestinyInventoryBucketDefinition>;
   stats: Record<string, DestinyStatDefinition>;
+  /** Element names and icons (Kinetic, Arc, Solar...). Optional so test fixtures can skip it. */
+  damageTypes?: Record<string, DestinyDamageTypeDefinition>;
 }
 
 const TABLES = {
   items: 'DestinyInventoryItemLiteDefinition',
   buckets: 'DestinyInventoryBucketDefinition',
   stats: 'DestinyStatDefinition',
+  damageTypes: 'DestinyDamageTypeDefinition',
 } as const;
 
 /**
@@ -57,6 +61,8 @@ export async function loadManifest(
     }
   };
 
-  const [items, buckets, stats] = await Promise.all([load(TABLES.items), load(TABLES.buckets), load(TABLES.stats)]);
-  return { version: m.version, items, buckets, stats };
+  const [items, buckets, stats, damageTypes] = await Promise.all([
+    load(TABLES.items), load(TABLES.buckets), load(TABLES.stats), load(TABLES.damageTypes),
+  ]);
+  return { version: m.version, items, buckets, stats, damageTypes };
 }

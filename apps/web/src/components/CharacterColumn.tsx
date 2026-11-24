@@ -1,6 +1,7 @@
 import { POSTMASTER_BUCKET, POSTMASTER_CAPACITY, type AppraisedItem, type CharacterRow } from '@triumvirate/core/browser';
 import { groupBySlot } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
+import { Icon } from './Icon.tsx';
 
 interface Props {
   character: CharacterRow;
@@ -26,7 +27,7 @@ export function CharacterColumn({ character, items, postmaster, onSelect }: Prop
             <span className="character__class">{character.className}</span>
             {character.title && <span className="character__title">{character.title}</span>}
           </span>
-          <span className="character__light"><span aria-hidden>✦</span>{character.light}</span>
+          <span className="character__light"><Icon name="power" filled />{character.light}</span>
         </div>
         {character.stats && character.stats.length > 0 && (
           <dl className="character__stats">

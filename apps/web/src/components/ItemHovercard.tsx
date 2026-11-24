@@ -37,7 +37,7 @@ export function ItemHovercard({ item, anchor }: { item: AppraisedItem; anchor: D
       </header>
       <div className="hovercard__body">
         <div className="hovercard__power">
-          {item.damage && <span className="tile__element" style={{ background: `var(--element-${item.damage.toLowerCase()})` }} />}
+          {item.damageIcon && <img className="hovercard__element" src={item.damageIcon} alt="" />}
           {item.power !== undefined && <span>{item.power}</span>}
           {item.damage && <span className="muted">{item.damage}</span>}
           <span className="muted hovercard__where">{item.equipped ? 'Equipped · ' : ''}{item.location}</span>

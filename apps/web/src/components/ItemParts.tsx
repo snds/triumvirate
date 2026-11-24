@@ -1,6 +1,7 @@
 // Pieces shared by the hovercard and the full item panel.
 import type { AppraisedItem, PerkOption } from '@triumvirate/core/browser';
 import { VERDICT_LABEL } from './ItemTile.tsx';
+import { Icon } from './Icon.tsx';
 
 // Weapon stats that are counts or times, not 0-100 ratings, so they get no bar.
 const NO_BAR = new Set(['Rounds Per Minute', 'Magazine', 'Charge Time', 'Draw Time', 'Reload Time', 'Recoil Direction', 'Ammo Capacity', 'Swing Speed']);
@@ -72,7 +73,7 @@ function PerkCell({ perk, wished, showName }: { perk: PerkOption; wished: boolea
     <li className={`perk-cell${perk.active ? ' is-active' : ''}${wished ? ' is-wished' : ''}`} title={label}>
       <span className="perk-cell__icon">
         {perk.icon ? <img src={perk.icon} alt="" /> : <span aria-hidden>{perk.name.slice(0, 1)}</span>}
-        {wished && <span className="perk-cell__wish" aria-hidden>✓</span>}
+        {wished && <span className="perk-cell__wish"><Icon name="check" /></span>}
       </span>
       {showName ? <span className="perk-cell__name">{perk.name}</span> : <span className="visually-hidden">{label}</span>}
     </li>
