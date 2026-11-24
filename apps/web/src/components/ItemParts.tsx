@@ -166,3 +166,13 @@ function PerkCell({ perk, wished, showName, square }: { perk: PerkOption; wished
     </li>
   );
 }
+
+/** Gear tier as diamonds (Tier 3 = three), like the game. Gold when masterworked. */
+export function TierDiamonds({ item, className }: { item: AppraisedItem; className?: string }) {
+  if (!item.gearTier) return null;
+  return (
+    <span className={`tier-diamonds${item.masterworked ? ' is-masterworked' : ''} ${className ?? ''}`} aria-label={`Tier ${item.gearTier}`} role="img">
+      {Array.from({ length: item.gearTier }, (_, n) => <span key={n} className="tier-diamonds__d" />)}
+    </span>
+  );
+}

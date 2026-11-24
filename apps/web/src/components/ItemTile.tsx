@@ -4,6 +4,7 @@ import { useDragActions } from '../drag.ts';
 import { useInventory } from '../inventory-context.ts';
 import { Icon, type IconName } from './Icon.tsx';
 import { ElementIcon } from './ElementIcon.tsx';
+import { TierDiamonds } from './ItemParts.tsx';
 import type { AppraisedItem, Verdict } from '@triumvirate/core';
 
 // Maps the item's rarity and element to semantic token names.
@@ -37,11 +38,11 @@ export const ItemTile = memo(function ItemTile({
   const draggable = !!item.movable && !item.equipped && !isMoving;
   const verdict = item.appraisal?.verdict;
   const label = [item.name, item.type, item.damage, item.power && `${item.power} power`,
-    verdict && VERDICT_LABEL[verdict], item.locked && 'locked'].filter(Boolean).join(' · ');
+    verdict && VERDICT_LABEL[verdict], item.gearTier && `tier ${item.gearTier}`, item.masterworked && 'masterworked', item.locked && 'locked'].filter(Boolean).join(' · ');
   return (
     <button
       type="button"
-      className={`tile tile--${size} ${tierClass(item.tier)}${isMoving ? ' is-moving' : ''}`}
+      className={`tile tile--${size} ${tierClass(item.tier)}${isMoving ? ' is-moving' : ''}${item.masterworked ? ' is-masterworked' : ''}`}
       aria-label={label}
       aria-busy={isMoving || undefined}
       data-movable={draggable || undefined}
@@ -54,6 +55,8 @@ export const ItemTile = memo(function ItemTile({
     >
       {item.icon && <img className="tile__icon" src={item.icon} alt="" decoding="async" draggable={false} />}
       {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" decoding="async" draggable={false} />}
+      {item.masterworked && <span className="tile__holofoil" aria-hidden />}
+      <TierDiamonds item={item} className="tile__tier" />
       {verdict && BADGE[verdict] && <span className={`tile__badge tile__badge--${verdict}`}><Icon name={BADGE[verdict]} filled /></span>}
       {item.power !== undefined && (
         <span className="tile__power">

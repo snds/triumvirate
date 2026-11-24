@@ -60,6 +60,9 @@
   --tier-uncommon: var(--green-600);
   --tier-common: var(--stone-300);
 
+  --masterwork: var(--gold-300);
+  --tier-diamond: var(--white-200);
+
   --verdict-god: var(--gold-400);
   --verdict-good: var(--mint-400);
   --verdict-bad: var(--danger);

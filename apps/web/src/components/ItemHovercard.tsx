@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
 import { ElementIcon } from './ElementIcon.tsx';
-import { ItemFacts, itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
+import { ItemFacts, itemSummary, PerkGrid, StatBars, TierDiamonds, VerdictLine } from './ItemParts.tsx';
 
 const GAP = 8;
 
@@ -32,8 +32,8 @@ export function ItemHovercard({ item, anchor, copies }: { item: AppraisedItem; a
       role="tooltip"
       style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden', left: 0, top: 0 }}
     >
-      <header className="hovercard__header">
-        <strong className="hovercard__name">{item.name}</strong>
+      <header className={`hovercard__header${item.masterworked ? ' is-masterworked' : ''}`}>
+        <strong className="hovercard__name"><TierDiamonds item={item} className="tier-diamonds--inline" />{item.name}</strong>
         <span className="hovercard__meta">{itemSummary(item)}</span>
       </header>
       <div className="hovercard__body">

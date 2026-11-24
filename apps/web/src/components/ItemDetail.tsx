@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
 import { Icon } from './Icon.tsx';
-import { ItemFacts, itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
+import { ItemFacts, itemSummary, PerkGrid, StatBars, TierDiamonds, VerdictLine } from './ItemParts.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { useInventory } from '../inventory-context.ts';
 
@@ -33,14 +33,15 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
     ['Power', item.power],
     ['Element', item.damage],
     ['Gear tier', item.gearTier],
+    ['Masterworked', item.itemType === 2 || item.itemType === 3 ? (item.masterworked ? 'Yes' : 'No') : undefined],
     ['Locked', item.locked ? 'Yes' : 'No'],
   ];
   return (
     <aside className="drawer" role="dialog" aria-label={item.name}>
-      <header className={`drawer__header tier-${tier}`}>
+      <header className={`drawer__header tier-${tier}${item.masterworked ? ' is-masterworked' : ''}`}>
         {item.icon && <img className="drawer__icon" src={item.icon} alt="" />}
         <div className="drawer__heading">
-          <h2 className="drawer__title">{item.name}</h2>
+          <h2 className="drawer__title"><TierDiamonds item={item} className="tier-diamonds--inline" />{item.name}</h2>
           <p className="drawer__meta">{itemSummary(item)}</p>
           {item.flavorText && <p className="drawer__flavor">{item.flavorText}</p>}
         </div>

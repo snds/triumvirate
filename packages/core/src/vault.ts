@@ -15,6 +15,8 @@ export const DAMAGE_NAMES = ['', 'Kinetic', 'Arc', 'Solar', 'Void', 'Raid', 'Sta
 const STATE_LOCKED = 1;
 /** Bit 8 = crafted (shaped) weapon. */
 const STATE_CRAFTED = 8;
+/** Bit 4 = masterworked (weapons and armor). */
+const STATE_MASTERWORK = 4;
 /** Socket categories on weapons. */
 const SOCKET_INTRINSIC = 3956125808;
 const SOCKET_WEAPON_PERKS = 4241085061;
@@ -64,6 +66,8 @@ export interface ItemRow {
   /** Masterwork and weapon mod, in socket order. */
   mods?: PerkOption[];
   crafted?: boolean;
+  /** Fully upgraded: gold border and holofoil in the UI, like in game. */
+  masterworked?: boolean;
   craftedLevel?: number;
   killTracker?: { label: string; count: number };
   flavorText?: string;
@@ -400,6 +404,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       ...(extras?.intrinsic ? { intrinsic: extras.intrinsic } : {}),
       ...(extras?.mods ? { mods: extras.mods } : {}),
       ...(crafted ? { crafted } : {}),
+      ...((item.state & STATE_MASTERWORK) !== 0 ? { masterworked: true } : {}),
       ...(progress?.craftedLevel !== undefined ? { craftedLevel: progress.craftedLevel } : {}),
       ...(progress?.killTracker ? { killTracker: progress.killTracker } : {}),
       ...(manifest.extras?.[item.itemHash]?.flavorText ? { flavorText: manifest.extras[item.itemHash]!.flavorText } : {}),
