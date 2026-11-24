@@ -367,7 +367,7 @@ export function App() {
             />
           </div>
         ) : view === 'rolls' ? (
-          <RollsView items={visible} syncedAt={inv.syncedAt} onSelect={setSelected} onChanged={() => void load(false)} />
+          <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} />
         ) : (
           <CleanupView
             cleanup={inv.cleanup.filter((c) => matches(c.item, query, kind))}

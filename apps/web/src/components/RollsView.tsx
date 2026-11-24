@@ -4,11 +4,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { AppraisedItem, CommunityAppraisal, Grade, PerkMark, PerkOption, Role, Verdict } from '@triumvirate/core';
 import { scoreRoll, toGrade } from '@triumvirate/core/browser';
-import { applyPerks, fetchCommunityAppraisals, type CommunityAppraisals } from '../api.ts';
+import { applyPerks, fetchCommunityAppraisals, fetchVendorOffers, type CommunityAppraisals, type VendorOffers } from '../api.ts';
 import {
-  defaultFilters, GRADE_ORDER, groupByType, isAppraisable, passes, pct, ROLE_LABEL, ROLL_TYPE_LABEL,
-  type RollFilters, type RollType,
+  decodeFilters, defaultFilters, encodeFilters, followCharacter, GRADE_ORDER, GROUP_LABEL, groupItems, isAppraisable, locationKey,
+  meetsGrade, passes, pct, ROLE_LABEL, ROLL_TYPE_LABEL, SORT_LABEL, updateStream,
+  type GroupBy, type RollFilters, type RollType, type SavedFilters, type SortBy, type StreamState,
 } from '../rolls-view.ts';
+import { usePref } from '../prefs.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { timeAgo } from '../inventory.ts';
@@ -22,19 +24,51 @@ const VERDICTS: { value: Verdict; label: string }[] = [
 ];
 const ROLES = Object.keys(ROLE_LABEL) as Role[];
 const ROLL_TYPES = Object.keys(ROLL_TYPE_LABEL) as RollType[];
+const GROUPS = Object.keys(GROUP_LABEL) as GroupBy[];
+const SORTS = Object.keys(SORT_LABEL) as SortBy[];
 
-export function RollsView({ items, syncedAt, onSelect, onChanged }: {
+type Panel = 'filters' | 'group' | 'activity' | 'settings';
+const PANELS: { id: Panel; label: string; icon: 'filter' | 'sort' | 'activity' | 'settings' }[] = [
+  { id: 'filters', label: 'Filters', icon: 'filter' },
+  { id: 'group', label: 'Group & sort', icon: 'sort' },
+  { id: 'activity', label: 'Activity', icon: 'activity' },
+  { id: 'settings', label: 'Settings', icon: 'settings' },
+];
+
+interface RollSettings {
+  groupBy: GroupBy;
+  sortBy: SortBy;
+  /** Swap the location filter to whichever character you're playing. */
+  followCharacter: boolean;
+  /** The activity stream's bar: new drops and vendor rolls at or above this grade. */
+  streamMin: Grade;
+  soundDrops: boolean;
+  soundVendors: boolean;
+}
+const DEFAULT_SETTINGS: RollSettings = { groupBy: 'type', sortBy: 'grade', followCharacter: true, streamMin: 'A', soundDrops: false, soundVendors: false };
+
+export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }: {
   items: AppraisedItem[];
   /** Called after perks change in game, so the app reloads the inventory. */
   onChanged: () => void;
   /** Refetch grades whenever the inventory changes. */
   syncedAt: string;
+  /** Class of the character played most recently ("Titan"), for following character swaps. */
+  activeClass?: string;
   onSelect: (i: AppraisedItem) => void;
 }) {
   const [data, setData] = useState<CommunityAppraisals>();
   const [error, setError] = useState<string>();
-  const [filters, setFilters] = useState<RollFilters>(defaultFilters);
-  const [railOpen, setRailOpen] = useState(true);
+  // Filters and view settings are saved per device, so they're still set next visit.
+  const [saved, setSaved] = usePref<SavedFilters>('rollFilters', encodeFilters(defaultFilters()));
+  const filters = useMemo(() => decodeFilters(saved), [saved]);
+  const setFilters = (next: RollFilters | ((f: RollFilters) => RollFilters)) =>
+    setSaved((s) => encodeFilters(typeof next === 'function' ? next(decodeFilters(s)) : next));
+  const [storedSettings, setSettings] = usePref<RollSettings>('rollSettings', DEFAULT_SETTINGS);
+  const settings = { ...DEFAULT_SETTINGS, ...storedSettings };
+  const set = <K extends keyof RollSettings>(k: K, v: RollSettings[K]) => setSettings((s) => ({ ...DEFAULT_SETTINGS, ...s, [k]: v }));
+  const [railOpen, setRailOpen] = usePref('rollRailOpen', true);
+  const [panel, setPanel] = usePref<Panel>('rollPanel', 'filters');
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -43,13 +77,59 @@ export function RollsView({ items, syncedAt, onSelect, onChanged }: {
     return () => { live = false; };
   }, [syncedAt]);
 
+  // Character follow. The last class we saw is saved too, so a swap made while the app was
+  // closed is caught on the next load, not only one made while it's open.
+  const [lastClass, setLastClass] = usePref<string | null>('rollLastClass', null);
+  useEffect(() => {
+    if (!activeClass || activeClass === lastClass) return;
+    if (settings.followCharacter && lastClass) setFilters((f) => followCharacter(f, lastClass, activeClass));
+    setLastClass(activeClass);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeClass, lastClass, settings.followCharacter]);
+
   const weapons = useMemo(() => items.filter(isAppraisable), [items]);
   const grades = data?.items ?? {};
   const shown = weapons.filter((i) => passes(i, i.instanceId ? grades[i.instanceId] : undefined, filters));
-  const groups = groupByType(shown, grades);
-  const locations = [...new Set(weapons.map((i) => i.location))].sort();
+  const groups = groupItems(shown, grades, settings.groupBy, settings.sortBy);
+  const locations = [...new Set(weapons.map(locationKey))].sort((a, b) => (a === 'Vault' ? 1 : 0) - (b === 'Vault' ? 1 : 0) || a.localeCompare(b));
   const types = [...new Set(weapons.map((i) => i.type))].sort();
-  const changed = JSON.stringify(serialize(filters)) !== JSON.stringify(serialize(defaultFilters()));
+  const changed = JSON.stringify(encodeFilters(filters)) !== JSON.stringify(encodeFilters(defaultFilters()));
+
+  // Activity stream: new drops, remembered between visits. Runs once grades for this sync are in.
+  const [stream, setStream] = usePref<StreamState | null>('rollStream', null);
+  useEffect(() => {
+    if (!data) return;
+    const { state, added } = updateStream(stream ?? undefined, weapons);
+    setStream(state);
+    if (settings.soundDrops && added.some((d) => meetsGrade(grades[d.instanceId]?.grade, settings.streamMin))) chime();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data]);
+  const byId = new Map(weapons.map((i) => [i.instanceId, i]));
+  const drops = (stream?.drops ?? []).filter((d) => meetsGrade(grades[d.instanceId]?.grade, settings.streamMin));
+
+  // Vendor offers, judged by the same filters (any location) and the stream's grade bar.
+  const [vendors, setVendors] = useState<VendorOffers>();
+  const [vendorError, setVendorError] = useState<string>();
+  const [vendorBusy, setVendorBusy] = useState(false);
+  const loadVendors = (refresh = false) => {
+    setVendorBusy(true);
+    fetchVendorOffers(refresh).then((v) => { setVendors(v); setVendorError(undefined); }, (e: Error) => setVendorError(e.message)).finally(() => setVendorBusy(false));
+  };
+  useEffect(() => { loadVendors(); }, [syncedAt]);
+  const vendorFilters = { ...filters, locations: new Set<string>() };
+  const vendorMatches = (vendors?.items ?? []).filter((i) => {
+    const c = i.instanceId ? vendors!.grades[i.instanceId] : undefined;
+    return meetsGrade(c?.grade, settings.streamMin) && passes(i, c, vendorFilters);
+  });
+  const [heard, setHeard] = usePref<string[]>('rollVendorHeard', []);
+  useEffect(() => {
+    if (!vendors) return;
+    const keys = vendorMatches.map((i) => `${i.itemHash}:${i.instanceId}`);
+    if (settings.soundVendors && keys.some((k) => !heard.includes(k))) chime();
+    setHeard(keys);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendors]);
+  const activityCount = drops.length + vendorMatches.length;
 
   const toggle = <K extends keyof RollFilters>(key: K, value: RollFilters[K] extends Set<infer V> ? V : never) =>
     setFilters((f) => {
@@ -60,53 +140,152 @@ export function RollsView({ items, syncedAt, onSelect, onChanged }: {
 
   return (
     <section className={`rolls${railOpen ? '' : ' rolls--rail-closed'}`}>
-      <aside className="rolls__rail" aria-label="Filters">
+      <aside className="rolls__rail" aria-label="Roll appraiser options">
         <header className="rolls__rail-head">
-          <button className="button button--quiet" onClick={() => setRailOpen((v) => !v)} aria-expanded={railOpen}>
-            <Icon name="filter" /> Filters{changed ? ' (on)' : ''}
+          <button className="button button--quiet" onClick={() => setRailOpen((v) => !v)} aria-expanded={railOpen} title={railOpen ? 'Hide options' : 'Show options'}>
+            <Icon name={railOpen ? 'chevronsLeft' : 'chevronsRight'} />
+            {!railOpen && changed && <span className="rolls__dot" aria-label="Filters on" />}
           </button>
-          {railOpen && changed && <button className="button button--quiet" onClick={() => setFilters(defaultFilters())}>Reset</button>}
+          {railOpen && (
+            <div className="rolls__panels" role="tablist" aria-label="Options">
+              {PANELS.map((p) => (
+                <button
+                  key={p.id}
+                  role="tab"
+                  aria-selected={panel === p.id}
+                  className={`rolls__panel-tab${panel === p.id ? ' is-selected' : ''}`}
+                  onClick={() => setPanel(p.id)}
+                  title={p.label}
+                >
+                  <Icon name={p.icon} />
+                  <span className="visually-hidden">{p.label}</span>
+                  {p.id === 'filters' && changed && <span className="rolls__dot" aria-hidden />}
+                  {p.id === 'activity' && activityCount > 0 && <span className="rolls__count">{activityCount}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </header>
         {railOpen && (
-          <div className="rolls__rail-body">
-            <FilterGroup title="Community roll type">
-              {ROLL_TYPES.map((t) => (
-                <Check key={t} checked={filters.rollTypes.has(t)} onChange={() => toggle('rollTypes', t)}>
-                  {t !== 'none' && <UseIcon use={t} />} {ROLL_TYPE_LABEL[t]}
-                </Check>
-              ))}
-            </FilterGroup>
-            <FilterGroup title="Most used for">
-              {ROLES.map((r) => (
-                <Check key={r} checked={filters.usedFor.has(r)} onChange={() => toggle('usedFor', r)}>{ROLE_LABEL[r]}</Check>
-              ))}
-            </FilterGroup>
-            <FilterGroup title="Popularity grade">
-              <div className="rolls__range">
-                <GradeSelect label="Lowest" value={filters.gradeMin} onChange={(g) => setFilters((f) => ({ ...f, gradeMin: g }))} />
-                <span className="muted">to</span>
-                <GradeSelect label="Highest" value={filters.gradeMax} onChange={(g) => setFilters((f) => ({ ...f, gradeMax: g }))} />
+          <div className="rolls__rail-body" role="tabpanel">
+            <div className="rolls__panel-head">
+              <h3>{PANELS.find((p) => p.id === panel)!.label}</h3>
+              {panel === 'filters' && changed && <button className="button button--quiet" onClick={() => setFilters(defaultFilters())}>Reset</button>}
+            </div>
+            {panel === 'filters' && (
+              <>
+                <FilterGroup title="Community roll type">
+                  {ROLL_TYPES.map((t) => (
+                    <Check key={t} checked={filters.rollTypes.has(t)} onChange={() => toggle('rollTypes', t)}>
+                      {t !== 'none' && <UseIcon use={t} />} {ROLL_TYPE_LABEL[t]}
+                    </Check>
+                  ))}
+                </FilterGroup>
+                <FilterGroup title="Most used for">
+                  {ROLES.map((r) => (
+                    <Check key={r} checked={filters.usedFor.has(r)} onChange={() => toggle('usedFor', r)}>{ROLE_LABEL[r]}</Check>
+                  ))}
+                </FilterGroup>
+                <FilterGroup title="Popularity grade">
+                  <div className="rolls__range">
+                    <GradeSelect label="Lowest" value={filters.gradeMin} onChange={(g) => setFilters((f) => ({ ...f, gradeMin: g }))} />
+                    <span className="muted">to</span>
+                    <GradeSelect label="Highest" value={filters.gradeMax} onChange={(g) => setFilters((f) => ({ ...f, gradeMax: g }))} />
+                  </div>
+                  <Check checked={filters.betterPossibleOnly} onChange={() => setFilters((f) => ({ ...f, betterPossibleOnly: !f.betterPossibleOnly }))}>
+                    <Icon name="arrowUp" /> Better grade possible
+                  </Check>
+                </FilterGroup>
+                <FilterGroup title="Wish list">
+                  {VERDICTS.map((v) => (
+                    <Check key={v.value} checked={filters.verdicts.has(v.value)} onChange={() => toggle('verdicts', v.value)}>{v.label}</Check>
+                  ))}
+                </FilterGroup>
+                <FilterGroup title="Rarity">
+                  {['Exotic', 'Legendary'].map((r) => (
+                    <Check key={r} checked={filters.rarities.has(r)} onChange={() => toggle('rarities', r)}>{r}</Check>
+                  ))}
+                </FilterGroup>
+                <FilterGroup title="Location">
+                  {locations.map((l) => (
+                    <Check key={l} checked={filters.locations.has(l)} onChange={() => toggle('locations', l)}>
+                      {l}{l === activeClass && <span className="muted"> · playing</span>}
+                    </Check>
+                  ))}
+                </FilterGroup>
+                <FilterGroup title="Weapon type" closed>
+                  {types.map((t) => <Check key={t} checked={filters.types.has(t)} onChange={() => toggle('types', t)}>{t}</Check>)}
+                </FilterGroup>
+              </>
+            )}
+            {panel === 'group' && (
+              <>
+                <FilterGroup title="Group by">
+                  {GROUPS.map((g) => <Radio key={g} name="roll-group" checked={settings.groupBy === g} onChange={() => set('groupBy', g)}>{GROUP_LABEL[g]}</Radio>)}
+                </FilterGroup>
+                <FilterGroup title="Sort by">
+                  {SORTS.map((s) => <Radio key={s} name="roll-sort" checked={settings.sortBy === s} onChange={() => set('sortBy', s)}>{SORT_LABEL[s]}</Radio>)}
+                </FilterGroup>
+              </>
+            )}
+            {panel === 'activity' && (
+              <div className="activity">
+                <div className="activity__bar">
+                  <span className="muted">Minimum grade</span>
+                  <GradeSelect label="Minimum" value={settings.streamMin} onChange={(g) => set('streamMin', g)} />
+                </div>
+                <section className="activity__section">
+                  <h4><Icon name="drop" /> New drops <span className="vault__count">{drops.length}</span></h4>
+                  {!stream || stream.drops.length === 0
+                    ? <p className="muted activity__empty">New weapons show up here as they drop. Everything you own now is already counted.</p>
+                    : drops.length === 0
+                      ? <p className="muted activity__empty">{stream.drops.length} new {stream.drops.length === 1 ? 'weapon' : 'weapons'}, none at {settings.streamMin} or better.</p>
+                      : <ul className="activity__list">
+                          {drops.map((d) => {
+                            const item = byId.get(d.instanceId);
+                            return item ? <ActivityRow key={d.instanceId} item={item} c={grades[d.instanceId]} meta={`${locationKey(item)} · ${timeAgo(d.at)}`} onSelect={onSelect} /> : null;
+                          })}
+                        </ul>}
+                </section>
+                <section className="activity__section">
+                  <h4>
+                    <Icon name="vendor" /> Vendors <span className="vault__count">{vendorMatches.length}</span>
+                    <button className="button button--quiet activity__refresh" onClick={() => loadVendors(true)} disabled={vendorBusy} title="Check vendors again">
+                      <Icon name="refresh" className={vendorBusy ? 'is-spinning' : ''} />
+                    </button>
+                  </h4>
+                  {vendorError ? <p className="muted activity__empty">Vendors aren't available: {vendorError}</p>
+                    : !vendors ? <p className="muted activity__empty">Checking vendors…</p>
+                    : vendorMatches.length === 0
+                      ? <p className="muted activity__empty">No vendor weapon at {settings.streamMin} or better matches your filters right now ({vendors.items.length} checked).</p>
+                      : <ul className="activity__list">
+                          {vendorMatches.map((i) => (
+                            <ActivityRow key={i.instanceId} item={i} c={vendors.grades[i.instanceId!]} meta={i.vendorName} onSelect={onSelect} />
+                          ))}
+                        </ul>}
+                  {vendors && <p className="muted activity__note">Uses your filters, except location. Checked {timeAgo(vendors.fetchedAt)}.</p>}
+                </section>
               </div>
-              <Check checked={filters.betterPossibleOnly} onChange={() => setFilters((f) => ({ ...f, betterPossibleOnly: !f.betterPossibleOnly }))}>
-                <Icon name="arrowUp" /> Better grade possible
-              </Check>
-            </FilterGroup>
-            <FilterGroup title="Wish list">
-              {VERDICTS.map((v) => (
-                <Check key={v.value} checked={filters.verdicts.has(v.value)} onChange={() => toggle('verdicts', v.value)}>{v.label}</Check>
-              ))}
-            </FilterGroup>
-            <FilterGroup title="Rarity">
-              {['Exotic', 'Legendary'].map((r) => (
-                <Check key={r} checked={filters.rarities.has(r)} onChange={() => toggle('rarities', r)}>{r}</Check>
-              ))}
-            </FilterGroup>
-            <FilterGroup title="Location">
-              {locations.map((l) => <Check key={l} checked={filters.locations.has(l)} onChange={() => toggle('locations', l)}>{l}</Check>)}
-            </FilterGroup>
-            <FilterGroup title="Weapon type" closed>
-              {types.map((t) => <Check key={t} checked={filters.types.has(t)} onChange={() => toggle('types', t)}>{t}</Check>)}
-            </FilterGroup>
+            )}
+            {panel === 'settings' && (
+              <>
+                <FilterGroup title="Characters">
+                  <Check checked={settings.followCharacter} onChange={() => set('followCharacter', !settings.followCharacter)}>
+                    Follow the character I'm playing
+                  </Check>
+                  <p className="muted rolls__hint">When you switch characters, a location filter set to your old class moves to the new one. The vault stays as you set it.</p>
+                </FilterGroup>
+                <FilterGroup title="Sounds">
+                  <Check checked={settings.soundDrops} onChange={() => { set('soundDrops', !settings.soundDrops); if (!settings.soundDrops) chime(); }}>
+                    Play a sound when a new drop is {settings.streamMin} or better
+                  </Check>
+                  <Check checked={settings.soundVendors} onChange={() => { set('soundVendors', !settings.soundVendors); if (!settings.soundVendors) chime(); }}>
+                    Play a sound when a vendor sells one
+                  </Check>
+                  <p className="muted rolls__hint">The grade bar is set in Activity.</p>
+                </FilterGroup>
+              </>
+            )}
           </div>
         )}
       </aside>
@@ -145,6 +324,43 @@ export function RollsView({ items, syncedAt, onSelect, onChanged }: {
       </div>
     </section>
   );
+}
+
+/** One line in the activity stream: tile, name, grade, and where it is. */
+function ActivityRow({ item, c, meta, onSelect }: { item: AppraisedItem; c?: CommunityAppraisal; meta: string; onSelect: (i: AppraisedItem) => void }) {
+  const grade = c?.grade;
+  return (
+    <li className={`activity__row tier-${item.tier.toLowerCase()}`}>
+      <ItemTile item={item} onSelect={onSelect} />
+      <div className="activity__text">
+        <span className="activity__name" title={item.name}>{item.name}</span>
+        <span className="activity__meta">
+          {c?.rollType && <UseIcon use={c.rollType} />} {meta}
+        </span>
+      </div>
+      <span className={`grade grade--sm grade--${(grade ?? 'none').toLowerCase()}`} title={grade ? `Popularity grade ${grade}` : undefined}>{grade ?? '–'}</span>
+    </li>
+  );
+}
+
+/** A short two-note chime, made on the spot (no audio file). Browsers may block it until the page is clicked once. */
+const audio = { ctx: undefined as AudioContext | undefined };
+function chime() {
+  try {
+    const ctx = (audio.ctx ??= new AudioContext());
+    [880, 1320].forEach((f, k) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      const t = ctx.currentTime + k * 0.12;
+      o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.15, t + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+      o.connect(g).connect(ctx.destination);
+      o.start(t);
+      o.stop(t + 0.32);
+    });
+  } catch { /* no audio; fine */ }
 }
 
 function RollCard({ item, c, onSelect, onChanged }: {
@@ -292,6 +508,15 @@ function Check({ checked, onChange, children }: { checked: boolean; onChange: ()
   );
 }
 
+function Radio({ name, checked, onChange, children }: { name: string; checked: boolean; onChange: () => void; children: React.ReactNode }) {
+  return (
+    <label className="rolls__check">
+      <input type="radio" name={name} checked={checked} onChange={onChange} />
+      <span>{children}</span>
+    </label>
+  );
+}
+
 function GradeSelect({ label, value, onChange }: { label: string; value: Grade; onChange: (g: Grade) => void }) {
   return (
     <select className="rolls__select" aria-label={`${label} grade`} value={value} onChange={(e) => onChange(e.target.value as Grade)}>
@@ -299,7 +524,3 @@ function GradeSelect({ label, value, onChange }: { label: string; value: Grade; 
     </select>
   );
 }
-
-/** Sets don't stringify; turn them into sorted arrays to compare filter states. */
-const serialize = (f: RollFilters) =>
-  Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v instanceof Set ? [...v].sort() : v]));

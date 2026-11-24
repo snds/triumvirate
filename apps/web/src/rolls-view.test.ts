@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AppraisedItem, CommunityAppraisal } from '@triumvirate/core';
-import { defaultFilters, groupByType, passes, pct } from './rolls-view.ts';
+import { decodeFilters, defaultFilters, encodeFilters, followCharacter, groupByType, groupItems, locationKey, meetsGrade, passes, pct, updateStream } from './rolls-view.ts';
 
 const gun = (o: Partial<AppraisedItem>): AppraisedItem => ({
   location: 'Vault', owner: 'vault', name: 'X', type: 'Hand Cannon', bucket: '', equipped: false, itemHash: 1,
@@ -27,7 +27,7 @@ test('filters by roll type, grade range, better-possible, and location', () => {
   f.betterPossibleOnly = false;
   f.locations = new Set(['Titan']);
   assert.equal(passes(a, undefined, f), false);
-  assert.equal(passes(gun({ location: 'Titan' }), undefined, f), true);
+  assert.equal(passes(gun({ location: 'Titan', owner: 'c1' }), undefined, f), true);
 });
 
 test('groups by weapon type with the best grades first', () => {
@@ -40,4 +40,62 @@ test('groups by weapon type with the best grades first', () => {
 test('pct keeps a decimal for small shares', () => {
   assert.equal(pct(0.2637), '26%');
   assert.equal(pct(0.044), '4.4%');
+});
+
+test('saved filters round-trip through JSON and fill in missing or bad keys from the defaults', () => {
+  const f = defaultFilters();
+  f.locations = new Set(['Hunter', 'Vault']);
+  f.gradeMin = 'A';
+  const back = decodeFilters(JSON.parse(JSON.stringify(encodeFilters(f))));
+  assert.deepEqual([...back.locations].sort(), ['Hunter', 'Vault']);
+  assert.equal(back.gradeMin, 'A');
+  const partial = decodeFilters({ gradeMax: 'Z' as never, betterPossibleOnly: true });
+  assert.equal(partial.gradeMax, 'S');
+  assert.equal(partial.betterPossibleOnly, true);
+  assert.equal(partial.rarities.has('Exotic'), true);
+  assert.equal(decodeFilters(null).gradeMin, 'F');
+});
+
+test('location filter keys on the class, not the light level', () => {
+  assert.equal(locationKey({ location: 'Titan (2010)', owner: 'c1' }), 'Titan');
+  assert.equal(locationKey({ location: 'Vault', owner: 'vault' }), 'Vault');
+  const f = defaultFilters();
+  f.locations = new Set(['Titan']);
+  assert.equal(passes(gun({ location: 'Titan (2010)', owner: 'c1' }), undefined, f), true);
+});
+
+test('following the character swaps the class in the location filter and keeps the vault', () => {
+  const f = defaultFilters();
+  f.locations = new Set(['Titan', 'Vault']);
+  assert.deepEqual([...followCharacter(f, 'Titan', 'Warlock').locations].sort(), ['Vault', 'Warlock']);
+  const vaultOnly = { ...f, locations: new Set(['Vault']) };
+  assert.equal(followCharacter(vaultOnly, 'Titan', 'Warlock'), vaultOnly);
+  assert.equal(followCharacter(f, undefined, 'Warlock'), f);
+});
+
+test('groups by slot, element, or grade, and sorts by power or newest', () => {
+  const items = [
+    gun({ name: 'A', bucket: 'Power Weapons', damage: 'Solar', power: 10, instanceId: '5' }),
+    gun({ name: 'B', bucket: 'Kinetic Weapons', damage: 'Kinetic', power: 30, instanceId: '9' }),
+    gun({ name: 'C', bucket: 'Kinetic Weapons', damage: 'Kinetic', power: 20, instanceId: '7' }),
+  ];
+  const grades = { 5: graded({ grade: 'S' }), 9: graded({ grade: 'B' }) };
+  assert.deepEqual(groupItems(items, grades, 'slot').map((g) => g.type), ['Kinetic Weapons', 'Power Weapons']);
+  assert.deepEqual(groupItems(items, grades, 'grade').map((g) => g.type), ['Grade S', 'Grade B', 'Not graded']);
+  assert.deepEqual(groupItems(items, grades, 'none', 'power')[0]!.items.map((i) => i.name), ['B', 'C', 'A']);
+  assert.deepEqual(groupItems(items, grades, 'none', 'newest')[0]!.items.map((i) => i.name), ['B', 'C', 'A']);
+  assert.deepEqual(groupItems(items, grades, 'element', 'name').map((g) => g.type), ['Kinetic', 'Solar']);
+});
+
+test('the activity stream takes stock first, then lists only new drops', () => {
+  const first = updateStream(undefined, [gun({ instanceId: '1' })]);
+  assert.deepEqual(first.added, []);
+  const next = updateStream(first.state, [gun({ instanceId: '1' }), gun({ instanceId: '2', name: 'New' })], new Date('2026-11-24T20:00:00Z'));
+  assert.deepEqual(next.added.map((d) => d.name), ['New']);
+  assert.equal(next.state.drops[0]!.at, '2026-11-24T20:00:00.000Z');
+  // Dismantled: it leaves the stream.
+  assert.deepEqual(updateStream(next.state, [gun({ instanceId: '1' })]).state.drops, []);
+  assert.equal(meetsGrade('A', 'B'), true);
+  assert.equal(meetsGrade('C', 'B'), false);
+  assert.equal(meetsGrade(undefined, 'F'), false);
 });

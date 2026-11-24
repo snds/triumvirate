@@ -30,6 +30,11 @@ const GLYPHS = {
   pvp: 'swords',
   both: 'star',
   filter: 'filter_alt',
+  sort: 'sort',
+  activity: 'notifications',
+  settings: 'settings',
+  vendor: 'storefront',
+  drop: 'new_releases',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;
