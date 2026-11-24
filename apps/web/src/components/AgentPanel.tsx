@@ -1,5 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { streamAgent, type ChatTurn } from '../api.ts';
+import { deleteChat, getChat, listChats, newChatId, saveChat, streamAgent, type ChatSummary, type ChatTurn } from '../api.ts';
+import { usePref } from '../prefs.ts';
+import { timeAgo } from '../inventory.ts';
 import { Icon } from './Icon.tsx';
 import { ChatMarkdown } from './ChatMarkdown.tsx';
 import { ResizeHandle } from './ResizeHandle.tsx';
@@ -26,6 +28,36 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState('');
+  // The open conversation, remembered so a reload picks up where you left off.
+  const [chatId, setChatId] = usePref<string>('chatId', newChatId());
+  const [history, setHistory] = useState<ChatSummary[] | null>(null);
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current || !enabled) return;
+    restored.current = true;
+    getChat(chatId).then((c) => setTurns((t) => (t.length ? t : c.turns))).catch(() => { /* not saved yet */ });
+  }, [chatId, enabled]);
+
+  const startNew = () => { setTurns([]); setError(''); setChatId(newChatId()); setHistory(null); };
+  const openHistory = async () => {
+    setError('');
+    try { setHistory(await listChats()); } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+  };
+  const openChat = async (id: string) => {
+    try {
+      const c = await getChat(id);
+      setTurns(c.turns);
+      setChatId(id);
+      setHistory(null);
+      setError('');
+      follow.current = true;
+    } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+  };
+  const removeChat = async (id: string) => {
+    await deleteChat(id);
+    setHistory((h) => h && h.filter((c) => c.id !== id));
+    if (id === chatId) { setTurns([]); setChatId(newChatId()); }
+  };
   const logRef = useRef<HTMLDivElement>(null);
   // Follow new output only while the reader is at the bottom; scrolling up or selecting text stops it.
   const follow = useRef(true);
@@ -72,7 +104,12 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
         } else if (e.type === 'done') final = e.text;
         else if (e.type === 'error') throw new Error(e.message);
       });
-      if (final) setTurns([...next, { role: 'assistant', content: final }]);
+      if (final) {
+        const done: ChatTurn[] = [...next, { role: 'assistant', content: final }];
+        setTurns(done);
+        // Saved after every answer; a failed save shouldn't interrupt the chat.
+        saveChat(chatId, done).catch(() => {});
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -93,23 +130,58 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
     <aside className="agent" aria-label="Ask Triumvirate" hidden={!open}>
       <ResizeHandle width={width} onWidth={onWidth} />
       <header className="agent__header">
-        <strong>Ask Triumvirate</strong>
-        {/* The top bar's chat button is the only open/close control; this one starts over. */}
-        <button
-          className="icon-button"
-          onClick={() => { setTurns([]); setError(''); }}
-          disabled={busy || turns.length === 0}
-          aria-label="New chat"
-          title="New chat"
-        >
-          <Icon name="newChat" />
-        </button>
+        {history ? (
+          <button className="icon-button" onClick={() => setHistory(null)} aria-label="Back to chat" title="Back to chat">
+            <Icon name="back" />
+          </button>
+        ) : null}
+        <strong className="agent__title">{history ? 'Past chats' : 'Ask Triumvirate'}</strong>
+        {/* The top bar's chat button is the only open/close control; these manage conversations. */}
+        <span className="agent__tools">
+          <button
+            className={`icon-button${history ? ' is-selected' : ''}`}
+            onClick={() => (history ? setHistory(null) : void openHistory())}
+            disabled={busy || !enabled}
+            aria-pressed={!!history}
+            aria-label="Past chats"
+            title="Past chats"
+          >
+            <Icon name="history" />
+          </button>
+          <button
+            className="icon-button"
+            onClick={startNew}
+            disabled={busy || (turns.length === 0 && !history)}
+            aria-label="New chat"
+            title="New chat"
+          >
+            <Icon name="newChat" />
+          </button>
+        </span>
       </header>
       {/* Screen readers hear a short status, not every streamed word of the whole log. */}
       <p className="visually-hidden" role="status">
         {busy ? (pending.text ? 'Writing the answer' : pending.steps.at(-1) ?? 'Thinking') : ''}
       </p>
-      <div className="agent__log" ref={logRef} onScroll={onLogScroll}>
+      {history && (
+        <div className="agent__history">
+          {history.length === 0 && <p className="muted">No saved chats yet. Each chat is saved after every answer.</p>}
+          <ul className="chat-list">
+            {history.map((c) => (
+              <li key={c.id} className={`chat-list__item${c.id === chatId ? ' is-current' : ''}`}>
+                <button className="chat-list__open" onClick={() => void openChat(c.id)}>
+                  <span className="chat-list__title">{c.title}</span>
+                  <span className="chat-list__meta">{timeAgo(c.updatedAt)} · {Math.ceil(c.turnCount / 2)} {c.turnCount > 2 ? 'questions' : 'question'}</span>
+                </button>
+                <button className="icon-button" onClick={() => void removeChat(c.id)} aria-label={`Delete "${c.title}"`} title="Delete">
+                  <Icon name="delete" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="agent__log" ref={logRef} onScroll={onLogScroll} hidden={!!history}>
         {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}
         {enabled && turns.length === 0 && !busy && (
           <div className="agent__starters">

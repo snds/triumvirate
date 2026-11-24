@@ -89,3 +89,21 @@ export async function streamAgent(messages: ChatTurn[], onEvent: (e: AgentEvent)
   }
   if (buffer.trim()) onEvent(JSON.parse(buffer) as AgentEvent);
 }
+
+export interface ChatSummary {
+  id: string;
+  title: string;
+  updatedAt: string;
+  turnCount: number;
+}
+
+export const listChats = async (): Promise<ChatSummary[]> => json(await fetch('/api/chats'));
+export const getChat = async (id: string): Promise<ChatSummary & { turns: ChatTurn[] }> => json(await fetch(`/api/chats/${encodeURIComponent(id)}`));
+export const saveChat = async (id: string, turns: ChatTurn[]): Promise<ChatSummary> => json(await fetch(`/api/chats/${encodeURIComponent(id)}`, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ turns }),
+}));
+export const deleteChat = async (id: string): Promise<void> => { await fetch(`/api/chats/${encodeURIComponent(id)}`, { method: 'DELETE' }); };
+/** A fresh chat id: time first, so ids sort by when the chat began. */
+export const newChatId = () => `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;

@@ -748,3 +748,22 @@ body.is-dragging-item .tile { pointer-events: none; }
   100% { box-shadow: 0 0 0 0 transparent; }
 }
 @media (prefers-reduced-motion: reduce) { [data-just-moved].tile { animation-duration: 4s; } }
+
+/* ── Past chats ───────────────────────────────────────────── */
+.agent__title { flex: 1; }
+.agent__header { gap: var(--space-2); }
+.agent__tools { display: flex; gap: var(--space-1); }
+.agent__history { overflow-y: auto; padding: var(--space-2); min-height: 0; }
+.agent__log[hidden] { display: none; }
+.chat-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.chat-list__item { display: flex; align-items: center; gap: var(--space-1); border-radius: var(--radius-sm); }
+.chat-list__item:hover, .chat-list__item.is-current { background: var(--surface-hover); }
+.chat-list__item .icon-button { opacity: 0; }
+.chat-list__item:hover .icon-button, .chat-list__item .icon-button:focus-visible { opacity: 1; }
+.chat-list__open {
+  flex: 1; min-width: 0; display: grid; gap: 2px; padding: var(--space-2) var(--space-3);
+  background: none; border: 0; color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.chat-list__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
+.chat-list__meta { font-size: 0.8rem; color: var(--text-muted); }
+@media (hover: none) { .chat-list__item .icon-button { opacity: 1; } }

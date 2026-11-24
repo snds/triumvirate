@@ -14,6 +14,7 @@ import {
 import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
 import { stream } from 'hono/streaming';
+import { createChatStore, validChatId } from './chats.ts';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
@@ -198,6 +199,27 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
         await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
       }
     });
+  });
+
+  // Saved conversations. Local, single user, so no sign-in check beyond the server only listening on 127.0.0.1.
+  const chats = createChatStore(store.dataDir);
+  app.get('/api/chats', async (c) => c.json(await chats.list()));
+  app.get('/api/chats/:id', async (c) => {
+    const chat = await chats.get(c.req.param('id'));
+    return chat ? c.json(chat) : c.json({ error: 'Chat not found.' }, 404);
+  });
+  app.put('/api/chats/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!validChatId(id)) return c.json({ error: 'Bad chat id.' }, 400);
+    const body = (await c.req.json().catch(() => ({}))) as { turns?: ChatTurn[] };
+    const turns = (body.turns ?? []).filter((t) => (t.role === 'user' || t.role === 'assistant') && typeof t.content === 'string');
+    if (turns.length === 0) return c.json({ error: 'Nothing to save.' }, 400);
+    const { turns: _, ...summary } = await chats.save(id, turns);
+    return c.json(summary);
+  });
+  app.delete('/api/chats/:id', async (c) => {
+    await chats.remove(c.req.param('id'));
+    return c.json({ ok: true });
   });
 
   // Moves one item to a character or the vault. The item's real owner comes from the server's own
