@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { streamAgent, type ChatTurn } from '../api.ts';
 import { Icon } from './Icon.tsx';
 import { ChatMarkdown } from './ChatMarkdown.tsx';
@@ -26,11 +26,22 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState('');
-  const endRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  // Follow new output only while the reader is at the bottom; scrolling up or selecting text stops it.
+  const follow = useRef(true);
   const busy = pending !== null;
 
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  const onLogScroll = () => {
+    const el = logRef.current;
+    if (el) follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
+  };
+
+  // Instant (not smooth) scroll after layout. A smooth scroll restarted on every streamed chunk,
+  // fighting an active text selection, is what froze the page.
+  useLayoutEffect(() => {
+    const el = logRef.current;
+    if (!el || !follow.current || selectionInside(el)) return;
+    el.scrollTop = el.scrollHeight;
   }, [turns, pending]);
 
   const send = async (text: string) => {
@@ -41,18 +52,31 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
     setDraft('');
     setError('');
     setPending({ steps: [], text: '' });
+    follow.current = true;
     let final = '';
+    // Text arrives in many tiny chunks; collect them and render at most once per frame.
+    let buffered = '';
+    let frame = 0;
+    const flush = () => {
+      frame = 0;
+      const delta = buffered;
+      buffered = '';
+      if (delta) setPending((p) => p && { ...p, text: p.text + delta });
+    };
     try {
       await streamAgent(next, (e) => {
         if (e.type === 'status') setPending((p) => p && { ...p, steps: [...p.steps, e.text] });
-        else if (e.type === 'text') setPending((p) => p && { ...p, text: p.text + e.delta });
-        else if (e.type === 'done') final = e.text;
+        else if (e.type === 'text') {
+          buffered += e.delta;
+          if (!frame) frame = requestAnimationFrame(flush);
+        } else if (e.type === 'done') final = e.text;
         else if (e.type === 'error') throw new Error(e.message);
       });
       if (final) setTurns([...next, { role: 'assistant', content: final }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
+      if (frame) cancelAnimationFrame(frame);
       setPending(null);
     }
   };
@@ -81,7 +105,11 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
           <Icon name="newChat" />
         </button>
       </header>
-      <div className="agent__log" aria-live="polite">
+      {/* Screen readers hear a short status, not every streamed word of the whole log. */}
+      <p className="visually-hidden" role="status">
+        {busy ? (pending.text ? 'Writing the answer' : pending.steps.at(-1) ?? 'Thinking') : ''}
+      </p>
+      <div className="agent__log" ref={logRef} onScroll={onLogScroll}>
         {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}
         {enabled && turns.length === 0 && !busy && (
           <div className="agent__starters">
@@ -98,7 +126,6 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
         )}
         {pending && <Working pending={pending} />}
         {error && <p className="error">{error}</p>}
-        <div ref={endRef} />
       </div>
       <form
         className="agent__form"
@@ -140,4 +167,10 @@ function Working({ pending }: { pending: Pending }) {
       {writing && <ChatMarkdown text={pending.text} />}
     </div>
   );
+}
+
+/** True when the reader has text selected inside `el`, so new output shouldn't move it. */
+function selectionInside(el: HTMLElement) {
+  const sel = document.getSelection();
+  return !!sel && !sel.isCollapsed && sel.rangeCount > 0 && el.contains(sel.getRangeAt(0).commonAncestorContainer);
 }

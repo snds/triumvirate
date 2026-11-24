@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import Markdown, { defaultUrlTransform, type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import type { Element, Text } from 'hast';
@@ -37,10 +38,11 @@ function textOf(children: React.ReactNode): string {
   return '';
 }
 
-export function ChatMarkdown({ text }: { text: string }) {
+// Memoized: finished replies never re-parse when the chat re-renders during a new stream.
+export const ChatMarkdown = memo(function ChatMarkdown({ text }: { text: string }) {
   return (
     <div className="md">
       <Markdown remarkPlugins={[remarkGfm]} components={components} urlTransform={urlTransform}>{text}</Markdown>
     </div>
   );
-}
+});
