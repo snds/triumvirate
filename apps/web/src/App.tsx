@@ -11,7 +11,7 @@ import { CleanupView } from './components/CleanupView.tsx';
 import { AgentPanel } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { Icon } from './components/Icon.tsx';
-import { isPostmaster } from './components/CharacterColumn.tsx';
+import { isPostmaster } from './inventory.ts';
 import { SLOT_ORDER } from './inventory.ts';
 import { clampChatWidth, CHAT_WIDTH, usePref } from './prefs.ts';
 import { HoverContext, type HoverApi } from './hover.ts';

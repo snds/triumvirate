@@ -1,5 +1,6 @@
 // Pure view logic: filtering and grouping items for display. No React here, so it's easy to test.
 import type { AppraisedItem, ItemRow } from '@triumvirate/core';
+import { POSTMASTER_BUCKET } from '@triumvirate/core/browser';
 
 export type Kind = 'all' | 'weapons' | 'armor';
 
@@ -62,3 +63,6 @@ export function timeAgo(iso: string, now = Date.now()): string {
   const h = Math.round(m / 60);
   return h < 24 ? `${h} hr ago` : `${Math.round(h / 24)} days ago`;
 }
+
+/** Items waiting at a character's postmaster. */
+export const isPostmaster = (i: { bucketHash?: number }) => i.bucketHash === POSTMASTER_BUCKET;

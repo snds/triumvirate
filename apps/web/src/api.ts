@@ -19,17 +19,33 @@ export interface ChatTurn {
   content: string;
 }
 
+/** What to say when the app server isn't running or sent back nothing readable. */
+const SERVER_DOWN = 'The app server isn\'t responding. Check the terminal running pnpm dev for an error, then try again.';
+
+class ServerDown extends Error {}
+
 async function json<T>(res: Response): Promise<T> {
-  const body = await res.json();
+  const text = await res.text();
+  let body: T & { error?: string };
+  // The dev proxy answers with an empty 500 or 502 when the server is down or restarting.
+  try { body = JSON.parse(text); } catch { throw new ServerDown(res.ok ? 'The app server sent back something unreadable.' : SERVER_DOWN); }
   if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
   return body;
 }
 
 /** Resolves to null when not signed in. */
 export async function fetchInventory(refresh = false): Promise<Inventory | null> {
-  const res = await fetch(`/api/inventory${refresh ? '?refresh=1' : ''}`);
-  if (res.status === 401) return null;
-  return json<Inventory>(res);
+  // The server restarts itself after a git pull; give it a few seconds before giving up.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await fetch(`/api/inventory${refresh ? '?refresh=1' : ''}`);
+      if (res.status === 401) return null;
+      return await json<Inventory>(res);
+    } catch (err) {
+      if (!(err instanceof ServerDown) || attempt >= 5) throw err;
+      await new Promise((f) => setTimeout(f, 1000 + attempt * 500));
+    }
+  }
 }
 
 export interface MoveResult {

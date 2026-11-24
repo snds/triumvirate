@@ -5,6 +5,10 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createStore } from './store.ts';
 import { createWishListCache } from './wishlist-cache.ts';
 
+// A stray failed promise (say, writing to a chat stream after the browser closed it) should be
+// logged, not take the whole server down. Node exits on these by default.
+process.on('unhandledRejection', (err) => console.error('Unhandled rejection (server kept running):', err));
+
 const env = (k: string) => {
   const v = process.env[k];
   if (!v) throw new Error(`Missing ${k}. Copy .env.example to .env and fill it in.`);

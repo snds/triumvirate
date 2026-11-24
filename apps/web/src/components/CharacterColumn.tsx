@@ -1,5 +1,5 @@
-import { POSTMASTER_BUCKET, POSTMASTER_CAPACITY, type AppraisedItem, type CharacterRow } from '@triumvirate/core/browser';
-import { groupBySlot } from '../inventory.ts';
+import { POSTMASTER_CAPACITY, type AppraisedItem, type CharacterRow } from '@triumvirate/core/browser';
+import { groupBySlot, isPostmaster } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { useDropZone } from '../drag.ts';
@@ -73,4 +73,3 @@ export function CharacterColumn({ character, items, postmaster, onSelect }: Prop
   );
 }
 
-export const isPostmaster = (i: AppraisedItem) => i.bucketHash === POSTMASTER_BUCKET;
