@@ -360,6 +360,26 @@ export interface CommunityAppraisal {
   copies: number;
   /** One entry per perk option, aligned with the item's perk columns. */
   perks: PerkMark[][];
+  /** Per column: true for trait columns, which count double in the score. */
+  traitColumns: boolean[];
+  /** Per column: the option index that reaches the best grade. */
+  bestPicks: number[];
+}
+
+/**
+ * Popularity score (0 to 1) of a roll from its perk marks: `picks` is the option index per column.
+ * Trait columns count double. Shared by the server and the web app's perk preview.
+ */
+export function scoreRoll(marks: PerkMark[][], traitColumns: boolean[], picks: number[]): number {
+  let total = 0, weight = 0;
+  marks.forEach((col, i) => {
+    const m = col[picks[i] ?? 0];
+    if (!m) return;
+    const w = traitColumns[i] ? 2 : 1;
+    total += w * m.rel;
+    weight += w;
+  });
+  return weight ? total / weight : 0;
 }
 
 interface Bucket { copies: number; columns: Map<number, number>[] }
@@ -378,7 +398,7 @@ function mergeRoles(roles: RoleUsage[]): Bucket {
   return { copies, columns };
 }
 
-const toGrade = (score: number): Grade =>
+export const toGrade = (score: number): Grade =>
   score >= 0.9 ? 'S' : score >= 0.75 ? 'A' : score >= 0.55 ? 'B' : score >= 0.35 ? 'C' : score >= 0.15 ? 'D' : 'F';
 
 /**
@@ -391,7 +411,11 @@ export function appraiseCommunity(
   itemHash: number,
   perks: { hash?: number; active: boolean }[][],
 ): CommunityAppraisal {
-  const empty: CommunityAppraisal = { betterPossible: false, copies: 0, perks: perks.map((c) => c.map(() => ({ rel: 0 }))) };
+  const slottedIdx = perks.map((c) => Math.max(0, c.findIndex((p) => p.active)));
+  const empty: CommunityAppraisal = {
+    betterPossible: false, copies: 0, perks: perks.map((c) => c.map(() => ({ rel: 0 }))),
+    traitColumns: perks.map(() => false), bestPicks: slottedIdx,
+  };
   if (!weapon) return empty;
   const pools = columnPools(manifest, itemHash);
   const bases = pools.map((p) => baseOf(manifest, p));
@@ -456,7 +480,10 @@ export function appraiseCommunity(
     if (s && col.some((m, k) => k !== slotted(i) && m.rel > s.rel)) s.better = true;
   });
 
-  const out: CommunityAppraisal = { betterPossible: false, copies: all.copies, perks: marks };
+  const traitColumns = located.map((col) => col.some((l) => !!l && traitCol(l[0])));
+  const out: CommunityAppraisal = {
+    betterPossible: false, copies: all.copies, perks: marks, traitColumns, bestPicks: marks.map((_, i) => bestPick(i)),
+  };
   if (all.copies < MIN_COPIES) return out;
   out.grade = toGrade(score(all, slotted));
   out.bestGrade = toGrade(score(all, bestPick));

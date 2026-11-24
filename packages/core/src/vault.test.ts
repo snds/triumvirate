@@ -89,8 +89,8 @@ test('reads weapon perk columns and armor stats', () => {
   } as unknown as DestinyProfileResponse;
   const [gun, hood] = summarizeProfile(p, m);
   assert.deepEqual(gun?.perks, [[
-    { hash: 20, name: 'Rampage', icon: 'https://www.bungie.net/r.png', active: true },
-    { hash: 21, name: 'Kill Clip', icon: undefined, active: false },
+    { hash: 20, name: 'Rampage', icon: 'https://www.bungie.net/r.png', active: true, socketIndex: 0 },
+    { hash: 21, name: 'Kill Clip', icon: undefined, active: false, socketIndex: 0 },
   ]]);
   assert.deepEqual(hood?.stats, { Health: 27 });
   assert.equal(hood?.gearTier, 4);

@@ -139,3 +139,15 @@ test('appraiseCommunity grades a roll, marks PvE/PvP perks, and spots a better o
   // No data: no grade.
   assert.equal(appraiseCommunity(manifest, undefined, GUN, [[{ hash: 1, active: true }]]).grade, undefined);
 });
+
+test('bestPicks and scoreRoll agree with the best grade', async () => {
+  const { appraiseCommunity, scoreRoll, toGrade } = await import('./community.ts');
+  const at = '2026-11-24T20:00:00Z';
+  const samples: Sample[] = ['a', 'b', 'c', 'd', 'e', 'f'].map((c) => ({ match: c, at, role: 'pve' as const, itemHash: GUN, copy: c, perks: [1, 3, 5, 7], kills: 1, precisionKills: 0 }));
+  const w = rollup(manifest, samples).weapons[GUN];
+  const a = appraiseCommunity(manifest, w, GUN, [[{ hash: 2, active: true }, { hash: 1, active: false }], [{ hash: 3, active: true }], [{ hash: 6, active: true }, { hash: 5, active: false }], [{ hash: 7, active: true }]]);
+  assert.deepEqual(a.bestPicks, [1, 0, 1, 0]);
+  assert.deepEqual(a.traitColumns, [false, false, true, true]);
+  assert.equal(toGrade(scoreRoll(a.perks, a.traitColumns, a.bestPicks)), a.bestGrade);
+  assert.equal(a.bestGrade, 'S');
+});

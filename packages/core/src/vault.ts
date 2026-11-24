@@ -91,6 +91,8 @@ export const AMMO_NAMES: Record<number, AmmoType> = { 1: 'Primary', 2: 'Special'
 export interface PerkOption {
   /** The plug's item hash. Optional so older cached views still load. */
   hash?: number;
+  /** Weapon perks: the socket this option plugs into, for swapping perks through Bungie. */
+  socketIndex?: number;
   name: string;
   icon?: string;
   /** True for the perk currently slotted in this column. */
@@ -273,7 +275,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
         .filter((p) => p.plugItemHash !== socket.plugHash)
         .map((p) => perkOption(p.plugItemHash, false))
         .filter((p): p is PerkOption => !!p);
-      columns.push([active, ...alts]);
+      columns.push([active, ...alts].map((p) => ({ ...p, socketIndex: index })));
     });
     return columns;
   };

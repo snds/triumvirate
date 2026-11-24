@@ -7,7 +7,7 @@ const gun = (o: Partial<AppraisedItem>): AppraisedItem => ({
   location: 'Vault', owner: 'vault', name: 'X', type: 'Hand Cannon', bucket: '', equipped: false, itemHash: 1,
   tier: 'Legendary', itemType: 3, classType: 3, locked: false, ...o,
 });
-const graded = (o: Partial<CommunityAppraisal>): CommunityAppraisal => ({ betterPossible: false, copies: 10, perks: [], ...o });
+const graded = (o: Partial<CommunityAppraisal>): CommunityAppraisal => ({ betterPossible: false, copies: 10, perks: [], traitColumns: [], bestPicks: [], ...o });
 
 test('filters by roll type, grade range, better-possible, and location', () => {
   const f = defaultFilters();

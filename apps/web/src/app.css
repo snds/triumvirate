@@ -1052,3 +1052,11 @@ body.is-dragging-item .tile { pointer-events: none; }
 .roll-perk__use--pvp { background: var(--use-pvp); }
 .roll-perk__use--both { background: var(--use-both); }
 .roll-perk__better { left: -3px; bottom: -3px; background: var(--grade-s); }
+.roll-perk.is-pickable { cursor: pointer; }
+.roll-perk.is-pickable:hover { opacity: 0.9; }
+.roll-perk.is-preview { outline: 2px dashed var(--grade-s); outline-offset: 1px; }
+.grade.is-preview { outline: 2px dashed var(--text-primary); outline-offset: 2px; }
+.pill--better { display: inline-flex; align-items: center; gap: 2px; background: color-mix(in srgb, var(--grade-s) 20%, transparent); color: var(--grade-s); }
+.pill--better .icon { font-size: 13px; }
+.roll-card__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) var(--space-2); }
+.roll-card__error { margin: 0; flex-basis: 100%; font-size: 12px; color: var(--danger); }

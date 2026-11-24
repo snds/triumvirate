@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { getDestinyEntityDefinition, getProfile, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
+import { getDestinyEntityDefinition, getProfile, insertSocketPlugFree, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   applyStep, appraise, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
@@ -265,6 +265,52 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     // Same for everyone until the next game update; let the browser keep it.
     c.header('Cache-Control', `private, max-age=86400`);
     return c.json(r);
+  });
+
+  // Swaps a weapon's perks to other options it already has (Bungie's free plug insert), then re-syncs.
+  app.post('/api/perks', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { instanceId?: string; plugs?: { socketIndex: number; plugHash: number }[] };
+    const { instanceId, plugs } = body;
+    if (!instanceId || !Array.isArray(plugs) || plugs.length === 0) return c.json({ error: 'Say which weapon and which perks.' }, 400);
+    const run = moveQueue.then(async () => {
+      if (!current || !lastView) {
+        setCurrent((await store.latestSnapshot()) ?? (await sync(t)));
+        if (!manifest) await sync(t);
+        await buildView(current!);
+      }
+      const item = lastView!.items.find((i) => i.instanceId === instanceId);
+      if (!item?.perks) return { status: 404 as const, body: { error: 'That weapon isn\'t there anymore. Refresh and try again.' } };
+      // Only options this copy already has: never anything it can't roll.
+      const allowed = (p: { socketIndex: number; plugHash: number }) =>
+        item.perks!.some((col) => col.some((o) => o.socketIndex === p.socketIndex && o.hash === p.plugHash));
+      if (!plugs.every(allowed)) return { status: 400 as const, body: { error: 'Those perks aren\'t options on this copy.' } };
+      // Bungie wants a character even for vault items; any of yours works.
+      const characterId = item.owner !== 'vault' ? item.owner : lastView!.characters[0]?.id;
+      if (!characterId) return { status: 400 as const, body: { error: 'No character found to act through.' } };
+      const http = createHttpClient(cfg.apiKey, t.accessToken);
+      let error: string | undefined;
+      for (const p of plugs) {
+        try {
+          await insertSocketPlugFree(http, {
+            plug: { socketIndex: p.socketIndex, socketArrayType: 0, plugItemHash: p.plugHash },
+            itemId: instanceId, characterId, membershipType: current!.membershipType,
+          } as never);
+        } catch (err) {
+          error = friendlyMoveError(err);
+          break;
+        }
+        await new Promise((f) => setTimeout(f, 120));
+      }
+      // Pull the real state back from Bungie, so the app shows what actually stuck.
+      const snap = await sync(t);
+      const view = await buildView(snap);
+      return { status: error ? 409 as const : 200 as const, body: { error, item: view.items.find((i) => i.instanceId === instanceId) } };
+    });
+    moveQueue = run.catch(() => {});
+    const out = await run;
+    return c.json(out.body, out.status);
   });
 
   // Community usage data from public matches (see community.ts). Uses the API key only, no sign-in.

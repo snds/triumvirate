@@ -72,3 +72,9 @@ test('community routes report status and reject a bad item hash', async () => {
   const w = await (await app.request('/api/community/items/123')).json();
   assert.deepEqual(w, { samples: 0, weapon: null, trend: [] });
 });
+
+test('perk swaps need a sign-in and a weapon', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  const res = await app.request('/api/perks', { method: 'POST', body: JSON.stringify({ instanceId: '1', plugs: [{ socketIndex: 1, plugHash: 2 }] }) });
+  assert.equal(res.status, 401);
+});

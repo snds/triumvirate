@@ -154,3 +154,19 @@ export interface CommunityAppraisals {
 
 /** Community grades for every weapon in the current inventory, keyed by instance id. */
 export const fetchCommunityAppraisals = async (): Promise<CommunityAppraisals> => json(await fetch('/api/community/appraisals'));
+
+/** Swaps a weapon's perks to options it already has. Never throws; a failure comes back as `error`. */
+export async function applyPerks(instanceId: string, plugs: { socketIndex: number; plugHash: number }[]): Promise<{ item?: AppraisedItem; error?: string }> {
+  try {
+    const res = await fetch('/api/perks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instanceId, plugs }),
+    });
+    const body = (await res.json().catch(() => ({}))) as { item?: AppraisedItem; error?: string };
+    if (!res.ok && !body.error) body.error = res.status === 401 ? 'Sign in again to change perks.' : `Perk change failed (${res.status})`;
+    return body;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
