@@ -8,7 +8,7 @@ import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
 import { CleanupView } from './components/CleanupView.tsx';
-import { AgentPanel } from './components/AgentPanel.tsx';
+import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
@@ -37,7 +37,9 @@ export function App() {
   const [kind, setKind] = useState<Kind>('all');
   const [view, setView] = useState<'inventory' | 'cleanup'>('inventory');
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
-  const [agentOpen, setAgentOpen] = usePref('chatOpen', false);
+  // Always starts closed; the chat button shows when a conversation is going.
+  const [agentOpen, setAgentOpen] = useState(false);
+  const [chatStatus, setChatStatus] = useState<ChatStatus>({ active: false, busy: false, unread: 0 });
   const [collapsed, setCollapsed] = usePref('charactersCollapsed', false);
   const [classOnly, setClassOnly] = usePref('vaultClassOnly', true);
   const [tileScale, setTileScale] = usePref('tileScale', 1);
@@ -370,17 +372,21 @@ export function App() {
         open={agentOpen}
         about={about}
         onClose={() => setAgentOpen(false)}
+        onStatus={setChatStatus}
         width={clampChatWidth(chatWidth, windowWidth)}
         onWidth={setChatWidth}
       />
       <button
-        className={`chat-fab${agentOpen ? ' is-open' : ''}`}
+        className={`chat-fab${agentOpen ? ' is-open' : ''}${chatStatus.busy ? ' is-busy' : ''}`}
         onClick={() => setAgentOpen((o) => !o)}
         aria-expanded={agentOpen}
-        aria-label={agentOpen ? 'Hide chat' : 'Ask Triumvirate'}
-        title={agentOpen ? 'Hide chat' : 'Ask Triumvirate'}
+        aria-label={agentOpen ? 'Hide chat' : `Ask Triumvirate${fabNote(chatStatus) ? ` (${fabNote(chatStatus)})` : ''}`}
+        title={agentOpen ? 'Hide chat' : `Ask Triumvirate${fabNote(chatStatus) ? ` · ${fabNote(chatStatus)}` : ''}`}
       >
         <Icon name={agentOpen ? 'close' : 'chat'} filled />
+        {/* Hidden chat indicators: a count of new answers, or a dot for a conversation in progress. */}
+        {!agentOpen && chatStatus.unread > 0 && <span className="chat-fab__badge">{chatStatus.unread}</span>}
+        {!agentOpen && chatStatus.unread === 0 && chatStatus.active && <span className="chat-fab__dot" />}
       </button>
       {selected && (
         <ItemDetail
@@ -405,4 +411,11 @@ export function App() {
     </InventoryContext.Provider>
     </HoverContext.Provider>
   );
+}
+
+/** What the chat button says about a hidden chat. */
+function fabNote(s: ChatStatus) {
+  if (s.busy) return 'writing an answer';
+  if (s.unread) return `${s.unread} new ${s.unread === 1 ? 'answer' : 'answers'}`;
+  return s.active ? 'conversation open' : '';
 }

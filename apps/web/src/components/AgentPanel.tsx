@@ -24,10 +24,21 @@ function itemStarters(item: AppraisedItem) {
   ];
 }
 
+/** What the chat button shows while the chat is hidden. */
+export interface ChatStatus {
+  /** A conversation is going (it has messages). */
+  active: boolean;
+  /** An answer is being written. */
+  busy: boolean;
+  /** Answers that arrived while the chat was hidden. */
+  unread: number;
+}
+
 // The floating chat. Stays mounted while hidden so the conversation survives toggling.
-export function AgentPanel({ enabled, open, about, onClose, width, onWidth }: {
+export function AgentPanel({ enabled, open, about, onClose, onStatus, width, onWidth }: {
   enabled: boolean; open: boolean; width: number; onWidth: (w: number) => void;
   onClose: () => void;
+  onStatus: (s: ChatStatus) => void;
   /** An item to talk about (from "Ask about this item"); `id` changes on each ask. */
   about?: { id: number; item: AppraisedItem };
 }) {
@@ -40,10 +51,12 @@ export function AgentPanel({ enabled, open, about, onClose, width, onWidth }: {
   const { turns, setTurns, pending, error, setError, busy, send: sendTurn } = useAgentChat(chatId, () => { follow.current = true; });
   const [history, setHistory] = useState<ChatSummary[] | null>(null);
   const restored = useRef(false);
+  /** Set when turns come back from a saved chat, so its old answers don't count as new. */
+  const restoring = useRef(false);
   useEffect(() => {
     if (restored.current || !enabled) return;
     restored.current = true;
-    getChat(chatId).then((c) => setTurns((t) => (t.length ? t : c.turns))).catch(() => { /* not saved yet */ });
+    getChat(chatId).then((c) => { restoring.current = true; setTurns((t) => (t.length ? t : c.turns)); }).catch(() => { /* not saved yet */ });
   }, [chatId, enabled]);
 
   const startNew = () => { setTurns([]); setError(''); setChatId(newChatId()); setHistory(null); setSubject(null); };
@@ -104,6 +117,20 @@ export function AgentPanel({ enabled, open, about, onClose, width, onWidth }: {
     setHistory(null);
     setSubject(about.item);
   });
+  // Count answers that land while hidden; opening the chat clears the count.
+  const [unread, setUnread] = useState(0);
+  const seen = useRef(0);
+  useEffect(() => {
+    const answers = turns.filter((t) => t.role === 'assistant').length;
+    // Work out the new count now: the updater runs later, after `seen` has moved on.
+    const fresh = restoring.current ? 0 : answers - seen.current;
+    restoring.current = false;
+    seen.current = answers;
+    if (open) setUnread(0);
+    else if (fresh > 0) setUnread((u) => u + fresh);
+  }, [turns, open]);
+  useEffect(() => { onStatus({ active: turns.length > 0, busy, unread }); }, [turns.length, busy, unread, onStatus]);
+
   // Opening the chat puts the cursor in the message box.
   useEffect(() => { if (open && enabled) inputRef.current?.focus(); }, [open, enabled, about?.id]);
 

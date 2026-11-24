@@ -962,3 +962,22 @@ body.is-dragging-item .tile { pointer-events: none; }
 .legend-swatch--owned { box-shadow: 0 0 0 2px var(--perk-active-border); border-color: transparent; }
 
 .button.is-selected { border-color: var(--accent); color: var(--text-primary); }
+/* Chat button indicators while the chat is hidden. */
+.chat-fab__badge, .chat-fab__dot {
+  position: absolute; top: 2px; right: 2px;
+  box-shadow: 0 0 0 2px var(--surface-page);
+}
+.chat-fab__badge {
+  min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+  display: grid; place-items: center;
+  background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 1;
+}
+.chat-fab__dot { width: 12px; height: 12px; border-radius: 50%; background: var(--text-primary); }
+/* While an answer is being written, a ring turns around the button. */
+.chat-fab.is-busy::after {
+  content: ''; position: absolute; inset: -4px; border-radius: 50%;
+  border: 2px solid transparent; border-top-color: var(--accent); border-right-color: var(--accent);
+  animation: fab-spin 900ms linear infinite;
+}
+@keyframes fab-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .chat-fab.is-busy::after { animation: none; border-color: var(--accent); } }
