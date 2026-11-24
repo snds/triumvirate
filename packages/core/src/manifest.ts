@@ -9,6 +9,9 @@ import {
   type DestinyInventoryItemLiteDefinition,
   type DestinyStatDefinition,
   type DestinyDamageTypeDefinition,
+  type DestinyInventoryItemDefinition,
+  type DestinyObjectiveDefinition,
+  type DestinyStatGroupDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 
@@ -19,6 +22,51 @@ export interface ManifestTables {
   stats: Record<string, DestinyStatDefinition>;
   /** Element names and icons (Kinetic, Arc, Solar...). Optional so test fixtures can skip it. */
   damageTypes?: Record<string, DestinyDamageTypeDefinition>;
+  /** Fields the lite item table leaves out, trimmed from the full table. Optional for fixtures. */
+  extras?: Record<string, ItemExtra>;
+  /** Stat display order and which stats are plain numbers (RPM, Magazine). */
+  statGroups?: Record<string, Pick<DestinyStatGroupDefinition, 'scaledStats'>>;
+  /** Objective styles, to find crafted level and kill tracker counts. */
+  objectives?: Record<string, ObjectiveExtra>;
+}
+
+/** The parts of the full item definition the app needs (the full table is hundreds of MB). */
+export interface ItemExtra {
+  statGroupHash?: number;
+  /** e.g. "frames", "barrels", "v400.plugs.weapons.masterworks.stat.stability". */
+  plugCategory?: string;
+  /** Always-on stat bonuses this item gives when plugged in: [statHash, value]. */
+  investment?: [number, number][];
+  /** Socket category hash and the socket indexes in it. */
+  socketCategories?: [number, number[]][];
+  flavorText?: string;
+}
+
+export interface ObjectiveExtra {
+  /** DestinyObjectiveUiStyle: 2 = crafted weapon level. */
+  uiStyle: number;
+  progressDescription?: string;
+}
+
+/** Keeps only what ItemExtra needs, for gear and for plugs. */
+export function slimItems(full: Record<string, DestinyInventoryItemDefinition>): Record<string, ItemExtra> {
+  const out: Record<string, ItemExtra> = {};
+  for (const [hash, d] of Object.entries(full)) {
+    const gear = d.itemType === 2 || d.itemType === 3;
+    if (!gear && !d.plug) continue;
+    const x: ItemExtra = {};
+    if (gear) {
+      if (d.stats?.statGroupHash) x.statGroupHash = d.stats.statGroupHash;
+      const cats = d.sockets?.socketCategories;
+      if (cats?.length) x.socketCategories = cats.map((c) => [c.socketCategoryHash, c.socketIndexes]);
+      if (d.flavorText) x.flavorText = d.flavorText;
+    }
+    if (d.plug?.plugCategoryIdentifier) x.plugCategory = d.plug.plugCategoryIdentifier;
+    const inv = (d.investmentStats ?? []).filter((st) => !st.isConditionallyActive && st.value !== 0);
+    if (inv.length) x.investment = inv.map((st) => [st.statTypeHash, st.value]);
+    if (Object.keys(x).length) out[hash] = x;
+  }
+  return out;
 }
 
 const TABLES = {
@@ -26,6 +74,9 @@ const TABLES = {
   buckets: 'DestinyInventoryBucketDefinition',
   stats: 'DestinyStatDefinition',
   damageTypes: 'DestinyDamageTypeDefinition',
+  statGroups: 'DestinyStatGroupDefinition',
+  objectives: 'DestinyObjectiveDefinition',
+  fullItems: 'DestinyInventoryItemDefinition',
 } as const;
 
 /**
@@ -46,23 +97,41 @@ export async function loadManifest(
   const paths = m.jsonWorldComponentContentPaths[lang];
   if (!paths) throw new Error(`Manifest has no "${lang}" language`);
 
-  const load = async (table: string) => {
-    const file = join(dir, `${table}.json`);
+  const download = async (table: string) => {
+    const path = paths[table];
+    if (!path) throw new Error(`Manifest has no ${table} table`);
+    const res = await fetch(BUNGIE_ROOT + path);
+    if (!res.ok) throw new Error(`Manifest download failed for ${table}: ${res.status}`);
+    return res.text();
+  };
+  // Cached as-is, or (when `slim` is given) trimmed first so only the small file is kept.
+  const load = async <T>(table: string, slim?: (full: any) => T): Promise<T> => {
+    const file = join(dir, `${table}${slim ? '.slim' : ''}.json`);
     try {
       return JSON.parse(await readFile(file, 'utf8'));
     } catch {
-      const path = paths[table];
-      if (!path) throw new Error(`Manifest has no ${table} table`);
-      const res = await fetch(BUNGIE_ROOT + path);
-      if (!res.ok) throw new Error(`Manifest download failed for ${table}: ${res.status}`);
-      const text = await res.text();
-      await writeFile(file, text);
-      return JSON.parse(text);
+      const text = await download(table);
+      if (!slim) {
+        await writeFile(file, text);
+        return JSON.parse(text);
+      }
+      const trimmed = slim(JSON.parse(text));
+      await writeFile(file, JSON.stringify(trimmed));
+      return trimmed;
     }
   };
 
-  const [items, buckets, stats, damageTypes] = await Promise.all([
-    load(TABLES.items), load(TABLES.buckets), load(TABLES.stats), load(TABLES.damageTypes),
+  const [items, buckets, stats, damageTypes, statGroups, objectives] = await Promise.all([
+    load<ManifestTables['items']>(TABLES.items),
+    load<ManifestTables['buckets']>(TABLES.buckets),
+    load<ManifestTables['stats']>(TABLES.stats),
+    load<NonNullable<ManifestTables['damageTypes']>>(TABLES.damageTypes),
+    load(TABLES.statGroups, (full: Record<string, DestinyStatGroupDefinition>) =>
+      Object.fromEntries(Object.entries(full).map(([h, g]) => [h, { scaledStats: g.scaledStats }]))),
+    load(TABLES.objectives, (full: Record<string, DestinyObjectiveDefinition>) =>
+      Object.fromEntries(Object.entries(full).map(([h, o]) => [h, { uiStyle: o.uiStyle, progressDescription: o.progressDescription }]))),
   ]);
-  return { version: m.version, items, buckets, stats, damageTypes };
+  // The full item table is huge; load it after the others so peak memory stays lower.
+  const extras = await load(TABLES.fullItems, slimItems);
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, extras };
 }

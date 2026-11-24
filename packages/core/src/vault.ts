@@ -13,6 +13,17 @@ export const CLASS_NAMES = ['Titan', 'Hunter', 'Warlock'];
 export const DAMAGE_NAMES = ['', 'Kinetic', 'Arc', 'Solar', 'Void', 'Raid', 'Stasis', 'Strand'];
 /** Bit 1 of DestinyItemComponent.state = locked in game. */
 const STATE_LOCKED = 1;
+/** Bit 8 = crafted (shaped) weapon. */
+const STATE_CRAFTED = 8;
+/** Socket categories on weapons. */
+const SOCKET_INTRINSIC = 3956125808;
+const SOCKET_WEAPON_PERKS = 4241085061;
+const SOCKET_WEAPON_MODS = 2685412949;
+/** DestinyObjectiveUiStyle.CraftingWeaponLevel. */
+const OBJECTIVE_CRAFTED_LEVEL = 2;
+export const STAT_RECOIL_DIRECTION = 2715839340;
+// Mods-row plugs that are cosmetic or empty, so not worth a slot in the UI.
+const NOT_A_MOD = /shader|ornament|memento|empty|default|tracker|deprecated/i;
 
 export interface ItemRow {
   location: string;
@@ -46,6 +57,16 @@ export interface ItemRow {
   perks?: PerkOption[][];
   /** Armor stats (e.g. Health, Grenade) or weapon stats (e.g. Range, Stability), by name. */
   stats?: Record<string, number>;
+  /** The same stats in game order, with the bonus from perks, mods, and masterwork. */
+  statDetails?: StatDetail[];
+  /** Weapon frame (e.g. "Rapid-Fire Frame"). */
+  intrinsic?: PerkOption;
+  /** Masterwork and weapon mod, in socket order. */
+  mods?: PerkOption[];
+  crafted?: boolean;
+  craftedLevel?: number;
+  killTracker?: { label: string; count: number };
+  flavorText?: string;
 }
 
 export interface PerkOption {
@@ -53,6 +74,20 @@ export interface PerkOption {
   icon?: string;
   /** True for the perk currently slotted in this column. */
   active: boolean;
+  description?: string;
+  /** Enhanced version of a trait (the game's yellow arrow). */
+  enhanced?: boolean;
+}
+
+export interface StatDetail {
+  hash: number;
+  name: string;
+  /** The value the game shows, bonuses included. */
+  value: number;
+  /** How much of `value` comes from perks, mods, and masterwork (can be negative). */
+  bonus: number;
+  /** Counts and times (RPM, Magazine): show the number, no bar. */
+  numeric: boolean;
 }
 
 // Plug types that aren't part of a roll: cosmetics, trackers, and masterwork/mod slots.
@@ -137,19 +172,32 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
   const reusable = profile.itemComponents?.reusablePlugs?.data ?? {};
   const itemStats = profile.itemComponents?.stats?.data ?? {};
 
-  const perkOption = (hash: number, active: boolean): PerkOption | undefined => {
-    const d = manifest.items[hash];
-    if (!d?.displayProperties.name || NOT_A_PERK.test(d.itemTypeDisplayName ?? '')) return undefined;
-    return { name: d.displayProperties.name, icon: bungieUrl(d.displayProperties.icon), active };
-  };
+  const plugObjectives = profile.itemComponents?.plugObjectives?.data ?? {};
 
-  const weaponPerks = (instanceId: string): PerkOption[][] | undefined => {
+  const plugInfo = (hash: number, active: boolean): PerkOption | undefined => {
+    const d = manifest.items[hash];
+    if (!d?.displayProperties.name) return undefined;
+    const p: PerkOption = { name: d.displayProperties.name, icon: bungieUrl(d.displayProperties.icon), active };
+    if (d.displayProperties.description) p.description = d.displayProperties.description;
+    if (/enhanced/i.test(d.itemTypeDisplayName ?? '')) p.enhanced = true;
+    return p;
+  };
+  const perkOption = (hash: number, active: boolean): PerkOption | undefined =>
+    NOT_A_PERK.test(manifest.items[hash]?.itemTypeDisplayName ?? '') ? undefined : plugInfo(hash, active);
+
+  /** Socket indexes per category, from the full item definition (absent with an older manifest cache). */
+  const socketIndexes = (itemHash: number, category: number) =>
+    manifest.extras?.[itemHash]?.socketCategories?.find(([c]) => c === category)?.[1];
+
+  const weaponPerks = (instanceId: string, itemHash: number): PerkOption[][] | undefined => {
     const socketList = sockets[instanceId]?.sockets;
     if (!socketList) return undefined;
     const options = reusable[instanceId]?.plugs ?? {};
+    const perkSockets = socketIndexes(itemHash, SOCKET_WEAPON_PERKS);
     const columns: PerkOption[][] = [];
     socketList.forEach((socket, index) => {
       if (!socket.plugHash || socket.isVisible === false) return;
+      if (perkSockets && !perkSockets.includes(index)) return;
       const active = perkOption(socket.plugHash, true);
       if (!active) return;
       // Other perks this roll can switch to in the same column (multi-perk columns).
@@ -160,6 +208,65 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       columns.push([active, ...alts]);
     });
     return columns;
+  };
+
+  /** Frame, masterwork, and mods: the sockets outside the perk columns. */
+  const weaponExtras = (instanceId: string, itemHash: number) => {
+    const socketList = sockets[instanceId]?.sockets ?? [];
+    const intrinsicIndex = socketIndexes(itemHash, SOCKET_INTRINSIC)?.[0];
+    const intrinsicHash = intrinsicIndex !== undefined ? socketList[intrinsicIndex]?.plugHash : undefined;
+    const mods = (socketIndexes(itemHash, SOCKET_WEAPON_MODS) ?? [])
+      .map((i) => socketList[i]?.plugHash)
+      .filter((h): h is number => !!h && !NOT_A_MOD.test(manifest.items[h]?.displayProperties.name ?? '')
+        && !NOT_A_MOD.test(manifest.items[h]?.itemTypeDisplayName ?? ''))
+      .map((h) => plugInfo(h, true))
+      .filter((p): p is PerkOption => !!p);
+    return { intrinsic: intrinsicHash ? plugInfo(intrinsicHash, true) : undefined, mods: mods.length ? mods : undefined };
+  };
+
+  /** Crafted level and kill tracker count, from the objectives on plugged items. */
+  const weaponProgress = (instanceId: string) => {
+    let craftedLevel: number | undefined;
+    let killTracker: { label: string; count: number } | undefined;
+    for (const [plugHash, objectives] of Object.entries(plugObjectives[instanceId]?.objectivesPerPlug ?? {})) {
+      const plugName = manifest.items[plugHash]?.displayProperties.name ?? '';
+      for (const o of objectives) {
+        const style = manifest.objectives?.[o.objectiveHash]?.uiStyle;
+        if (style === OBJECTIVE_CRAFTED_LEVEL) craftedLevel = o.progress;
+        else if (/tracker/i.test(plugName) && o.progress !== undefined) {
+          killTracker = { label: manifest.objectives?.[o.objectiveHash]?.progressDescription || plugName, count: o.progress };
+        }
+      }
+    }
+    return { craftedLevel, killTracker };
+  };
+
+  /** Stats in the game's display order, each with the bonus that plugged perks and mods add. */
+  const statDetails = (instanceId: string, itemHash: number): StatDetail[] | undefined => {
+    const s = itemStats[instanceId]?.stats;
+    if (!s) return undefined;
+    const bonus = new Map<number, number>();
+    for (const socket of sockets[instanceId]?.sockets ?? []) {
+      // Frames and cosmetics carry no stats; perks, mods, and masterwork do.
+      for (const [hash, value] of (socket.plugHash && manifest.extras?.[socket.plugHash]?.investment) || []) {
+        bonus.set(hash, (bonus.get(hash) ?? 0) + value);
+      }
+    }
+    const group = manifest.statGroups?.[manifest.extras?.[itemHash]?.statGroupHash ?? -1]?.scaledStats ?? [];
+    const order = new Map(group.map((g, i) => [g.statHash, i]));
+    const numeric = new Set(group.filter((g) => g.displayAsNumeric).map((g) => g.statHash));
+    return Object.values(s)
+      .map((st) => ({
+        hash: st.statHash,
+        name: manifest.stats[st.statHash]?.displayProperties.name ?? '',
+        value: st.value,
+        // Bonuses can't exceed the value itself (stats are clamped at 0).
+        bonus: Math.min(bonus.get(st.statHash) ?? 0, st.value),
+        numeric: numeric.has(st.statHash),
+      }))
+      .filter((d) => d.name && !['Attack', 'Defense', 'Power'].includes(d.name))
+      // Stats the game shows come first, in its order; hidden ones (Aim Assistance, Zoom...) follow.
+      .sort((a, b) => (order.get(a.hash) ?? 999) - (order.get(b.hash) ?? 999) || a.name.localeCompare(b.name));
   };
 
   const itemStatValues = (instanceId: string): Record<string, number> | undefined => {
@@ -184,6 +291,11 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     const def = manifest.items[item.itemHash];
     const bucketHash = item.bucketHash === VAULT_BUCKET ? def?.inventory?.bucketTypeHash : item.bucketHash;
     const inst = item.itemInstanceId ? instances[item.itemInstanceId] : undefined;
+    const id = item.itemInstanceId;
+    const isWeapon = def?.itemType === WEAPON;
+    const extras = id && isWeapon ? weaponExtras(id, item.itemHash) : undefined;
+    const progress = id && isWeapon ? weaponProgress(id) : undefined;
+    const crafted = (item.state & STATE_CRAFTED) !== 0;
     return {
       location,
       owner,
@@ -204,8 +316,16 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       damageIcon: elementIcon(inst?.damageTypeHash),
       locked: (item.state & STATE_LOCKED) !== 0,
       gearTier: inst?.gearTier || undefined,
-      perks: item.itemInstanceId && def?.itemType === WEAPON ? weaponPerks(item.itemInstanceId) : undefined,
-      stats: item.itemInstanceId && (def?.itemType === ARMOR || def?.itemType === WEAPON) ? itemStatValues(item.itemInstanceId) : undefined,
+      perks: id && isWeapon ? weaponPerks(id, item.itemHash) : undefined,
+      stats: id && (def?.itemType === ARMOR || isWeapon) ? itemStatValues(id) : undefined,
+      // Optional extras: only set when present, so plain rows stay small.
+      ...(id && (def?.itemType === ARMOR || isWeapon) && manifest.extras ? { statDetails: statDetails(id, item.itemHash) } : {}),
+      ...(extras?.intrinsic ? { intrinsic: extras.intrinsic } : {}),
+      ...(extras?.mods ? { mods: extras.mods } : {}),
+      ...(crafted ? { crafted } : {}),
+      ...(progress?.craftedLevel !== undefined ? { craftedLevel: progress.craftedLevel } : {}),
+      ...(progress?.killTracker ? { killTracker: progress.killTracker } : {}),
+      ...(manifest.extras?.[item.itemHash]?.flavorText ? { flavorText: manifest.extras[item.itemHash]!.flavorText } : {}),
     };
   };
 

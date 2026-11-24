@@ -79,6 +79,17 @@ export function App() {
     document.documentElement.style.setProperty('--tile-scale', String(tileScale));
   }, [tileScale]);
 
+  // Every copy of each item, so the hovercard and panel can say "2 other copies".
+  const byHash = useMemo(() => {
+    const m = new Map<number, AppraisedItem[]>();
+    if (state.status === 'ready') for (const i of state.inv.items) m.set(i.itemHash, [...(m.get(i.itemHash) ?? []), i]);
+    return m;
+  }, [state]);
+  const copiesOf = useCallback(
+    (item: AppraisedItem) => (item.instanceId ? (byHash.get(item.itemHash) ?? []).filter((i) => i.instanceId && i.instanceId !== item.instanceId) : []),
+    [byHash],
+  );
+
   const visible = useMemo(
     () => (state.status === 'ready' ? state.inv.items.filter((i) => matches(i, query, kind)) : []),
     [state, query, kind],
@@ -228,10 +239,12 @@ export function App() {
         <ItemDetail
           item={selected}
           onClose={closeDetail}
+          copies={copiesOf(selected)}
+          onSelect={setSelected}
           onAsk={(text) => { setAgentOpen(true); setSelected(null); setAsk((a) => ({ id: (a?.id ?? 0) + 1, text })); }}
         />
       )}
-      {hovered && !selected && <ItemHovercard item={hovered.item} anchor={hovered.anchor} />}
+      {hovered && !selected && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
     </div>
     </HoverContext.Provider>
   );

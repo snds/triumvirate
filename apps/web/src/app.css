@@ -373,7 +373,24 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .verdict-line--meh strong, .verdict-line--trash strong { color: var(--verdict-bad); }
 
 /* Perk grid: one column per socket, selected perk on top. */
+.perks-block { display: grid; gap: var(--space-2); }
 .perk-grid { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-1); }
+/* Frame gets a little separation from the perk columns, like the game. */
+.perk-grid__column--intrinsic { padding-right: var(--space-1); margin-right: var(--space-1); border-right: 1px solid var(--border-subtle); }
+.perk-grid__mods { display: flex; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.perk-cell.is-square .perk-cell__icon, .perk-cell.is-square .perk-cell__icon img { border-radius: var(--radius-sm); }
+.perk-cell.is-square.is-active .perk-cell__icon { background: var(--surface-raised); border-color: var(--border-subtle); }
+.perk-cell__enhanced {
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  display: grid;
+  place-items: center;
+  color: var(--perk-enhanced);
+}
+.perk-cell__enhanced .icon { font-size: 13px; font-variation-settings: 'FILL' 0, 'wght' 700, 'GRAD' 0, 'opsz' 20; }
+.perk-cell__text { display: grid; gap: 2px; }
+.perk-cell__desc { font-size: 11px; color: var(--text-secondary); max-width: 36ch; }
 .perk-grid--named { flex-wrap: wrap; gap: var(--space-3); }
 .perk-grid__column { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); align-content: start; }
 .perk-cell { display: flex; align-items: center; gap: var(--space-2); font-size: 12px; color: var(--text-muted); }
@@ -409,18 +426,46 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   line-height: 1;
 }
 .perk-cell__wish--inline { position: static; }
-.perk-grid--named { flex-direction: column; gap: var(--space-2); }
+.perks-block--named .perk-grid { flex-direction: column; gap: var(--space-2); }
 /* In the panel each socket is a row: the selected perk first, its alternatives after. */
-.perk-grid--named .perk-grid__column { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border-subtle); }
-.perk-grid--named .perk-cell:first-child { min-width: 170px; }
+.perks-block--named .perk-grid__column { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-1) var(--space-4); padding-bottom: var(--space-2); border-bottom: 1px solid var(--border-subtle); }
+.perks-block--named .perk-grid__column--intrinsic { border-right: 0; margin-right: 0; padding-right: 0; }
+.perks-block--named .perk-cell { align-items: flex-start; }
+.perks-block--named .perk-cell:first-child { min-width: 170px; }
+.perks-block--named .perk-grid__mods { flex-direction: column; }
+.drawer__flavor { margin: var(--space-1) 0 0; font-size: 12px; font-style: italic; color: var(--text-primary); opacity: 0.8; }
+
+/* Other copies */
+.copies { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.copy { display: grid; grid-template-columns: auto 1fr; gap: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); background: var(--surface-raised); }
+.copy__body { display: grid; gap: var(--space-1); min-width: 0; }
+.copy__where { font-size: 12px; color: var(--text-secondary); }
+.copy__where strong { color: var(--text-primary); }
+.copy .perk-cell__icon { width: 24px; height: 24px; }
 
 .stats { margin: 0; display: grid; gap: var(--space-1); }
 .stats__row { display: grid; grid-template-columns: 130px 1fr; align-items: center; font-size: 12px; }
 .stats__row dt { color: var(--text-secondary); text-align: right; padding-right: var(--space-3); }
 .stats__row dd { margin: 0; display: flex; align-items: center; gap: var(--space-2); }
-.stats__track { flex: 1; max-width: 160px; height: 8px; background: var(--surface-hover); }
-.stats__bar { display: block; height: 100%; background: var(--text-secondary); }
-.stats__value { min-width: 2.5em; font-variant-numeric: tabular-nums; }
+/* Fixed width so values line up whether or not a bonus is shown. */
+.stats__track { display: flex; flex: none; width: 160px; height: 8px; background: var(--surface-hover); }
+.stats--compact .stats__track { width: 130px; }
+.stats__bar { display: block; height: 100%; background: var(--stat-bar); }
+/* The part of the stat that perks, mods, and masterwork add. */
+.stats__bonus { display: block; height: 100%; background: var(--stat-bonus); }
+.stats__value { min-width: 2.2em; font-variant-numeric: tabular-nums; }
+.stats__value.is-boosted, .stats__delta { color: var(--stat-bonus); }
+.stats__value.is-reduced, .stats__delta.is-reduced { color: var(--danger); }
+.stats__delta { font-size: 0.9em; font-weight: 600; font-variant-numeric: tabular-nums; }
+.recoil { width: 32px; height: 19px; flex: none; }
+.recoil__arc { fill: var(--surface-hover); }
+.recoil__wedge { fill: var(--stat-bar); }
+
+/* Crafted, kill tracker, other copies */
+.facts { display: flex; flex-wrap: wrap; gap: var(--space-1); margin: 0; padding: 0; list-style: none; }
+.fact { display: inline-flex; align-items: center; gap: var(--space-1); padding: 2px var(--space-2); border-radius: 999px; background: var(--surface-raised); font-size: 11px; color: var(--text-secondary); }
+.fact .icon { font-size: 14px; }
+.drawer__body > .facts { margin-top: var(--space-3); }
 .stats__row--total { margin-top: var(--space-1); font-weight: 600; }
 .stats--compact .stats__row { grid-template-columns: 140px 1fr; font-size: 11px; }
 .stats__row dt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -135,3 +135,47 @@ test('summarizes currencies and vault space', () => {
     vault: { used: 2, capacity: 700 },
   });
 });
+
+test('splits weapon sockets into frame, perks, and mods, with stat bonuses and crafted level', () => {
+  const m = {
+    ...manifest,
+    items: {
+      10: { displayProperties: { name: 'Gun' }, itemType: 3, inventory: { bucketTypeHash: 10 } },
+      30: { displayProperties: { name: 'Rapid-Fire Frame' }, itemTypeDisplayName: 'Intrinsic' },
+      31: { displayProperties: { name: 'Fluted Barrel', description: 'Handling up.' }, itemTypeDisplayName: 'Barrel' },
+      32: { displayProperties: { name: 'Rampage' }, itemTypeDisplayName: 'Enhanced Trait' },
+      33: { displayProperties: { name: 'Masterworked: Stability' }, itemTypeDisplayName: 'Masterwork' },
+      34: { displayProperties: { name: 'Default Shader' }, itemTypeDisplayName: 'Shader' },
+      40: { displayProperties: { name: 'Shaped Weapon' }, itemTypeDisplayName: 'Memento' },
+    },
+    stats: { 155624089: { displayProperties: { name: 'Stability' } }, 4284893193: { displayProperties: { name: 'Rounds Per Minute' } } },
+    extras: {
+      10: { statGroupHash: 7, socketCategories: [[3956125808, [0]], [4241085061, [1, 2]], [2685412949, [3, 4]]] },
+      31: { investment: [[155624089, 5]] },
+      33: { investment: [[155624089, 10]] },
+    },
+    statGroups: { 7: { scaledStats: [{ statHash: 4284893193, displayAsNumeric: true }, { statHash: 155624089 }] } },
+    objectives: { 99: { uiStyle: 2 } },
+  } as unknown as ManifestTables;
+  const p = {
+    profileInventory: { data: { items: [{ itemHash: 10, bucketHash: VAULT_BUCKET, itemInstanceId: 'w', state: 8 }] } },
+    itemComponents: {
+      instances: { data: {} },
+      sockets: { data: { w: { sockets: [{ plugHash: 30 }, { plugHash: 31 }, { plugHash: 32 }, { plugHash: 33 }, { plugHash: 34 }] } } },
+      stats: { data: { w: { stats: { 155624089: { statHash: 155624089, value: 60 }, 4284893193: { statHash: 4284893193, value: 720 } } } } },
+      plugObjectives: { data: { w: { objectivesPerPlug: { 40: [{ objectiveHash: 99, progress: 17 }] } } } },
+    },
+  } as unknown as DestinyProfileResponse;
+  const [gun] = summarizeProfile(p, m);
+  assert.equal(gun?.intrinsic?.name, 'Rapid-Fire Frame');
+  assert.deepEqual(gun?.perks?.map((c) => c[0]?.name), ['Fluted Barrel', 'Rampage']);
+  assert.equal(gun?.perks?.[1]?.[0]?.enhanced, true);
+  assert.equal(gun?.perks?.[0]?.[0]?.description, 'Handling up.');
+  assert.deepEqual(gun?.mods?.map((x) => x.name), ['Masterworked: Stability']);
+  assert.deepEqual(gun?.statDetails, [
+    { hash: 4284893193, name: 'Rounds Per Minute', value: 720, bonus: 0, numeric: true },
+    { hash: 155624089, name: 'Stability', value: 60, bonus: 15, numeric: false },
+  ]);
+  assert.equal(gun?.crafted, true);
+  assert.equal(gun?.craftedLevel, 17);
+});

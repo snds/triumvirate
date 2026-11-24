@@ -1,17 +1,21 @@
 import { useEffect, useRef } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
 import { Icon } from './Icon.tsx';
-import { itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
+import { ItemFacts, itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
+import { ItemTile } from './ItemTile.tsx';
 
 interface Props {
   item: AppraisedItem;
   onClose: () => void;
   /** Sends a question about this item to the chat panel. */
   onAsk: (question: string) => void;
+  /** Other copies of the same item you own. */
+  copies: AppraisedItem[];
+  onSelect: (item: AppraisedItem) => void;
 }
 
 /** Peek panel: everything about one item, docked over the right side. */
-export function ItemDetail({ item, onClose, onAsk }: Props) {
+export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   // Escape closes the panel, like any dialog; focus moves in so keyboard users land here.
   useEffect(() => {
@@ -37,6 +41,7 @@ export function ItemDetail({ item, onClose, onAsk }: Props) {
         <div className="drawer__heading">
           <h2 className="drawer__title">{item.name}</h2>
           <p className="drawer__meta">{itemSummary(item)}</p>
+          {item.flavorText && <p className="drawer__flavor">{item.flavorText}</p>}
         </div>
         <button ref={closeRef} className="icon-button drawer__close" onClick={onClose} aria-label="Close" title="Close">
           <Icon name="close" />
@@ -52,6 +57,8 @@ export function ItemDetail({ item, onClose, onAsk }: Props) {
             Open on light.gg <Icon name="openExternal" />
           </a>
         </div>
+
+        <ItemFacts item={item} copies={copies.length} />
 
         {a && (
           <section className={`verdict verdict--${a.verdict}`}>
@@ -75,6 +82,26 @@ export function ItemDetail({ item, onClose, onAsk }: Props) {
           <section>
             <h3 className="drawer__section">Stats</h3>
             <StatBars item={item} />
+          </section>
+        )}
+
+        {copies.length > 0 && (
+          <section>
+            <h3 className="drawer__section">Other copies you own</h3>
+            <ul className="copies">
+              {copies.map((c, n) => (
+                <li key={c.instanceId ?? n} className="copy">
+                  <ItemTile item={c} onSelect={onSelect} />
+                  <div className="copy__body">
+                    <span className="copy__where">
+                      {c.power !== undefined && <strong>{c.power}</strong>} {c.location}{c.equipped ? ' (equipped)' : ''}
+                    </span>
+                    <VerdictLine item={c} />
+                    <PerkGrid item={c} />
+                  </div>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
-import { itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
+import { ItemFacts, itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 
 const GAP = 8;
 
 /** Quick look shown while hovering a tile. Placed beside the tile, flipped to stay on screen. */
-export function ItemHovercard({ item, anchor }: { item: AppraisedItem; anchor: DOMRect }) {
+export function ItemHovercard({ item, anchor, copies }: { item: AppraisedItem; anchor: DOMRect; copies: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
@@ -43,6 +43,7 @@ export function ItemHovercard({ item, anchor }: { item: AppraisedItem; anchor: D
           <span className="muted hovercard__where">{item.equipped ? 'Equipped · ' : ''}{item.location}</span>
         </div>
         <VerdictLine item={item} />
+        <ItemFacts item={item} copies={copies} />
         <PerkGrid item={item} />
         <StatBars item={item} compact />
         <p className="hovercard__hint">Click for full details</p>

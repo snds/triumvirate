@@ -25,6 +25,7 @@ const COMPONENTS = [
   300, // ItemInstances (power, element, gear tier)
   304, // ItemStats (armor stats)
   305, // ItemSockets (slotted perks)
+  309, // ItemPlugObjectives (crafted level, kill trackers)
   310, // ItemReusablePlugs (other perks in each column)
 ];
 

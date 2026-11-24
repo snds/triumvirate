@@ -95,6 +95,9 @@
   --avatar-size: 32px;
   --drawer-width: 440px;
   --hovercard-width: 360px;
+  --stat-bar: var(--gray-300);
+  --stat-bonus: var(--mint-400);
+  --perk-enhanced: var(--gold-400);
   --perk-active-fill: var(--blue-500);
   --perk-active-border: var(--gray-100);
   --agent-width: 400px;

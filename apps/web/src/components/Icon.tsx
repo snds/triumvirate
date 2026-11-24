@@ -15,6 +15,10 @@ const GLYPHS = {
   openExternal: 'open_in_new',
   chat: 'forum',
   newChat: 'edit_square',
+  crafted: 'construction',
+  tracker: 'my_location',
+  copies: 'filter_none',
+  enhanced: 'keyboard_double_arrow_up',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;
