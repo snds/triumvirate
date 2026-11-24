@@ -5,7 +5,7 @@ import { TierDiamonds } from './ItemParts.tsx';
 
 /**
  * The item's identity band, shared by the hovercard and the item dialog: tier diamonds and name,
- * rarity and type, then power with element, champion stun, and ammo. Tier color fills it;
+ * art with tier diamonds, name, rarity and type, then power with element, champion stun, and ammo. Tier color fills it;
  * masterworked items get the gold banner.
  */
 export function ItemHeader({ item, size, children }: {
@@ -15,24 +15,28 @@ export function ItemHeader({ item, size, children }: {
   children?: React.ReactNode;
 }) {
   const tier = item.tier.toLowerCase() || 'common';
-  const kind = [item.tier, item.type].filter(Boolean).join(' · ');
   return (
     <header className={`item-header item-header--${size} tier-${tier}${item.masterworked ? ' is-masterworked' : ''}`}>
-      {size === 'dialog' && item.icon && (
+      {/* The art, dressed like the inventory tile: watermark, masterwork shimmer, and the
+          tier diamonds standing in a column under the release icon. */}
+      {item.icon && (
         <span className="item-header__art">
           <img src={item.icon} alt="" />
           {item.watermark && <img src={item.watermark} alt="" />}
+          {item.masterworked && <span className="tile__holofoil" aria-hidden />}
+          <TierDiamonds item={item} className="tile__tier" />
         </span>
       )}
       <div className="item-header__id">
         <h2 className="item-header__name">
-          <TierDiamonds item={item} className="tier-diamonds--inline" />
           {item.name}
         </h2>
+        {/* Each part stays whole when the line wraps; the dot stays at the end of a line. */}
         <p className="item-header__kind">
-          {kind}
-          {item.gearTier ? <span className="item-header__tier"> · Tier {item.gearTier}</span> : null}
-          {item.masterworked ? <span className="item-header__mw"> · Masterworked</span> : null}
+          {item.tier && <span>{item.tier}</span>}
+          {item.type && <span>{item.type}</span>}
+          {item.gearTier ? <span>Tier {item.gearTier}</span> : null}
+          {item.masterworked ? <span className="item-header__mw">Masterworked</span> : null}
         </p>
         {size === 'dialog' && item.flavorText && <p className="item-header__flavor">{item.flavorText}</p>}
       </div>
