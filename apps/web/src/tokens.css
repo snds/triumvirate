@@ -52,6 +52,11 @@
   --tier-uncommon: var(--green-600);
   --tier-common: var(--stone-300);
 
+  --verdict-god: var(--gold-400);
+  --verdict-good: var(--mint-400);
+  --verdict-bad: #e5534b;
+  --overlay-scrim: rgb(0 0 0 / 0.55);
+
   --element-kinetic: var(--white-200);
   --element-arc: var(--cyan-300);
   --element-solar: var(--orange-500);
@@ -66,4 +71,7 @@
   --tile-border-width: 2px;
   --tile-gap: 6px;
   --column-min-width: 300px;
+  --drawer-width: 420px;
+  --agent-width: 400px;
+  --badge-size: 14px;
 }

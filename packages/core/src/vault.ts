@@ -33,7 +33,25 @@ export interface ItemRow {
   classType: number;
   damage?: string;
   locked: boolean;
+  /** Armor 3.0 gear tier (1-5); absent on older gear. */
+  gearTier?: number;
+  /** Weapon perk columns, in socket order. */
+  perks?: PerkOption[][];
+  /** Armor stats by stat name (e.g. Health, Grenade). */
+  stats?: Record<string, number>;
 }
+
+export interface PerkOption {
+  name: string;
+  icon?: string;
+  /** True for the perk currently slotted in this column. */
+  active: boolean;
+}
+
+// Plug types that aren't part of a roll: cosmetics, trackers, and masterwork/mod slots.
+const NOT_A_PERK = /shader|ornament|masterwork|mod\b|tracker|memento|empty|catalyst|deprecated|kill tracker/i;
+const WEAPON = 3;
+const ARMOR = 2;
 
 export interface CharacterRow {
   id: string;
@@ -62,6 +80,45 @@ export function summarizeCharacters(profile: DestinyProfileResponse): CharacterR
 
 export function summarizeProfile(profile: DestinyProfileResponse, manifest: ManifestTables): ItemRow[] {
   const instances = profile.itemComponents?.instances?.data ?? {};
+  const sockets = profile.itemComponents?.sockets?.data ?? {};
+  const reusable = profile.itemComponents?.reusablePlugs?.data ?? {};
+  const itemStats = profile.itemComponents?.stats?.data ?? {};
+
+  const perkOption = (hash: number, active: boolean): PerkOption | undefined => {
+    const d = manifest.items[hash];
+    if (!d?.displayProperties.name || NOT_A_PERK.test(d.itemTypeDisplayName ?? '')) return undefined;
+    return { name: d.displayProperties.name, icon: bungieUrl(d.displayProperties.icon), active };
+  };
+
+  const weaponPerks = (instanceId: string): PerkOption[][] | undefined => {
+    const socketList = sockets[instanceId]?.sockets;
+    if (!socketList) return undefined;
+    const options = reusable[instanceId]?.plugs ?? {};
+    const columns: PerkOption[][] = [];
+    socketList.forEach((socket, index) => {
+      if (!socket.plugHash || socket.isVisible === false) return;
+      const active = perkOption(socket.plugHash, true);
+      if (!active) return;
+      // Other perks this roll can switch to in the same column (multi-perk columns).
+      const alts = (options[index] ?? [])
+        .filter((p) => p.plugItemHash !== socket.plugHash)
+        .map((p) => perkOption(p.plugItemHash, false))
+        .filter((p): p is PerkOption => !!p);
+      columns.push([active, ...alts]);
+    });
+    return columns;
+  };
+
+  const armorStats = (instanceId: string): Record<string, number> | undefined => {
+    const s = itemStats[instanceId]?.stats;
+    if (!s) return undefined;
+    const out: Record<string, number> = {};
+    for (const st of Object.values(s)) {
+      const name = manifest.stats[st.statHash]?.displayProperties.name;
+      if (name) out[name] = st.value;
+    }
+    return out;
+  };
   const rows: ItemRow[] = [];
 
   const toRow = (item: DestinyItemComponent, location: string, owner: string, equipped: boolean): ItemRow => {
@@ -86,6 +143,9 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       classType: def?.classType ?? 3,
       damage: inst?.damageType ? DAMAGE_NAMES[inst.damageType] : undefined,
       locked: (item.state & STATE_LOCKED) !== 0,
+      gearTier: inst?.gearTier || undefined,
+      perks: item.itemInstanceId && def?.itemType === WEAPON ? weaponPerks(item.itemInstanceId) : undefined,
+      stats: item.itemInstanceId && def?.itemType === ARMOR ? armorStats(item.itemInstanceId) : undefined,
     };
   };
 

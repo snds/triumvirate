@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchInventory, logout, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
+import type { AppraisedItem } from '@triumvirate/core';
 import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
+import { ItemDetail } from './components/ItemDetail.tsx';
+import { CleanupView } from './components/CleanupView.tsx';
+import { AgentPanel } from './components/AgentPanel.tsx';
 
 type State =
   | { status: 'loading' }
@@ -21,6 +25,9 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind>('all');
+  const [view, setView] = useState<'inventory' | 'cleanup'>('inventory');
+  const [selected, setSelected] = useState<AppraisedItem | null>(null);
+  const [agentOpen, setAgentOpen] = useState(false);
   const [, tick] = useState(0);
 
   const load = useCallback(async (refresh: boolean) => {
@@ -71,6 +78,22 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <h1 className="brand">Triumvirate</h1>
+        <nav className="segmented" aria-label="View">
+          <button
+            className={`segmented__option${view === 'inventory' ? ' is-selected' : ''}`}
+            aria-current={view === 'inventory' ? 'page' : undefined}
+            onClick={() => setView('inventory')}
+          >
+            Inventory
+          </button>
+          <button
+            className={`segmented__option${view === 'cleanup' ? ' is-selected' : ''}`}
+            aria-current={view === 'cleanup' ? 'page' : undefined}
+            onClick={() => setView('cleanup')}
+          >
+            Cleanup <span className="muted">{inv.cleanup.length}</span>
+          </button>
+        </nav>
         <input
           className="search"
           type="search"
@@ -94,6 +117,7 @@ export function App() {
         </div>
         <div className="topbar__end">
           <span className="muted">{inv.displayName} · synced {timeAgo(inv.syncedAt)}</span>
+          <button className="button button--primary" onClick={() => setAgentOpen((o) => !o)}>Ask</button>
           <button className="button" onClick={() => void load(true)} disabled={syncing}>
             {syncing ? 'Syncing…' : 'Refresh'}
           </button>
@@ -106,13 +130,29 @@ export function App() {
         </div>
       </header>
 
-      <div className="columns">
-        {inv.characters.map((c) => (
-          <CharacterColumn key={c.id} character={c} items={visible.filter((i) => i.owner === c.id)} />
-        ))}
-      </div>
+      {view === 'inventory' ? (
+        <>
+          <div className="columns">
+            {inv.characters.map((c) => (
+              <CharacterColumn
+                key={c.id}
+                character={c}
+                items={visible.filter((i) => i.owner === c.id)}
+                onSelect={setSelected}
+              />
+            ))}
+          </div>
+          <VaultSection items={visible.filter((i) => i.owner === 'vault')} total={vaultTotal} onSelect={setSelected} />
+        </>
+      ) : (
+        <CleanupView
+          cleanup={inv.cleanup.filter((c) => matches(c.item, query, kind))}
+          onSelect={setSelected}
+        />
+      )}
 
-      <VaultSection items={visible.filter((i) => i.owner === 'vault')} total={vaultTotal} />
+      {selected && <ItemDetail item={selected} onClose={() => setSelected(null)} />}
+      {agentOpen && <AgentPanel enabled={inv.agentEnabled} onClose={() => setAgentOpen(false)} />}
     </div>
   );
 }

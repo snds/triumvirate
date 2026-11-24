@@ -1,5 +1,5 @@
 // Pure view logic: filtering and grouping items for display. No React here, so it's easy to test.
-import type { ItemRow } from '@triumvirate/core';
+import type { AppraisedItem, ItemRow } from '@triumvirate/core';
 
 export type Kind = 'all' | 'weapons' | 'armor';
 
@@ -11,27 +11,27 @@ export const SLOT_ORDER = [
 const WEAPON = 3;
 const ARMOR = 2;
 
-export function matches(item: ItemRow, query: string, kind: Kind): boolean {
+export function matches(item: AppraisedItem, query: string, kind: Kind): boolean {
   if (kind === 'weapons' && item.itemType !== WEAPON) return false;
   if (kind === 'armor' && item.itemType !== ARMOR) return false;
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  // Every word must appear somewhere, so "solar hand" finds Solar hand cannons.
-  const hay = `${item.name} ${item.type} ${item.tier} ${item.damage ?? ''}`.toLowerCase();
+  // Every word must appear somewhere, so "solar hand" finds Solar hand cannons and "god" finds god rolls.
+  const hay = `${item.name} ${item.type} ${item.tier} ${item.damage ?? ''} ${item.appraisal?.verdict ?? ''}`.toLowerCase();
   return q.split(/\s+/).every((w) => hay.includes(w));
 }
 
-export interface SlotGroup {
+export interface SlotGroup<T extends ItemRow = ItemRow> {
   slot: string;
-  items: ItemRow[];
+  items: T[];
 }
 
 /**
  * Groups items by slot in game order; "Other" collects the rest when `includeOther`.
  * Within a slot: equipped first, then highest power, then name.
  */
-export function groupBySlot(items: ItemRow[], includeOther: boolean): SlotGroup[] {
-  const bySlot = new Map<string, ItemRow[]>();
+export function groupBySlot<T extends ItemRow>(items: T[], includeOther: boolean): SlotGroup<T>[] {
+  const bySlot = new Map<string, T[]>();
   for (const item of items) {
     const slot = SLOT_ORDER.includes(item.bucket) ? item.bucket : 'Other';
     if (slot === 'Other' && !includeOther) continue;

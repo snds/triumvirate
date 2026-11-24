@@ -37,6 +37,7 @@ test('lists vault items with their real bucket and power', () => {
       location: 'Vault', owner: 'vault', name: 'Fatebringer', type: 'Hand Cannon', bucket: 'Kinetic Weapons', bucketHash: 10,
       power: 1990, equipped: false, itemHash: 1, instanceId: 'a', icon: undefined, watermark: undefined,
       tier: '', itemType: 0, classType: 3, damage: 'Arc', locked: true,
+      gearTier: undefined, perks: undefined, stats: undefined,
     },
   );
 });
@@ -60,6 +61,39 @@ test('orders characters by most recently played', () => {
   const chars = summarizeCharacters(p);
   assert.deepEqual(chars.map((c) => c.className), ['Hunter', 'Titan']);
   assert.equal(chars[0]?.emblemBackground, 'https://www.bungie.net/e.jpg');
+});
+
+test('reads weapon perk columns and armor stats', () => {
+  const m = {
+    ...manifest,
+    items: {
+      10: { displayProperties: { name: 'Gun' }, itemType: 3, inventory: { bucketTypeHash: 10 } },
+      11: { displayProperties: { name: 'Hood' }, itemType: 2, inventory: { bucketTypeHash: 10 } },
+      20: { displayProperties: { name: 'Rampage', icon: '/r.png' }, itemTypeDisplayName: 'Trait' },
+      21: { displayProperties: { name: 'Kill Clip' }, itemTypeDisplayName: 'Trait' },
+      22: { displayProperties: { name: 'Default Shader' }, itemTypeDisplayName: 'Shader' },
+    },
+    stats: { 900: { displayProperties: { name: 'Health' } } },
+  } as unknown as ManifestTables;
+  const p = {
+    profileInventory: { data: { items: [
+      { itemHash: 10, bucketHash: VAULT_BUCKET, itemInstanceId: 'w', state: 0 },
+      { itemHash: 11, bucketHash: VAULT_BUCKET, itemInstanceId: 'a', state: 0 },
+    ] } },
+    itemComponents: {
+      instances: { data: { w: {}, a: { gearTier: 4 } } },
+      sockets: { data: { w: { sockets: [{ plugHash: 20, isVisible: true }, { plugHash: 22, isVisible: true }] } } },
+      reusablePlugs: { data: { w: { plugs: { 0: [{ plugItemHash: 20 }, { plugItemHash: 21 }] } } } },
+      stats: { data: { a: { stats: { 900: { statHash: 900, value: 27 } } } } },
+    },
+  } as unknown as DestinyProfileResponse;
+  const [gun, hood] = summarizeProfile(p, m);
+  assert.deepEqual(gun?.perks, [[
+    { name: 'Rampage', icon: 'https://www.bungie.net/r.png', active: true },
+    { name: 'Kill Clip', icon: undefined, active: false },
+  ]]);
+  assert.deepEqual(hood?.stats, { Health: 27 });
+  assert.equal(hood?.gearTier, 4);
 });
 
 test('refreshes a token within a minute of expiry', () => {

@@ -1,8 +1,8 @@
-import type { ItemRow } from '@triumvirate/core';
 import { groupBySlot } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
+import type { AppraisedItem } from '@triumvirate/core';
 
-export function VaultSection({ items, total }: { items: ItemRow[]; total: number }) {
+export function VaultSection({ items, total, onSelect }: { items: AppraisedItem[]; total: number; onSelect: (i: AppraisedItem) => void }) {
   const groups = groupBySlot(items, true);
   return (
     <section className="vault" aria-label="Vault">
@@ -16,7 +16,7 @@ export function VaultSection({ items, total }: { items: ItemRow[]; total: number
             {g.slot} <span className="vault__count">{g.items.length}</span>
           </h3>
           <div className="grid">
-            {g.items.map((i, n) => <ItemTile key={i.instanceId ?? `${i.itemHash}-${n}`} item={i} />)}
+            {g.items.map((i, n) => <ItemTile key={i.instanceId ?? `${i.itemHash}-${n}`} item={i} onSelect={onSelect} />)}
           </div>
         </div>
       ))}

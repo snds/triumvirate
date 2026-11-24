@@ -7,16 +7,17 @@ import { createApp } from './app.ts';
 import { createStore } from './store.ts';
 
 const cfg = { apiKey: 'k', clientId: '123', clientSecret: 's' };
+const deps = { wishList: async () => new Map() };
 
 test('inventory says signed out when there is no token', async () => {
-  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))));
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
   const res = await app.request('/api/inventory');
   assert.equal(res.status, 401);
   assert.deepEqual(await res.json(), { signedIn: false });
 });
 
 test('login redirects to Bungie with a state value', async () => {
-  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))));
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
   const res = await app.request('/auth/login');
   assert.equal(res.status, 302);
   const loc = new URL(res.headers.get('location')!);
@@ -26,8 +27,15 @@ test('login redirects to Bungie with a state value', async () => {
 });
 
 test('callback rejects a mismatched state', async () => {
-  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))));
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
   await app.request('/auth/login');
   const res = await app.request('/auth/callback?code=abc&state=wrong');
   assert.equal(res.status, 400);
+});
+
+test('agent explains how to turn it on when there is no API key', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  const res = await app.request('/api/agent', { method: 'POST', body: JSON.stringify({ messages: [] }) });
+  assert.equal(res.status, 400);
+  assert.match((await res.json()).error, /ANTHROPIC_API_KEY/);
 });

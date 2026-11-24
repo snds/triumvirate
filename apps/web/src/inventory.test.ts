@@ -13,6 +13,7 @@ test('search needs every word, across name, type, and element', () => {
   assert.equal(matches(sunshot, 'solar hand', 'all'), true);
   assert.equal(matches(sunshot, 'solar auto', 'all'), false);
   assert.equal(matches(sunshot, '', 'armor'), false);
+  assert.equal(matches({ ...sunshot, appraisal: { verdict: 'god', pve: true, pvp: false, rollCount: 3 } }, 'god', 'all'), true);
 });
 
 test('groups by slot in game order, equipped then power first', () => {

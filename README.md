@@ -10,8 +10,8 @@ The full product plan lives in the "Destiny Companion — Product Plan" doc in t
 | Step | What lands |
 | --- | --- |
 | 0 | Spike: sign in with Bungie, pull the profile, list every item by name (done) |
-| 1 | **Foundation (current):** React web app, API server, snapshot sync, vault and character views |
-| 2 | Wish-list roll scoring, vault cleanup list, agent side panel |
+| 1 | Foundation: React web app, API server, snapshot sync, vault and character views (done) |
+| 2 | **Appraisal (current):** wish-list roll scoring, vault cleanup list, agent side panel |
 | 3 | Play-style profile (match history, loadouts, DIM) and build cards |
 | 4 | Vendor highlights, farming list, weekly digest |
 | 5 | Actions: move, equip, lock, apply loadout, DIM tag write-back |
@@ -43,6 +43,16 @@ The full product plan lives in the "Destiny Companion — Product Plan" doc in t
 4. Open <https://localhost:5443>, accept the self-signed certificate warning, and sign in.
    The first load after the server starts reads the item database (about 60 MB), so give it a few seconds.
    **Refresh** pulls a fresh copy of your profile and saves it as a snapshot (the last 50 are kept).
+   The community wish list (about 30 MB) downloads on first use and refreshes once a day.
+
+## How the features work
+
+- **Roll badges:** ★ god roll, ✓ recommended, ✕ no recommended roll matches. Perks are compared by name,
+  so enhanced perks count. Source: the community "voltron" wish list DIM uses.
+- **Cleanup:** duplicates with a better copy, lone rolls no list wants ("Check"), and armor beaten in every
+  stat by another piece for the same class and slot ("Safe"). Locked and equipped items are never listed.
+  **Copy DIM search** gives you an `id:` search to select them all in DIM.
+- **Ask:** Claude (`claude-opus-5-5`) with read-only tools over your snapshot. Needs `ANTHROPIC_API_KEY` in `.env`.
 
 Tokens and the manifest cache live in `.data/` (git-ignored). Never commit `.env`.
 

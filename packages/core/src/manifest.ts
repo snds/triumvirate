@@ -7,6 +7,7 @@ import {
   getDestinyManifest,
   type DestinyInventoryBucketDefinition,
   type DestinyInventoryItemLiteDefinition,
+  type DestinyStatDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 
@@ -14,11 +15,13 @@ export interface ManifestTables {
   version: string;
   items: Record<string, DestinyInventoryItemLiteDefinition>;
   buckets: Record<string, DestinyInventoryBucketDefinition>;
+  stats: Record<string, DestinyStatDefinition>;
 }
 
 const TABLES = {
   items: 'DestinyInventoryItemLiteDefinition',
   buckets: 'DestinyInventoryBucketDefinition',
+  stats: 'DestinyStatDefinition',
 } as const;
 
 /**
@@ -54,6 +57,6 @@ export async function loadManifest(
     }
   };
 
-  const [items, buckets] = await Promise.all([load(TABLES.items), load(TABLES.buckets)]);
-  return { version: m.version, items, buckets };
+  const [items, buckets, stats] = await Promise.all([load(TABLES.items), load(TABLES.buckets), load(TABLES.stats)]);
+  return { version: m.version, items, buckets, stats };
 }
