@@ -12,6 +12,7 @@ import {
   type DestinyInventoryItemDefinition,
   type DestinyObjectiveDefinition,
   type DestinyStatGroupDefinition,
+  type DestinyBreakerTypeDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 
@@ -28,6 +29,8 @@ export interface ManifestTables {
   statGroups?: Record<string, Pick<DestinyStatGroupDefinition, 'scaledStats'>>;
   /** Objective styles, to find crafted level and kill tracker counts. */
   objectives?: Record<string, ObjectiveExtra>;
+  /** Champion stun types (Anti-Barrier, Overload, Unstoppable) with their icons. */
+  breakerTypes?: Record<string, Pick<DestinyBreakerTypeDefinition, 'displayProperties'>>;
 }
 
 /** The parts of the full item definition the app needs (the full table is hundreds of MB). */
@@ -40,6 +43,8 @@ export interface ItemExtra {
   /** Socket category hash and the socket indexes in it. */
   socketCategories?: [number, number[]][];
   flavorText?: string;
+  /** Built-in champion stun (exotics and some legendaries). */
+  breakerTypeHash?: number;
 }
 
 export interface ObjectiveExtra {
@@ -60,6 +65,7 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       const cats = d.sockets?.socketCategories;
       if (cats?.length) x.socketCategories = cats.map((c) => [c.socketCategoryHash, c.socketIndexes]);
       if (d.flavorText) x.flavorText = d.flavorText;
+      if (d.breakerTypeHash) x.breakerTypeHash = d.breakerTypeHash;
     }
     if (d.plug?.plugCategoryIdentifier) x.plugCategory = d.plug.plugCategoryIdentifier;
     const inv = (d.investmentStats ?? []).filter((st) => !st.isConditionallyActive && st.value !== 0);
@@ -77,7 +83,11 @@ const TABLES = {
   statGroups: 'DestinyStatGroupDefinition',
   objectives: 'DestinyObjectiveDefinition',
   fullItems: 'DestinyInventoryItemDefinition',
+  breakerTypes: 'DestinyBreakerTypeDefinition',
 } as const;
+
+/** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
+const SLIM_VERSION = 2;
 
 /**
  * Returns the manifest tables, or undefined when `currentVersion` is already the
@@ -106,7 +116,7 @@ export async function loadManifest(
   };
   // Cached as-is, or (when `slim` is given) trimmed first so only the small file is kept.
   const load = async <T>(table: string, slim?: (full: any) => T): Promise<T> => {
-    const file = join(dir, `${table}${slim ? '.slim' : ''}.json`);
+    const file = join(dir, `${table}${slim ? `.slim${SLIM_VERSION}` : ''}.json`);
     try {
       return JSON.parse(await readFile(file, 'utf8'));
     } catch {
@@ -121,7 +131,7 @@ export async function loadManifest(
     }
   };
 
-  const [items, buckets, stats, damageTypes, statGroups, objectives] = await Promise.all([
+  const [items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes] = await Promise.all([
     load<ManifestTables['items']>(TABLES.items),
     load<ManifestTables['buckets']>(TABLES.buckets),
     load<ManifestTables['stats']>(TABLES.stats),
@@ -130,8 +140,10 @@ export async function loadManifest(
       Object.fromEntries(Object.entries(full).map(([h, g]) => [h, { scaledStats: g.scaledStats }]))),
     load(TABLES.objectives, (full: Record<string, DestinyObjectiveDefinition>) =>
       Object.fromEntries(Object.entries(full).map(([h, o]) => [h, { uiStyle: o.uiStyle, progressDescription: o.progressDescription }]))),
+    load(TABLES.breakerTypes, (full: Record<string, DestinyBreakerTypeDefinition>) =>
+      Object.fromEntries(Object.entries(full).map(([h, b]) => [h, { displayProperties: b.displayProperties }]))),
   ]);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, extras };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, extras };
 }

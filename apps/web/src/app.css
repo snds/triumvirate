@@ -791,7 +791,7 @@ body.is-dragging-item .tile { pointer-events: none; }
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
 }
 .tier-diamonds.is-masterworked .tier-diamonds__d { background: var(--masterwork); }
-.tile__tier { position: absolute; z-index: 1; left: calc(3px * var(--s)); top: calc(var(--badge-size) * var(--s) + 4px); pointer-events: none; }
+.tile__tier { position: absolute; z-index: 1; left: calc(3px * var(--s)); top: calc(4px * var(--s)); pointer-events: none; }
 /* The big equipped tile keeps diamonds at the regular size. */
 .tile--lg .tile__tier { --s: var(--tile-scale); }
 .tier-diamonds--inline { --s: 1.3; flex-direction: row; gap: 5px; align-items: center; margin-right: 10px; vertical-align: middle; }
@@ -814,3 +814,7 @@ body.is-dragging-item .tile { pointer-events: none; }
   background-blend-mode: normal;
 }
 @media (prefers-reduced-motion: reduce) { .tile__holofoil { background-image: none; } }
+
+/* Champion stun icon: same height as the element icon in the power strip. */
+.tile__breaker { width: calc(var(--tile-element-icon) * var(--s)); height: calc(var(--tile-element-icon) * var(--s)); }
+.hovercard__breaker { width: 20px; height: 20px; }

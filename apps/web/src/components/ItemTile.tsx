@@ -2,7 +2,7 @@ import { useHover } from '../hover.ts';
 import { memo } from 'react';
 import { useDragActions } from '../drag.ts';
 import { useInventory } from '../inventory-context.ts';
-import { Icon, type IconName } from './Icon.tsx';
+import { Icon } from './Icon.tsx';
 import { ElementIcon } from './ElementIcon.tsx';
 import { TierDiamonds } from './ItemParts.tsx';
 import type { AppraisedItem, Verdict } from '@triumvirate/core';
@@ -18,7 +18,6 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
   trash: 'Marked as trash',
   unrated: 'No wish list data',
 };
-const BADGE: Partial<Record<Verdict, IconName>> = { god: 'star', good: 'check', meh: 'cross', trash: 'cross' };
 
 /** Hover lift: nudges the tile toward the pointer. Written straight to CSS variables, so no re-render. */
 function tilt(e: React.PointerEvent<HTMLElement>) {
@@ -57,9 +56,10 @@ export const ItemTile = memo(function ItemTile({
       {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" decoding="async" draggable={false} />}
       {item.masterworked && <span className="tile__holofoil" aria-hidden />}
       <TierDiamonds item={item} className="tile__tier" />
-      {verdict && BADGE[verdict] && <span className={`tile__badge tile__badge--${verdict}`}><Icon name={BADGE[verdict]} filled /></span>}
       {item.power !== undefined && (
         <span className="tile__power">
+          {/* Champion stun sits just before the element, like the game's tooltip. */}
+          {item.breaker?.icon && <img className="tile__breaker" src={item.breaker.icon} alt={item.breaker.name} title={item.breaker.name} draggable={false} />}
           {item.damageIcon
             ? <ElementIcon className="tile__element-icon" damage={item.damage} icon={item.damageIcon} />
             : item.damage && <span className="tile__element" style={{ background: elementVar(item.damage) }} />}

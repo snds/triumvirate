@@ -32,6 +32,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
     ['Location', `${item.location}${item.equipped ? ' (equipped)' : ''}`],
     ['Power', item.power],
     ['Element', item.damage],
+    ['Champion stun', item.breaker?.name],
     ['Gear tier', item.gearTier],
     ['Masterworked', item.itemType === 2 || item.itemType === 3 ? (item.masterworked ? 'Yes' : 'No') : undefined],
     ['Locked', item.locked ? 'Yes' : 'No'],

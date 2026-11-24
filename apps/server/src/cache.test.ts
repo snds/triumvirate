@@ -19,7 +19,7 @@ function fakeBungie(stamp: { value: string }) {
     if (url.includes('/Destiny2/Manifest/')) {
       calls.manifest++;
       const tables = ['DestinyInventoryItemLiteDefinition', 'DestinyInventoryBucketDefinition', 'DestinyStatDefinition', 'DestinyDamageTypeDefinition',
-        'DestinyStatGroupDefinition', 'DestinyObjectiveDefinition', 'DestinyInventoryItemDefinition'];
+        'DestinyStatGroupDefinition', 'DestinyObjectiveDefinition', 'DestinyInventoryItemDefinition', 'DestinyBreakerTypeDefinition'];
       return ok({ version: 'v1', jsonWorldComponentContentPaths: { en: Object.fromEntries(tables.map((t) => [t, `/m/${t}.json`])) } });
     }
     if (url.includes('/m/')) return new Response('{}');

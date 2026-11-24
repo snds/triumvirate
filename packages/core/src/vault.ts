@@ -71,6 +71,8 @@ export interface ItemRow {
   craftedLevel?: number;
   killTracker?: { label: string; count: number };
   flavorText?: string;
+  /** Champion stun this weapon has built in: Anti-Barrier, Overload, or Unstoppable. */
+  breaker?: { name: string; icon?: string };
   /** Applied ornament ("fashion"), when it changes the look. `icon` above is then the ornament's art. */
   ornament?: { name: string; icon?: string };
   /** The item's own art, kept when an ornament replaces `icon`. */
@@ -376,6 +378,9 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     const styleIcon = styleDef?.displayProperties.icon;
     const ornament = styleDef && styleIcon && styleIcon !== def?.displayProperties.icon
       && !/^default/i.test(styleDef.displayProperties.name) ? styleDef : undefined;
+    // Champion stun: the instance knows (it can change), else the definition.
+    const breakerHash = inst?.breakerTypeHash || manifest.extras?.[item.itemHash]?.breakerTypeHash;
+    const breakerDef = breakerHash ? manifest.breakerTypes?.[breakerHash] : undefined;
     const movable = !!id && !equipped && item.bucketHash !== SUBCLASS_BUCKET && (inPostmaster || !notTransferrable);
     return {
       location,
@@ -412,6 +417,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
         ornament: { name: ornament.displayProperties.name, icon: bungieUrl(ornament.displayProperties.icon) },
         baseIcon: bungieUrl(def?.displayProperties.icon),
       } : {}),
+      ...(breakerDef ? { breaker: { name: breakerDef.displayProperties.name, icon: bungieUrl(breakerDef.displayProperties.icon) } } : {}),
       ...(movable ? { movable } : {}),
       ...(movable && inPostmaster && notTransferrable ? { pullOnly: true } : {}),
     };

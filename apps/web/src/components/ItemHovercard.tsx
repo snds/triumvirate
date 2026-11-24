@@ -38,9 +38,10 @@ export function ItemHovercard({ item, anchor, copies }: { item: AppraisedItem; a
       </header>
       <div className="hovercard__body">
         <div className="hovercard__power">
+          {item.breaker?.icon && <img className="hovercard__breaker" src={item.breaker.icon} alt="" title={item.breaker.name} />}
           <ElementIcon className="hovercard__element" damage={item.damage} icon={item.damageIcon} />
           {item.power !== undefined && <span>{item.power}</span>}
-          {item.damage && <span className="muted">{item.damage}</span>}
+          {item.damage && <span className="muted">{item.damage}{item.breaker ? ` · ${item.breaker.name}` : ''}</span>}
           <span className="muted hovercard__where">{item.equipped ? 'Equipped · ' : ''}{item.location}</span>
         </div>
         <VerdictLine item={item} />

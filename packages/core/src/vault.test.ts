@@ -250,3 +250,21 @@ test('an ornament in the ornament socket counts when Bungie leaves overrideStyle
   assert.equal(row?.ornament?.name, 'Timelost Finish');
   assert.equal(row?.icon, 'https://www.bungie.net/orn.png');
 });
+
+test('reads a weapon\'s champion stun from the instance or the definition', () => {
+  const m = {
+    ...manifest,
+    extras: { 2: { breakerTypeHash: 30 } },
+    breakerTypes: { 20: { displayProperties: { name: 'Overload', icon: '/over.png' } }, 30: { displayProperties: { name: 'Unstoppable', icon: '/stop.png' } } },
+  } as unknown as ManifestTables;
+  const p = {
+    profileInventory: { data: { items: [
+      { itemHash: 1, bucketHash: VAULT_BUCKET, itemInstanceId: 'a', state: 0 },
+      { itemHash: 2, bucketHash: VAULT_BUCKET, itemInstanceId: 'b', state: 0 },
+    ] } },
+    itemComponents: { instances: { data: { a: { breakerTypeHash: 20 }, b: {} } } },
+  } as unknown as DestinyProfileResponse;
+  const [a, b] = summarizeProfile(p, m);
+  assert.deepEqual(a?.breaker, { name: 'Overload', icon: 'https://www.bungie.net/over.png' });
+  assert.equal(b?.breaker?.name, 'Unstoppable');
+});
