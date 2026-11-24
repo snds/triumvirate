@@ -795,15 +795,30 @@ body.is-dragging-item .tile { pointer-events: none; }
   background: var(--band);
   color: var(--text-primary);
 }
-.item-header.is-masterworked { border-top: 3px solid var(--masterwork); isolation: isolate; }
-/* The banner is a vector mask filled with the masterwork token, so it stays sharp at any header
-   height and follows the token if the gold changes. It sits behind the header's content. */
+.item-header.is-masterworked {
+  /* Bar thickness and pattern height scale with the header; the dialog sets larger ones. */
+  --mw-bar: 4px;
+  --mw-pattern: 80px;
+  border-top: var(--mw-bar) solid var(--masterwork);
+  isolation: isolate;
+}
+/* The banner: the SVG is only the chevron shape, used as a mask. The fade is a gradient of the
+   masterwork token, so the shape stays sharp at any size and follows the token's color. */
 .item-header.is-masterworked::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: var(--masterwork);
-  -webkit-mask: url('./assets/masterwork-header.svg') top left / auto 100% repeat-x;
-  mask: url('./assets/masterwork-header.svg') top left / auto 100% repeat-x;
+  background: linear-gradient(
+    color-mix(in srgb, var(--masterwork) 38%, transparent),
+    color-mix(in srgb, var(--masterwork) 30%, transparent) 12%,
+    color-mix(in srgb, var(--masterwork) 16%, transparent) 24%,
+    color-mix(in srgb, var(--masterwork) 7%, transparent) 35%,
+    color-mix(in srgb, var(--masterwork) 5%, transparent) 55%,
+    color-mix(in srgb, var(--masterwork) 2%, transparent) 80%,
+    transparent
+  ) top / 100% var(--mw-pattern) no-repeat;
+  -webkit-mask: url('./assets/masterwork-header.svg') top left / auto var(--mw-pattern) repeat-x;
+  mask: url('./assets/masterwork-header.svg') top left / auto var(--mw-pattern) repeat-x;
 }
+.item-header--dialog.is-masterworked { --mw-bar: 5px; --mw-pattern: 104px; }
 .item-header__id { min-width: 0; }
 .item-header__name { display: flex; align-items: center; margin: 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; }
 .item-header__kind { margin: 2px 0 0; font-size: 11px; opacity: 0.9; }
