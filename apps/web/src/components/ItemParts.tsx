@@ -17,8 +17,9 @@ function detailsOf(item: AppraisedItem): StatDetail[] {
   }));
 }
 
-export function StatBars({ item, compact }: { item: AppraisedItem; compact?: boolean }) {
-  const stats = detailsOf(item);
+export function StatBars({ item, compact, stats: given }: { item: AppraisedItem; compact?: boolean; stats?: StatDetail[] }) {
+  // `stats` overrides the item's own, e.g. the weapon's base stats on the All rolls tab.
+  const stats = given ?? detailsOf(item);
   if (stats.length === 0) return null;
   // Armor stats top out far lower than weapon stats.
   const max = item.itemType === WEAPON ? 100 : 45;
@@ -144,12 +145,18 @@ export function PerkGrid({ item, showNames }: { item: AppraisedItem; showNames?:
   );
 }
 
-function PerkCell({ perk, wished, showName, square }: { perk: PerkOption; wished: boolean; showName?: boolean; square?: boolean }) {
+export function PerkCell({ perk, wished, showName, square, className, onPoint }: {
+  perk: PerkOption; wished: boolean; showName?: boolean; square?: boolean;
+  className?: string;
+  /** Makes the cell focusable and reports when it's pointed at or focused. */
+  onPoint?: (perk: PerkOption) => void;
+}) {
   const label = [perk.name, perk.enhanced && 'enhanced', perk.active && 'selected', wished && 'in a recommended roll']
     .filter(Boolean).join(' · ');
   return (
     <li
-      className={`perk-cell${perk.active ? ' is-active' : ''}${wished ? ' is-wished' : ''}${square ? ' is-square' : ''}`}
+      className={`perk-cell${perk.active ? ' is-active' : ''}${wished ? ' is-wished' : ''}${square ? ' is-square' : ''}${className ? ` ${className}` : ''}`}
+      {...(onPoint ? { tabIndex: 0, onMouseEnter: () => onPoint(perk), onFocus: () => onPoint(perk) } : {})}
       title={perk.description ? `${label}\n\n${perk.description}` : label}
     >
       <span className="perk-cell__icon">

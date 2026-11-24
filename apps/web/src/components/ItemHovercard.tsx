@@ -1,7 +1,7 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
-import { ElementIcon } from './ElementIcon.tsx';
-import { ItemFacts, itemSummary, PerkGrid, StatBars, TierDiamonds, VerdictLine } from './ItemParts.tsx';
+import { ItemFacts, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
+import { ItemHeader } from './ItemHeader.tsx';
 
 const GAP = 8;
 
@@ -32,18 +32,9 @@ export function ItemHovercard({ item, anchor, copies }: { item: AppraisedItem; a
       role="tooltip"
       style={pos ? { left: pos.left, top: pos.top } : { visibility: 'hidden', left: 0, top: 0 }}
     >
-      <header className={`hovercard__header${item.masterworked ? ' is-masterworked' : ''}`}>
-        <strong className="hovercard__name"><TierDiamonds item={item} className="tier-diamonds--inline" />{item.name}</strong>
-        <span className="hovercard__meta">{itemSummary(item)}</span>
-      </header>
+      <ItemHeader item={item} size="card" />
       <div className="hovercard__body">
-        <div className="hovercard__power">
-          {item.breaker?.icon && <img className="hovercard__breaker" src={item.breaker.icon} alt="" title={item.breaker.name} />}
-          <ElementIcon className="hovercard__element" damage={item.damage} icon={item.damageIcon} />
-          {item.power !== undefined && <span>{item.power}</span>}
-          {item.damage && <span className="muted">{item.damage}{item.breaker ? ` · ${item.breaker.name}` : ''}</span>}
-          <span className="muted hovercard__where">{item.equipped ? 'Equipped · ' : ''}{item.location}</span>
-        </div>
+        <p className="hovercard__where">{item.equipped ? 'Equipped · ' : ''}{item.location}</p>
         <VerdictLine item={item} />
         <ItemFacts item={item} copies={copies} />
         <PerkGrid item={item} />

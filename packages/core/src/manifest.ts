@@ -13,6 +13,7 @@ import {
   type DestinyObjectiveDefinition,
   type DestinyStatGroupDefinition,
   type DestinyBreakerTypeDefinition,
+  type DestinyPlugSetDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 
@@ -31,6 +32,8 @@ export interface ManifestTables {
   objectives?: Record<string, ObjectiveExtra>;
   /** Champion stun types (Anti-Barrier, Overload, Unstoppable) with their icons. */
   breakerTypes?: Record<string, Pick<DestinyBreakerTypeDefinition, 'displayProperties'>>;
+  /** Plug sets: the plugs each can roll (used for "every possible roll"). */
+  plugSets?: Record<string, number[]>;
 }
 
 /** The parts of the full item definition the app needs (the full table is hundreds of MB). */
@@ -45,6 +48,12 @@ export interface ItemExtra {
   flavorText?: string;
   /** Built-in champion stun (exotics and some legendaries). */
   breakerTypeHash?: number;
+  /** Weapons: 1 Primary, 2 Special, 3 Heavy. */
+  ammoType?: number;
+  /** Weapons: the definition's stats before any perks, [statHash, value]. */
+  baseStats?: [number, number][];
+  /** Weapons: per socket, [plug set hash (0 if none), the plug it starts with]. */
+  socketEntries?: [number, number][];
 }
 
 export interface ObjectiveExtra {
@@ -66,6 +75,15 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       if (cats?.length) x.socketCategories = cats.map((c) => [c.socketCategoryHash, c.socketIndexes]);
       if (d.flavorText) x.flavorText = d.flavorText;
       if (d.breakerTypeHash) x.breakerTypeHash = d.breakerTypeHash;
+      if (d.itemType === 3) {
+        if (d.equippingBlock?.ammoType) x.ammoType = d.equippingBlock.ammoType;
+        const base = Object.values(d.stats?.stats ?? {}).filter((st) => st.value !== 0);
+        if (base.length) x.baseStats = base.map((st) => [st.statHash, st.value]);
+        const entries = d.sockets?.socketEntries ?? [];
+        if (entries.length) {
+          x.socketEntries = entries.map((e) => [e.randomizedPlugSetHash ?? e.reusablePlugSetHash ?? 0, e.singleInitialItemHash ?? 0]);
+        }
+      }
     }
     if (d.plug?.plugCategoryIdentifier) x.plugCategory = d.plug.plugCategoryIdentifier;
     const inv = (d.investmentStats ?? []).filter((st) => !st.isConditionallyActive && st.value !== 0);
@@ -84,10 +102,11 @@ const TABLES = {
   objectives: 'DestinyObjectiveDefinition',
   fullItems: 'DestinyInventoryItemDefinition',
   breakerTypes: 'DestinyBreakerTypeDefinition',
+  plugSets: 'DestinyPlugSetDefinition',
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 2;
+const SLIM_VERSION = 3;
 
 /**
  * Returns the manifest tables, or undefined when `currentVersion` is already the
@@ -131,7 +150,7 @@ export async function loadManifest(
     }
   };
 
-  const [items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes] = await Promise.all([
+  const [items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets] = await Promise.all([
     load<ManifestTables['items']>(TABLES.items),
     load<ManifestTables['buckets']>(TABLES.buckets),
     load<ManifestTables['stats']>(TABLES.stats),
@@ -142,8 +161,11 @@ export async function loadManifest(
       Object.fromEntries(Object.entries(full).map(([h, o]) => [h, { uiStyle: o.uiStyle, progressDescription: o.progressDescription }]))),
     load(TABLES.breakerTypes, (full: Record<string, DestinyBreakerTypeDefinition>) =>
       Object.fromEntries(Object.entries(full).map(([h, b]) => [h, { displayProperties: b.displayProperties }]))),
+    // Plugs that can currently drop; retired ones (currentlyCanRoll false) are left out.
+    load(TABLES.plugSets, (full: Record<string, DestinyPlugSetDefinition>) =>
+      Object.fromEntries(Object.entries(full).map(([h, ps]) => [h, ps.reusablePlugItems.filter((p) => p.currentlyCanRoll).map((p) => p.plugItemHash)]))),
   ]);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, extras };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras };
 }

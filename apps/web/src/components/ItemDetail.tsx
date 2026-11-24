@@ -1,7 +1,9 @@
-import { useEffect, useRef } from 'react';
-import type { AppraisedItem } from '@triumvirate/core/browser';
+import { useEffect, useRef, useState } from 'react';
+import type { AppraisedItem, PerkOption, RollOptions } from '@triumvirate/core/browser';
+import { fetchRolls } from '../api.ts';
+import { ItemHeader } from './ItemHeader.tsx';
 import { Icon } from './Icon.tsx';
-import { ItemFacts, itemSummary, PerkGrid, StatBars, TierDiamonds, VerdictLine } from './ItemParts.tsx';
+import { ItemFacts, PerkCell, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { useInventory } from '../inventory-context.ts';
 
@@ -15,10 +17,23 @@ interface Props {
   onSelect: (item: AppraisedItem) => void;
 }
 
-/** Peek panel: everything about one item, docked over the right side. */
+type Tab = 'roll' | 'all' | 'details';
+
+/**
+ * Item dialog: a large header (shared with the hovercard), actions, then tabs. "This roll" shows
+ * the copy you clicked, with its own perks and stats; "All rolls" shows every perk the weapon can
+ * drop with and its base stats; "Details" has the rest.
+ */
 export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  // Escape closes the panel, like any dialog; focus moves in so keyboard users land here.
+  const isWeapon = item.itemType === 3;
+  const [tab, setTab] = useState<Tab>('roll');
+  // A different item resets to its own roll; switching copies keeps the tab you were on.
+  const lastHash = useRef(item.itemHash);
+  useEffect(() => {
+    if (lastHash.current !== item.itemHash) { setTab('roll'); lastHash.current = item.itemHash; }
+  }, [item.itemHash]);
+  // Escape closes, like any dialog; focus moves in so keyboard users land here.
   useEffect(() => {
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -27,101 +42,202 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
   }, [item, onClose]);
 
   const a = item.appraisal;
-  const tier = item.tier.toLowerCase() || 'common';
-  const details: [string, string | number | undefined][] = [
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'roll', label: 'This roll' },
+    ...(isWeapon ? [{ id: 'all' as const, label: 'All rolls' }] : []),
+    { id: 'details', label: 'Details' },
+  ];
+  return (
+    <div className="dialog-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="dialog item-dialog" role="dialog" aria-modal="true" aria-label={item.name}>
+        <ItemHeader item={item} size="dialog">
+          <button ref={closeRef} className="icon-button item-header__close" onClick={onClose} aria-label="Close" title="Close">
+            <Icon name="close" />
+          </button>
+        </ItemHeader>
+
+        <div className="item-dialog__bar">
+          <div className="drawer__actions">
+            <button className="button" onClick={() => onAsk(`Tell me about my ${item.name}${item.power ? ` (${item.power})` : ''}. Is it worth keeping, and what would I use it for?`)}>
+              <Icon name="chat" /> Ask about this item
+            </button>
+            <a className="button button--quiet" href={`https://www.light.gg/db/items/${item.itemHash}/`} target="_blank" rel="noreferrer">
+              Open on light.gg <Icon name="openExternal" />
+            </a>
+          </div>
+          <MoveButtons item={item} />
+        </div>
+
+        <div className="tabs" role="tablist" aria-label="Item information">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              role="tab"
+              id={`item-tab-${t.id}`}
+              aria-selected={tab === t.id}
+              aria-controls={`item-panel-${t.id}`}
+              className={`tabs__tab${tab === t.id ? ' is-selected' : ''}`}
+              onClick={() => setTab(t.id)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="item-dialog__body" role="tabpanel" id={`item-panel-${tab}`} aria-labelledby={`item-tab-${tab}`}>
+          {tab === 'roll' && (
+            <div className="item-dialog__roll">
+              <div className="item-dialog__main">
+                <ItemFacts item={item} copies={copies.length} />
+                {a && (
+                  <section className={`verdict verdict--${a.verdict}`}>
+                    <VerdictLine item={item} />
+                    {a.rollCount > 0 && <p className="verdict__notes">{a.rollCount} curated rolls exist for this weapon.</p>}
+                    {a.notes && <p className="verdict__notes">{a.notes}</p>}
+                  </section>
+                )}
+                {item.perks && item.perks.length > 0 && (
+                  <section>
+                    <h3 className="drawer__section">Perks on this copy</h3>
+                    <PerkGrid item={item} showNames />
+                    {(a?.wishedPerks?.length ?? 0) > 0 && (
+                      <p className="drawer__legend"><span className="perk-cell__wish perk-cell__wish--inline"><Icon name="check" /></span> In a recommended roll</p>
+                    )}
+                  </section>
+                )}
+              </div>
+              <aside className="item-dialog__side">
+                {item.stats && Object.keys(item.stats).length > 0 && (
+                  <section>
+                    <h3 className="drawer__section">Stats</h3>
+                    <StatBars item={item} />
+                  </section>
+                )}
+                {copies.length > 0 && (
+                  <section>
+                    <h3 className="drawer__section">Other copies you own</h3>
+                    <ul className="copies">
+                      {copies.map((c, n) => (
+                        <li key={c.instanceId ?? n} className="copy">
+                          <ItemTile item={c} onSelect={onSelect} />
+                          <div className="copy__body">
+                            <span className="copy__where">
+                              {c.power !== undefined && <strong>{c.power}</strong>} {c.location}{c.equipped ? ' (equipped)' : ''}
+                            </span>
+                            <VerdictLine item={c} />
+                            <PerkGrid item={c} />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+              </aside>
+            </div>
+          )}
+          {tab === 'all' && <AllRolls item={item} />}
+          {tab === 'details' && <Details item={item} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Details({ item }: { item: AppraisedItem }) {
+  const rows: [string, string | number | undefined][] = [
     ['Location', `${item.location}${item.equipped ? ' (equipped)' : ''}`],
     ['Power', item.power],
     ['Element', item.damage],
     ['Champion stun', item.breaker?.name],
+    ['Ammo', item.ammo],
     ['Gear tier', item.gearTier],
     ['Masterworked', item.itemType === 2 || item.itemType === 3 ? (item.masterworked ? 'Yes' : 'No') : undefined],
+    ['Ornament', item.ornament?.name],
+    ['Crafted', item.crafted ? `Yes${item.craftedLevel !== undefined ? `, level ${item.craftedLevel}` : ''}` : undefined],
     ['Locked', item.locked ? 'Yes' : 'No'],
   ];
   return (
-    <aside className="drawer" role="dialog" aria-label={item.name}>
-      <header className={`drawer__header tier-${tier}${item.masterworked ? ' is-masterworked' : ''}`}>
-        {item.icon && <img className="drawer__icon" src={item.icon} alt="" />}
-        <div className="drawer__heading">
-          <h2 className="drawer__title"><TierDiamonds item={item} className="tier-diamonds--inline" />{item.name}</h2>
-          <p className="drawer__meta">{itemSummary(item)}</p>
-          {item.flavorText && <p className="drawer__flavor">{item.flavorText}</p>}
-        </div>
-        <button ref={closeRef} className="icon-button drawer__close" onClick={onClose} aria-label="Close" title="Close">
-          <Icon name="close" />
-        </button>
-      </header>
-
-      <div className="drawer__body">
-        <div className="drawer__actions">
-          <button className="button" onClick={() => onAsk(`Tell me about my ${item.name}${item.power ? ` (${item.power})` : ''}. Is it worth keeping, and what would I use it for?`)}>
-            <Icon name="chat" /> Ask about this item
-          </button>
-          <a className="button button--quiet" href={`https://www.light.gg/db/items/${item.itemHash}/`} target="_blank" rel="noreferrer">
-            Open on light.gg <Icon name="openExternal" />
-          </a>
-        </div>
-
-        <MoveButtons item={item} />
-
-        <ItemFacts item={item} copies={copies.length} />
-
-        {a && (
-          <section className={`verdict verdict--${a.verdict}`}>
-            <VerdictLine item={item} />
-            {a.rollCount > 0 && <p className="verdict__notes">{a.rollCount} curated rolls exist for this weapon.</p>}
-            {a.notes && <p className="verdict__notes">{a.notes}</p>}
-          </section>
-        )}
-
-        {item.perks && item.perks.length > 0 && (
-          <section>
-            <h3 className="drawer__section">Perks</h3>
-            <PerkGrid item={item} showNames />
-            {(a?.wishedPerks?.length ?? 0) > 0 && (
-              <p className="drawer__legend"><span className="perk-cell__wish perk-cell__wish--inline"><Icon name="check" /></span> In a recommended roll</p>
-            )}
-          </section>
-        )}
-
-        {item.stats && Object.keys(item.stats).length > 0 && (
-          <section>
-            <h3 className="drawer__section">Stats</h3>
-            <StatBars item={item} />
-          </section>
-        )}
-
-        {copies.length > 0 && (
-          <section>
-            <h3 className="drawer__section">Other copies you own</h3>
-            <ul className="copies">
-              {copies.map((c, n) => (
-                <li key={c.instanceId ?? n} className="copy">
-                  <ItemTile item={c} onSelect={onSelect} />
-                  <div className="copy__body">
-                    <span className="copy__where">
-                      {c.power !== undefined && <strong>{c.power}</strong>} {c.location}{c.equipped ? ' (equipped)' : ''}
-                    </span>
-                    <VerdictLine item={c} />
-                    <PerkGrid item={c} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        <section>
-          <h3 className="drawer__section">Details</h3>
-          <dl className="details">
-            {details.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => (
-              <div className="details__row" key={k}><dt>{k}</dt><dd>{v}</dd></div>
-            ))}
-          </dl>
-        </section>
-      </div>
-    </aside>
+    <dl className="details">
+      {rows.filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => (
+        <div className="details__row" key={k}><dt>{k}</dt><dd>{v}</dd></div>
+      ))}
+    </dl>
   );
 }
+
+/**
+ * Every perk the weapon can roll, by column, with its base stats. Perks on this copy are marked:
+ * filled when selected, ringed when available to switch to. Hover or focus a perk to read it.
+ */
+function AllRolls({ item }: { item: AppraisedItem }) {
+  const [data, setData] = useState<RollOptions | null>(null);
+  const [error, setError] = useState('');
+  const [focus, setFocus] = useState<PerkOption | null>(null);
+  useEffect(() => {
+    let live = true;
+    setData(null);
+    setError('');
+    fetchRolls(item.itemHash).then((r) => live && setData(r)).catch((e) => live && setError(e instanceof Error ? e.message : String(e)));
+    return () => { live = false; };
+  }, [item.itemHash]);
+
+  if (error) return <p className="error">{error}</p>;
+  if (!data) return <p className="muted"><span className="spinner" /> Loading every roll…</p>;
+
+  const mine = new Map<string, boolean>(); // perk name → selected on this copy
+  for (const col of item.perks ?? []) for (const p of col) mine.set(base(p.name), p.active || mine.get(base(p.name)) === true);
+  const wished = new Set((item.appraisal?.wishedPerks ?? []).map(base));
+  const decorate = (p: PerkOption): PerkOption => ({ ...p, active: mine.get(base(p.name)) === true });
+
+  return (
+    <div className="all-rolls">
+      <div className="all-rolls__perks">
+        {data.intrinsic && (
+          <div className="all-rolls__frame">
+            {data.intrinsic.icon && <img src={data.intrinsic.icon} alt="" />}
+            <span><strong>{data.intrinsic.name}</strong>{data.intrinsic.description && <span className="muted"> · {data.intrinsic.description}</span>}</span>
+          </div>
+        )}
+        <div className="all-rolls__grid" style={{ '--columns': data.columns.length } as React.CSSProperties}>
+          {data.columns.map((col, c) => (
+            <ul className="all-rolls__column" key={c}>
+              {col.map((p) => (
+                <PerkCell
+                  key={p.name}
+                  perk={decorate(p)}
+                  wished={wished.has(base(p.name))}
+                  className={mine.has(base(p.name)) ? 'is-owned' : undefined}
+                  onPoint={setFocus}
+                />
+              ))}
+            </ul>
+          ))}
+        </div>
+        <p className="drawer__legend">
+          <span className="legend-swatch legend-swatch--selected" /> On this copy
+          <span className="legend-swatch legend-swatch--owned" /> Available on this copy
+          <span className="perk-cell__wish perk-cell__wish--inline"><Icon name="check" /></span> In a recommended roll
+        </p>
+        <div className="all-rolls__focus" aria-live="polite">
+          {focus ? (
+            <>
+              <strong>{focus.name}</strong>
+              {focus.description && <p>{focus.description}</p>}
+            </>
+          ) : <p className="muted">Point at a perk to read what it does.</p>}
+        </div>
+      </div>
+      <aside className="all-rolls__stats">
+        <h3 className="drawer__section">Base stats</h3>
+        <p className="muted all-rolls__note">Before perks, mods, and masterwork.</p>
+        <StatBars item={item} stats={data.baseStats} />
+      </aside>
+    </div>
+  );
+}
+
+/** "Kill Clip Enhanced" and "Kill Clip" are the same choice. */
+const base = (name: string) => name.replace(/\s+Enhanced$/i, '');
 
 /** The keyboard-friendly way to move an item: one button per place it could go. */
 function MoveButtons({ item }: { item: AppraisedItem }) {

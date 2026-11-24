@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, CharacterRow, CleanupCandidate } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, CharacterRow, CleanupCandidate, RollOptions } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -130,3 +130,15 @@ export const saveChat = async (id: string, turns: ChatTurn[]): Promise<ChatSumma
 export const deleteChat = async (id: string): Promise<void> => { await fetch(`/api/chats/${encodeURIComponent(id)}`, { method: 'DELETE' }); };
 /** A fresh chat id: time first, so ids sort by when the chat began. */
 export const newChatId = () => `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+const rollCache = new Map<number, Promise<RollOptions>>();
+/** Every roll a weapon can have. Cached per weapon for the session. */
+export function fetchRolls(itemHash: number): Promise<RollOptions> {
+  let p = rollCache.get(itemHash);
+  if (!p) {
+    p = fetch(`/api/items/${itemHash}/rolls`).then((r) => json<RollOptions>(r));
+    p.catch(() => rollCache.delete(itemHash)); // let a failure be retried
+    rollCache.set(itemHash, p);
+  }
+  return p;
+}

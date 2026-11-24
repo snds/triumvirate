@@ -328,32 +328,7 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .tile__badge--good { color: var(--verdict-good); }
 .tile__badge--meh, .tile__badge--trash { color: var(--verdict-bad); }
 
-/* Item panel (peek) */
-.drawer {
-  position: fixed;
-  inset: 0 0 0 auto;
-  z-index: 3;
-  width: min(var(--drawer-width), 100vw);
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  background: var(--surface-panel);
-  border-left: 1px solid var(--border-subtle);
-  box-shadow: -8px 0 24px var(--overlay-scrim);
-}
-.drawer__header {
-  display: flex;
-  gap: var(--space-3);
-  align-items: center;
-  padding: var(--space-3) var(--space-4);
-  /* Tier band, like the game's item header. */
-  background: color-mix(in srgb, var(--tile-tier) 70%, var(--surface-page));
-}
-.drawer__icon { width: 64px; height: 64px; border-radius: var(--radius-sm); border: 2px solid var(--tile-tier); }
-.drawer__heading { min-width: 0; }
-.drawer__title { margin: 0; font-size: 20px; text-transform: uppercase; letter-spacing: 0.02em; }
-.drawer__meta { margin: 2px 0 0; font-size: 12px; color: var(--text-primary); opacity: 0.85; }
-.drawer__close { margin-left: auto; align-self: flex-start; color: var(--text-primary); }
-.drawer__body { overflow-y: auto; padding: var(--space-4); }
+/* Item dialog sections */
 .drawer__actions { display: flex; gap: var(--space-2); flex-wrap: wrap; }
 .drawer__section { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin: var(--space-6) 0 var(--space-2); padding-bottom: var(--space-1); border-bottom: 1px solid var(--border-subtle); }
 .drawer__legend { display: flex; align-items: center; gap: var(--space-2); margin: var(--space-2) 0 0; font-size: 12px; color: var(--text-secondary); }
@@ -490,13 +465,7 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   box-shadow: 0 8px 24px var(--overlay-scrim);
   overflow: hidden;
 }
-.hovercard__header { display: grid; padding: var(--space-2) var(--space-3); background: color-mix(in srgb, var(--tile-tier) 70%, var(--surface-page)); }
-.hovercard__name { font-size: 15px; text-transform: uppercase; letter-spacing: 0.02em; }
-.hovercard__meta { font-size: 11px; opacity: 0.85; }
 .hovercard__body { display: grid; gap: var(--space-2); padding: var(--space-3); }
-.hovercard__power { display: flex; align-items: center; gap: var(--space-2); font-size: 18px; font-weight: 700; }
-.hovercard__power .muted { font-size: 12px; font-weight: 400; }
-.hovercard__element { width: 20px; height: 20px; }
 .element-icon {
   display: inline-block;
   flex: none;
@@ -504,11 +473,11 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   -webkit-mask: var(--element-icon) center / contain no-repeat;
   mask: var(--element-icon) center / contain no-repeat;
 }
-.hovercard__where { margin-left: auto; }
 /* Perk columns wrap instead of running off the card; labels stay on one line. */
 .hovercard .perk-cell__icon { width: 26px; height: 26px; }
 .hovercard .perk-grid { gap: var(--space-2) 6px; }
 .hovercard__body > * { min-width: 0; }
+.hovercard__where { margin: 0; font-size: 12px; color: var(--text-secondary); }
 .hovercard__hint { margin: 0; font-size: 11px; color: var(--text-muted); }
 
 /* Cleanup view */
@@ -798,7 +767,7 @@ body.is-dragging-item .tile { pointer-events: none; }
    fractions of the art, so they line up at every tile size, including the larger equipped tile. */
 .tile__tier {
   position: absolute; z-index: 1; pointer-events: none;
-  left: calc(var(--art) * 0.125); top: calc(var(--art) * 0.3); transform: translateX(-50%);
+  left: calc(var(--art) * 0.16); top: calc(var(--art) * 0.3); transform: translateX(-50%);
   gap: calc(var(--art) * 0.045); align-items: center;
 }
 .tile__tier .tier-diamonds__d { width: calc(var(--art) * 0.075); height: calc(var(--art) * 0.075); }
@@ -811,18 +780,124 @@ body.is-dragging-item .tile { pointer-events: none; }
   background: url('./assets/holofoil.apng') center / cover;
   mix-blend-mode: overlay; opacity: 0.55;
 }
-/* Headers get the gold masterwork banner across the top. */
-.drawer__header.is-masterworked, .hovercard__header.is-masterworked {
-  position: relative;
-  border-top: 3px solid var(--masterwork);
-  background-image: url('./assets/masterwork-header.png'), linear-gradient(color-mix(in srgb, var(--tile-tier) 70%, var(--surface-page)), color-mix(in srgb, var(--tile-tier) 70%, var(--surface-page)));
-  background-repeat: repeat-x, no-repeat;
-  background-position: top left, 0 0;
-  background-size: auto 100%, 100% 100%;
-  background-blend-mode: normal;
-}
 @media (prefers-reduced-motion: reduce) { .tile__holofoil { background-image: none; } }
 
 /* Champion stun icon: same height as the element icon in the power strip. */
 .tile__breaker { width: calc(var(--tile-element-icon) * var(--s)); height: calc(var(--tile-element-icon) * var(--s)); }
-.hovercard__breaker { width: 20px; height: 20px; }
+
+/* ── Item header: shared by the hovercard and the item dialog ── */
+/* Tier color band like the game's item header. Masterworked items add the gold banner art. */
+.item-header {
+  --band: color-mix(in srgb, var(--tile-tier) 72%, var(--surface-page));
+  position: relative;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--band);
+  color: var(--text-primary);
+}
+.item-header.is-masterworked {
+  border-top: 3px solid var(--masterwork);
+  background: url('./assets/masterwork-header.png') top left / auto 100% repeat-x, var(--band);
+}
+.item-header__id { min-width: 0; }
+.item-header__name { display: flex; align-items: center; margin: 0; font-size: 15px; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1.2; }
+.item-header__kind { margin: 2px 0 0; font-size: 11px; opacity: 0.9; }
+.item-header__mw { color: var(--masterwork); font-weight: 600; }
+.item-header__flavor { margin: var(--space-2) 0 0; font-size: 12px; font-style: italic; opacity: 0.8; max-width: 60ch; }
+.item-header__stats { display: grid; justify-items: end; gap: 4px; }
+.item-header__power { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.item-header__icons { display: inline-flex; align-items: center; gap: 6px; }
+.item-header__icon { width: 18px; height: 18px; }
+.item-header__ammo { height: 16px; width: auto; }
+
+/* Dialog size: big art on the left, larger name and power. */
+.item-header--dialog {
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5, 20px);
+  min-height: 128px;
+}
+.item-header__art { position: relative; width: 96px; height: 96px; flex: none; border: 2px solid var(--tile-tier); border-radius: var(--radius-sm); overflow: hidden; box-shadow: 0 4px 12px rgb(0 0 0 / 0.35); }
+.item-header.is-masterworked .item-header__art { border-color: var(--masterwork); }
+.item-header__art img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.item-header--dialog .item-header__name { font-size: 26px; }
+.item-header--dialog .item-header__kind { font-size: 13px; }
+.item-header--dialog .item-header__power { font-size: 40px; }
+.item-header--dialog .item-header__icon { width: 24px; height: 24px; }
+.item-header--dialog .item-header__ammo { height: 22px; }
+.item-header__close { align-self: start; color: var(--text-primary); }
+
+/* Ammo: the game's colors, white Primary, green Special, purple Heavy. */
+.ammo-icon { display: inline-block; }
+.ammo-icon--primary { fill: var(--ammo-primary); }
+.ammo-icon--special { fill: var(--ammo-special); }
+.ammo-icon--heavy { fill: var(--ammo-heavy); }
+.ammo-icon path { stroke: rgb(0 0 0 / 0.5); stroke-width: 0.6; }
+
+/* ── Item dialog ────────────────────────────────────────── */
+.dialog-scrim {
+  position: fixed; inset: 0; z-index: 6;
+  display: grid; place-items: center; padding: var(--space-4);
+  background: var(--overlay-scrim);
+}
+.dialog {
+  width: min(980px, 100%); max-height: min(90vh, 900px);
+  display: grid; grid-template-rows: auto auto auto minmax(0, 1fr);
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+  overflow: hidden;
+}
+.item-dialog__bar {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.item-dialog__body { overflow-y: auto; padding: var(--space-4); }
+.item-dialog__body > :first-child > :first-child > .drawer__section:first-child,
+.item-dialog__body .drawer__section:first-child { margin-top: 0; }
+.item-dialog__roll { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: var(--space-6); align-items: start; }
+.item-dialog__main, .item-dialog__side { display: grid; gap: var(--space-2); min-width: 0; }
+.item-dialog__main .verdict { margin-top: var(--space-2); }
+@media (max-width: 720px) {
+  .item-dialog__roll, .all-rolls { grid-template-columns: 1fr; }
+  .item-header--dialog { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .item-header--dialog .item-header__stats { grid-column: 2; justify-items: start; }
+}
+
+/* Tabs */
+.tabs { display: flex; gap: var(--space-1); padding: 0 var(--space-4); border-bottom: 1px solid var(--border-subtle); }
+.tabs__tab {
+  padding: var(--space-2) var(--space-3); margin-bottom: -1px;
+  border: none; border-bottom: 2px solid transparent; background: none;
+  color: var(--text-secondary); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.tabs__tab:hover { color: var(--text-primary); }
+.tabs__tab.is-selected { color: var(--text-primary); border-bottom-color: var(--accent); }
+
+/* Details tab */
+.details { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); margin: 0; }
+.details__row { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.details__row dt { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+.details__row dd { margin: 2px 0 0; font-size: 14px; }
+
+/* All rolls tab: every perk by column. Perks on this copy are filled (selected) or ringed. */
+.all-rolls { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr); gap: var(--space-6); align-items: start; }
+.all-rolls__perks { display: grid; gap: var(--space-3); min-width: 0; }
+.all-rolls__frame { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; }
+.all-rolls__frame img { width: 32px; height: 32px; border-radius: var(--radius-sm); }
+.all-rolls__grid { display: grid; grid-template-columns: repeat(var(--columns), max-content); gap: var(--space-4); overflow-x: auto; padding-bottom: var(--space-1); }
+.all-rolls__column { list-style: none; margin: 0; padding: 0 var(--space-4) 0 0; display: grid; align-content: start; gap: 6px; border-right: 1px solid var(--border-subtle); }
+.all-rolls__column:last-child { border-right: none; padding-right: 0; }
+.all-rolls__column .perk-cell { cursor: default; border-radius: 50%; outline-offset: 2px; }
+.all-rolls__column .perk-cell__icon { width: 36px; height: 36px; opacity: 0.75; }
+.all-rolls__column .perk-cell:hover .perk-cell__icon, .all-rolls__column .perk-cell:focus-visible .perk-cell__icon { opacity: 1; }
+.all-rolls__column .perk-cell.is-owned .perk-cell__icon { opacity: 1; box-shadow: 0 0 0 2px var(--perk-active-border); }
+.all-rolls__focus { min-height: 64px; padding: var(--space-3); border-radius: var(--radius-sm); background: var(--surface-raised); font-size: 13px; }
+.all-rolls__focus p { margin: var(--space-1) 0 0; color: var(--text-secondary); }
+.all-rolls__stats .drawer__section { margin-top: 0; }
+.all-rolls__note { margin: 0 0 var(--space-2); font-size: 12px; }
+.drawer__legend { flex-wrap: wrap; }
+.legend-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border-subtle); }
+.legend-swatch--selected { background: var(--perk-active-fill); border-color: var(--perk-active-border); }
+.legend-swatch--owned { box-shadow: 0 0 0 2px var(--perk-active-border); border-color: transparent; }

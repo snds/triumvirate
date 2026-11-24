@@ -71,6 +71,8 @@ export interface ItemRow {
   craftedLevel?: number;
   killTracker?: { label: string; count: number };
   flavorText?: string;
+  /** Weapons: which ammo it uses. */
+  ammo?: AmmoType;
   /** Champion stun this weapon has built in: Anti-Barrier, Overload, or Unstoppable. */
   breaker?: { name: string; icon?: string };
   /** Applied ornament ("fashion"), when it changes the look. `icon` above is then the ornament's art. */
@@ -82,6 +84,9 @@ export interface ItemRow {
   /** A postmaster item Bungie won't transfer: it can only be pulled to its own character. */
   pullOnly?: boolean;
 }
+
+export type AmmoType = 'Primary' | 'Special' | 'Heavy';
+export const AMMO_NAMES: Record<number, AmmoType> = { 1: 'Primary', 2: 'Special', 3: 'Heavy' };
 
 export interface PerkOption {
   name: string;
@@ -105,7 +110,7 @@ export interface StatDetail {
 }
 
 // Plug types that aren't part of a roll: cosmetics, trackers, and masterwork/mod slots.
-const NOT_A_PERK = /shader|ornament|masterwork|mod\b|tracker|memento|empty|catalyst|deprecated|kill tracker/i;
+export const NOT_A_PERK = /shader|ornament|masterwork|mod\b|tracker|memento|empty|catalyst|deprecated|kill tracker/i;
 const WEAPON = 3;
 const ARMOR = 2;
 
@@ -152,7 +157,7 @@ export interface AccountSummary {
   vault: { used: number; capacity: number };
 }
 
-const bungieUrl = (path?: string) => (path ? `https://www.bungie.net${path}` : undefined);
+export const bungieUrl = (path?: string) => (path ? `https://www.bungie.net${path}` : undefined);
 
 /**
  * `manifest` adds stat names and icons; `titles` maps character id to the equipped
@@ -417,6 +422,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
         ornament: { name: ornament.displayProperties.name, icon: bungieUrl(ornament.displayProperties.icon) },
         baseIcon: bungieUrl(def?.displayProperties.icon),
       } : {}),
+      ...(manifest.extras?.[item.itemHash]?.ammoType ? { ammo: AMMO_NAMES[manifest.extras[item.itemHash]!.ammoType!] } : {}),
       ...(breakerDef ? { breaker: { name: breakerDef.displayProperties.name, icon: bungieUrl(breakerDef.displayProperties.icon) } } : {}),
       ...(movable ? { movable } : {}),
       ...(movable && inPostmaster && notTransferrable ? { pullOnly: true } : {}),

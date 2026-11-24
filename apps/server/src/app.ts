@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { getDestinyEntityDefinition, getProfile, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyStep, appraise, authorizeUrl, planMove, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
+  applyStep, appraise, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
   type ManifestTables, type Tokens, type WishList,
 } from '@triumvirate/core';
@@ -250,6 +250,18 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
         await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
       }
     });
+  });
+
+  // Every roll a weapon can have, for the item dialog's "All rolls" tab. Only needs the manifest.
+  app.get('/api/items/:hash/rolls', async (c) => {
+    const hash = Number(c.req.param('hash'));
+    if (!Number.isInteger(hash) || hash <= 0) return c.json({ error: 'Bad item hash.' }, 400);
+    if (!manifest) return c.json({ error: 'Item data is still loading. Try again in a moment.' }, 503);
+    const r = rollOptions(manifest, hash);
+    if (!r) return c.json({ error: 'No roll data for this item.' }, 404);
+    // Same for everyone until the next game update; let the browser keep it.
+    c.header('Cache-Control', `private, max-age=86400`);
+    return c.json(r);
   });
 
   // Saved conversations. Local, single user, so no sign-in check beyond the server only listening on 127.0.0.1.
