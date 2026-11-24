@@ -96,11 +96,20 @@ export function ItemFacts({ item, copies }: { item: AppraisedItem; copies: numbe
   const facts: { icon: Parameters<typeof Icon>[0]['name']; text: string }[] = [];
   if (item.crafted) facts.push({ icon: 'crafted', text: item.craftedLevel !== undefined ? `Crafted · Level ${item.craftedLevel}` : 'Crafted' });
   if (item.killTracker) facts.push({ icon: 'tracker', text: `${item.killTracker.count.toLocaleString('en-US')} ${shortTracker(item.killTracker.label)}` });
+  if (item.ornament) facts.push({ icon: 'ornament', text: `${item.ornament.name} ornament` });
   if (copies > 0) facts.push({ icon: 'copies', text: `${copies} other ${copies === 1 ? 'copy' : 'copies'}` });
   if (facts.length === 0) return null;
   return (
     <ul className="facts">
-      {facts.map((f) => <li key={f.text} className="fact"><Icon name={f.icon} />{f.text}</li>)}
+      {facts.map((f) => (
+        <li key={f.text} className="fact">
+          <Icon name={f.icon} />{f.text}
+          {/* The original art, so you can see what the ornament is covering. */}
+          {f.icon === 'ornament' && item.baseIcon && (
+            <img className="fact__thumb" src={item.baseIcon} alt="Original look" title="Original look" />
+          )}
+        </li>
+      ))}
     </ul>
   );
 }

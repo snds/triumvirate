@@ -767,3 +767,5 @@ body.is-dragging-item .tile { pointer-events: none; }
 .chat-list__title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text-primary); }
 .chat-list__meta { font-size: 0.8rem; color: var(--text-muted); }
 @media (hover: none) { .chat-list__item .icon-button { opacity: 1; } }
+
+.fact__thumb { width: 20px; height: 20px; border-radius: 2px; margin-left: var(--space-1); border: 1px solid var(--border-subtle); }

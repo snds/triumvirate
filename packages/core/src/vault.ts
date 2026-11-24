@@ -67,6 +67,10 @@ export interface ItemRow {
   craftedLevel?: number;
   killTracker?: { label: string; count: number };
   flavorText?: string;
+  /** Applied ornament ("fashion"), when it changes the look. `icon` above is then the ornament's art. */
+  ornament?: { name: string; icon?: string };
+  /** The item's own art, kept when an ornament replaces `icon`. */
+  baseIcon?: string;
   /** Can be dragged somewhere: instanced, not equipped, and Bungie allows moving it. */
   movable?: boolean;
   /** A postmaster item Bungie won't transfer: it can only be pulled to its own character. */
@@ -348,6 +352,12 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     const inPostmaster = item.bucketHash === POSTMASTER_BUCKET;
     const notTransferrable = (item.transferStatus & TRANSFER_NOT_TRANSFERRABLE) !== 0;
     // Postmaster items can always be pulled; anything else needs Bungie's go-ahead.
+    // An ornament swaps the art, like in game. "Default" ornaments and same-art styles change nothing.
+    const styleDef = item.overrideStyleItemHash && item.overrideStyleItemHash !== item.itemHash
+      ? manifest.items[item.overrideStyleItemHash] : undefined;
+    const styleIcon = styleDef?.displayProperties.icon;
+    const ornament = styleDef && styleIcon && styleIcon !== def?.displayProperties.icon
+      && !/^default/i.test(styleDef.displayProperties.name) ? styleDef : undefined;
     const movable = !!id && !equipped && item.bucketHash !== SUBCLASS_BUCKET && (inPostmaster || !notTransferrable);
     return {
       location,
@@ -360,7 +370,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       equipped,
       itemHash: item.itemHash,
       instanceId: item.itemInstanceId,
-      icon: bungieUrl(def?.displayProperties.icon),
+      icon: bungieUrl(ornament ? ornament.displayProperties.icon : def?.displayProperties.icon),
       watermark: bungieUrl(def?.iconWatermark),
       tier: def?.inventory?.tierTypeName ?? '',
       itemType: def?.itemType ?? 0,
@@ -379,6 +389,10 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       ...(progress?.craftedLevel !== undefined ? { craftedLevel: progress.craftedLevel } : {}),
       ...(progress?.killTracker ? { killTracker: progress.killTracker } : {}),
       ...(manifest.extras?.[item.itemHash]?.flavorText ? { flavorText: manifest.extras[item.itemHash]!.flavorText } : {}),
+      ...(ornament ? {
+        ornament: { name: ornament.displayProperties.name, icon: bungieUrl(ornament.displayProperties.icon) },
+        baseIcon: bungieUrl(def?.displayProperties.icon),
+      } : {}),
       ...(movable ? { movable } : {}),
       ...(movable && inPostmaster && notTransferrable ? { pullOnly: true } : {}),
     };

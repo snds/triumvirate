@@ -207,3 +207,27 @@ test('reads the equipped subclass and its slotted parts', () => {
     supers: ['Nova Bomb'], aspects: ['Feed the Void'], fragments: ['Echo of Persistence'],
   });
 });
+
+test('an applied ornament replaces the tile art; default ornaments do not', () => {
+  const m = {
+    ...manifest,
+    items: {
+      ...manifest.items,
+      1: { displayProperties: { name: 'Fatebringer', icon: '/base.png' }, itemTypeDisplayName: 'Hand Cannon', inventory: { bucketTypeHash: 10 } },
+      7: { displayProperties: { name: 'Timelost Finish', icon: '/orn.png' } },
+      8: { displayProperties: { name: 'Default Ornament', icon: '/default.png' } },
+    },
+  } as unknown as ManifestTables;
+  const p = (style?: number) => ({
+    profileInventory: { data: { items: [{ itemHash: 1, bucketHash: VAULT_BUCKET, itemInstanceId: 'a', state: 0, overrideStyleItemHash: style }] } },
+  }) as unknown as DestinyProfileResponse;
+  const [styled] = summarizeProfile(p(7), m);
+  assert.equal(styled?.icon, 'https://www.bungie.net/orn.png');
+  assert.equal(styled?.baseIcon, 'https://www.bungie.net/base.png');
+  assert.deepEqual(styled?.ornament, { name: 'Timelost Finish', icon: 'https://www.bungie.net/orn.png' });
+  for (const style of [undefined, 1, 8]) {
+    const [plain] = summarizeProfile(p(style), m);
+    assert.equal(plain?.icon, 'https://www.bungie.net/base.png');
+    assert.equal(plain?.ornament, undefined);
+  }
+});

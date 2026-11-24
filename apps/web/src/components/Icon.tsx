@@ -16,6 +16,7 @@ const GLYPHS = {
   chat: 'forum',
   newChat: 'edit_square',
   history: 'history',
+  ornament: 'palette',
   delete: 'delete',
   back: 'arrow_back',
   crafted: 'construction',
