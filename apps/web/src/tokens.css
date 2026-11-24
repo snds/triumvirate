@@ -3,6 +3,9 @@
  * Components only read semantic or component tokens, never globals.
  */
 :root {
+  /* Tells the browser this is a dark UI: native scrollbars, form controls, and autofill go dark too. */
+  color-scheme: dark;
+
   /* ── Global ─────────────────────────────────────────── */
   --gray-950: #0b0d10;
   --gray-900: #12151a;
@@ -68,6 +71,10 @@
   --element-void: var(--violet-400);
   --element-stasis: var(--azure-500);
   --element-strand: var(--mint-400);
+
+  --scrollbar-thumb: var(--gray-700);
+  --scrollbar-thumb-hover: var(--gray-500);
+  --scrollbar-track: transparent;
 
   /* ── Component ──────────────────────────────────────── */
   /* Item size: the user setting writes --tile-scale on :root. Equipped tiles keep their ratio. */

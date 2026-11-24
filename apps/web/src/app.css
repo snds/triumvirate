@@ -1,4 +1,13 @@
 * { box-sizing: border-box; }
+
+/* Scrollbars: thin and dark. scrollbar-color covers Chrome/Edge 121+ and Firefox;
+   the ::-webkit rules give older Chromium the same look and a hover state. */
+* { scrollbar-width: thin; scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-thumb-hover); }
+::-webkit-scrollbar-corner { background: transparent; }
 body {
   margin: 0;
   background: var(--surface-page);
