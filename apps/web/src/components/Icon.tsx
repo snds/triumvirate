@@ -19,6 +19,7 @@ const GLYPHS = {
   tracker: 'my_location',
   copies: 'filter_none',
   enhanced: 'keyboard_double_arrow_up',
+  arrowRight: 'arrow_forward',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

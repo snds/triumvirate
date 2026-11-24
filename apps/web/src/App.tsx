@@ -13,6 +13,7 @@ import { isPostmaster } from './components/CharacterColumn.tsx';
 import { SLOT_ORDER } from './inventory.ts';
 import { usePref } from './prefs.ts';
 import { HoverContext, type HoverApi } from './hover.ts';
+import { InventoryContext, type InventoryApi } from './inventory-context.ts';
 import { ItemHovercard } from './components/ItemHovercard.tsx';
 
 type State =
@@ -90,6 +91,11 @@ export function App() {
     [byHash],
   );
 
+  const inventoryApi = useMemo<InventoryApi>(() => ({
+    byId: new Map(state.status === 'ready' ? state.inv.items.filter((i) => i.instanceId).map((i) => [i.instanceId!, i]) : []),
+    select: setSelected,
+  }), [state]);
+
   const visible = useMemo(
     () => (state.status === 'ready' ? state.inv.items.filter((i) => matches(i, query, kind)) : []),
     [state, query, kind],
@@ -132,6 +138,7 @@ export function App() {
 
   return (
     <HoverContext.Provider value={hoverApi}>
+    <InventoryContext.Provider value={inventoryApi}>
     <div className={`app${agentOpen ? ' app--chat' : ''}`}>
       <header className="topbar">
         <h1 className="brand">Triumvirate</h1>
@@ -246,6 +253,7 @@ export function App() {
       )}
       {hovered && !selected && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
     </div>
+    </InventoryContext.Provider>
     </HoverContext.Provider>
   );
 }

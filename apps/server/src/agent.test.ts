@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTools, type AgentContext } from './agent.ts';
+import { buildTools, enrichBuilds, type AgentContext } from './agent.ts';
 
 const ctx: AgentContext = {
   displayName: 'Guardian',
@@ -38,4 +38,26 @@ test('inventory_summary lists exotics and counts', async () => {
   const s = await run('inventory_summary', {});
   assert.equal(s.itemCounts.Vault, 2);
   assert.deepEqual(s.exotics.map((i: { name: string }) => i.name), ['Sunshot']);
+});
+
+test('enrichBuilds adds subclass icons and drops items the player does not own', () => {
+  const c: AgentContext = {
+    ...ctx,
+    characters: [{ ...ctx.characters[0]!, stats: [{ name: 'Grenade', value: 100, icon: 'g.png' }] }],
+    subclass: { options: new Map(), byName: new Map([['nova bomb', { name: 'Nova Bomb', icon: 'n.png' }]]) },
+  };
+  const out = enrichBuilds(
+    'Try this:\n```build\n{"name":"Nova","super":"nova bomb","aspects":["Made Up"],"weapons":[{"id":"a"},{"id":"nope"}],"statPriority":["Grenade"]}\n```',
+    c,
+  );
+  const json = JSON.parse(/```build\n(.*)\n```/.exec(out)![1]!);
+  assert.deepEqual(json.super, { name: 'Nova Bomb', icon: 'n.png' }); // JSON drops undefined
+  assert.deepEqual(json.aspects, [{ name: 'Made Up' }]);
+  assert.deepEqual(json.weapons, [{ id: 'a' }]);
+  assert.deepEqual(json.statPriority, [{ name: 'Grenade', icon: 'g.png' }]);
+});
+
+test('subclass_options explains when data is missing', async () => {
+  const r = await run('subclass_options', { class: 'Warlock', element: 'Void' });
+  assert.match(r.error, /loading/);
 });

@@ -106,6 +106,18 @@ export interface CharacterRow {
   title?: string;
   /** The six character stats, in-game order. */
   stats?: CharacterStat[];
+  /** The equipped subclass and what's slotted in it. */
+  subclass?: EquippedSubclass;
+}
+
+export interface EquippedSubclass {
+  /** e.g. "Voidwalker". */
+  name: string;
+  /** e.g. "Void", "Prismatic". */
+  element: string;
+  icon?: string;
+  /** Slotted parts by slot: supers, grenades, melee, class_abilities, movement, aspects, fragments. */
+  parts: Record<string, { name: string; icon?: string; description?: string }[]>;
 }
 
 export interface CharacterStat {
@@ -132,8 +144,36 @@ const bungieUrl = (path?: string) => (path ? `https://www.bungie.net${path}` : u
  * `manifest` adds stat names and icons; `titles` maps character id to the equipped
  * title (looked up separately, since the record table is too big to cache whole).
  */
+const SUBCLASS_BUCKET = 3284755031;
+const SUBCLASS_PLUG = /^(?:titan|hunter|warlock|shared)\.(\w+)\.(supers|grenades|melee|class_abilities|movement|aspects|fragments)$/;
+
+/** Reads the subclass a character has equipped and every plug slotted into it. */
+export function equippedSubclass(
+  profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items' | 'extras'>, characterId: string,
+): EquippedSubclass | undefined {
+  const item = profile.characterEquipment?.data?.[characterId]?.items.find((i) => i.bucketHash === SUBCLASS_BUCKET);
+  if (!item) return undefined;
+  const def = manifest.items[item.itemHash];
+  const parts: EquippedSubclass['parts'] = {};
+  let element = '';
+  const socketList = item.itemInstanceId ? profile.itemComponents?.sockets?.data?.[item.itemInstanceId]?.sockets ?? [] : [];
+  for (const socket of socketList) {
+    if (!socket.plugHash) continue;
+    const m = SUBCLASS_PLUG.exec(manifest.extras?.[socket.plugHash]?.plugCategory ?? '');
+    const d = manifest.items[socket.plugHash];
+    const name = d?.displayProperties.name;
+    // Empty aspect/fragment sockets have plugs named "Empty ... Socket".
+    if (!m || !name || /^empty/i.test(name)) continue;
+    const [, el, slot] = m as unknown as [string, string, string];
+    if (el !== 'shared' && !element) element = el[0]!.toUpperCase() + el.slice(1);
+    (parts[slot] ??= []).push({ name, icon: bungieUrl(d.displayProperties.icon), description: d.displayProperties.description || undefined });
+  }
+  return { name: def?.displayProperties.name ?? 'Subclass', element, icon: bungieUrl(def?.displayProperties.icon), parts };
+}
+
 export function summarizeCharacters(
-  profile: DestinyProfileResponse, manifest?: Pick<ManifestTables, 'stats'>, titles: Record<string, string> = {},
+  profile: DestinyProfileResponse, manifest?: Pick<ManifestTables, 'stats'> & Partial<Pick<ManifestTables, 'items' | 'extras'>>,
+  titles: Record<string, string> = {},
 ): CharacterRow[] {
   return Object.entries(profile.characters?.data ?? {})
     .map(([id, ch]) => ({
@@ -144,6 +184,9 @@ export function summarizeCharacters(
       emblemBackground: bungieUrl(ch.emblemBackgroundPath),
       lastPlayed: ch.dateLastPlayed,
       title: titles[id],
+      subclass: manifest?.items && manifest.extras
+        ? equippedSubclass(profile, { items: manifest.items, extras: manifest.extras }, id)
+        : undefined,
       stats: manifest
         ? CHARACTER_STAT_ORDER.filter((h) => ch.stats?.[h] !== undefined).map((h) => ({
           name: manifest.stats[h]?.displayProperties.name ?? '',

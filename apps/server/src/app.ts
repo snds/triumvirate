@@ -8,11 +8,12 @@ import { getDestinyEntityDefinition, getProfile, type DestinyProfileResponse, ty
 import Anthropic from '@anthropic-ai/sdk';
 import {
   appraise, authorizeUrl, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
-  refreshTokens, summarizeAccount, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
+  refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
   type ManifestTables, type Tokens, type WishList,
 } from '@triumvirate/core';
 import type { Store, Snapshot } from './store.ts';
-import { askAgent, type AgentContext, type ChatTurn } from './agent.ts';
+import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
+import { stream } from 'hono/streaming';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
@@ -41,6 +42,8 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   let lastView: AgentContext | undefined;
   let pendingState = '';
   let manifest: ManifestTables | undefined;
+  let subclass: ReturnType<typeof buildSubclassIndex> | undefined;
+  let subclassFor = '';
 
   async function validTokens(): Promise<Tokens | undefined> {
     let t = await store.readTokens();
@@ -175,8 +178,20 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const body = (await c.req.json()) as { messages?: ChatTurn[] };
     const history = (body.messages ?? []).filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content);
     if (history.at(-1)?.role !== 'user') return c.json({ error: 'The last message must be from you.' }, 400);
-    const reply = await askAgent(deps.anthropic, () => lastView!, history);
-    return c.json({ reply });
+    const client = deps.anthropic;
+    // Newline-delimited JSON events, so the chat can show progress as it happens.
+    c.header('Content-Type', 'application/x-ndjson');
+    c.header('Cache-Control', 'no-cache');
+    return stream(c, async (out) => {
+      const send = (e: AgentEvent) => out.write(JSON.stringify(e) + '\n');
+      try {
+        const text = await streamAgent(client, () => lastView!, history, (e) => void send(e));
+        await send({ type: 'done', text });
+      } catch (err) {
+        console.error(err);
+        await send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
+      }
+    });
   });
 
   // Turns a raw snapshot into what the web app and the agent see: items with roll verdicts, plus cleanup picks.
@@ -190,7 +205,12 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const characters = summarizeCharacters(snap.profile, manifest!, snap.titles);
     const account = summarizeAccount(snap.profile, manifest!);
     const cleanup = cleanupCandidates(items);
-    lastView = { displayName: snap.displayName, characters, items, cleanup };
+    // The subclass index only changes with the manifest, so build it once per version.
+    if (subclassFor !== manifest!.version) {
+      subclass = buildSubclassIndex(manifest!);
+      subclassFor = manifest!.version;
+    }
+    lastView = { displayName: snap.displayName, characters, items, cleanup, subclass };
     return { characters, account, items, cleanup };
   }
 

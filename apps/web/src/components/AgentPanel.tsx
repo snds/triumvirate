@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { askAgent, type ChatTurn } from '../api.ts';
+import { streamAgent, type ChatTurn } from '../api.ts';
 import { Icon } from './Icon.tsx';
+import { ChatMarkdown } from './ChatMarkdown.tsx';
 
 const STARTERS = [
   'What should I dismantle first?',
   'Which of my weapons are god rolls?',
-  'Suggest a Solar build for my Warlock using what I own.',
+  'Build me a Void Warlock setup from what I own.',
 ];
+
+/** An assistant reply while it's being made: the steps taken so far and the text written so far. */
+interface Pending {
+  steps: string[];
+  text: string;
+}
 
 // Stays mounted while collapsed (just hidden) so the conversation survives toggling.
 export function AgentPanel({ enabled, open, ask }: {
@@ -16,13 +23,14 @@ export function AgentPanel({ enabled, open, ask }: {
 }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<Pending | null>(null);
   const [error, setError] = useState('');
   const endRef = useRef<HTMLDivElement>(null);
+  const busy = pending !== null;
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [turns, busy]);
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [turns, pending]);
 
   const send = async (text: string) => {
     const question = text.trim();
@@ -30,15 +38,21 @@ export function AgentPanel({ enabled, open, ask }: {
     const next: ChatTurn[] = [...turns, { role: 'user', content: question }];
     setTurns(next);
     setDraft('');
-    setBusy(true);
     setError('');
+    setPending({ steps: [], text: '' });
+    let final = '';
     try {
-      const reply = await askAgent(next);
-      setTurns([...next, { role: 'assistant', content: reply }]);
+      await streamAgent(next, (e) => {
+        if (e.type === 'status') setPending((p) => p && { ...p, steps: [...p.steps, e.text] });
+        else if (e.type === 'text') setPending((p) => p && { ...p, text: p.text + e.delta });
+        else if (e.type === 'done') final = e.text;
+        else if (e.type === 'error') throw new Error(e.message);
+      });
+      if (final) setTurns([...next, { role: 'assistant', content: final }]);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
-      setBusy(false);
+      setPending(null);
     }
   };
 
@@ -65,9 +79,9 @@ export function AgentPanel({ enabled, open, ask }: {
           <Icon name="newChat" />
         </button>
       </header>
-      <div className="agent__log">
+      <div className="agent__log" aria-live="polite">
         {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}
-        {enabled && turns.length === 0 && (
+        {enabled && turns.length === 0 && !busy && (
           <div className="agent__starters">
             <p className="muted">Ask about your gear. Answers only use items you own.</p>
             {STARTERS.map((s) => (
@@ -75,10 +89,12 @@ export function AgentPanel({ enabled, open, ask }: {
             ))}
           </div>
         )}
-        {turns.map((t, n) => (
-          <div key={n} className={`bubble bubble--${t.role}`}>{t.content}</div>
-        ))}
-        {busy && <div className="bubble bubble--assistant muted">Checking your vault…</div>}
+        {turns.map((t, n) =>
+          t.role === 'user'
+            ? <div key={n} className="bubble bubble--user">{t.content}</div>
+            : <div key={n} className="reply"><ChatMarkdown text={t.content} /></div>,
+        )}
+        {pending && <Working pending={pending} />}
         {error && <p className="error">{error}</p>}
         <div ref={endRef} />
       </div>
@@ -97,5 +113,29 @@ export function AgentPanel({ enabled, open, ask }: {
         <button className="button button--primary" disabled={!enabled || busy || !draft.trim()}>Send</button>
       </form>
     </aside>
+  );
+}
+
+/** The in-progress state: each step as it happens, then the answer as it streams in. */
+function Working({ pending }: { pending: Pending }) {
+  const writing = pending.text.length > 0;
+  return (
+    <div className="reply reply--pending">
+      <ol className="steps">
+        {pending.steps.map((s, n) => {
+          const current = !writing && n === pending.steps.length - 1;
+          return (
+            <li key={n} className={`step${current ? ' is-current' : ''}`}>
+              {current ? <span className="spinner" /> : <Icon name="check" className="step__done" />}
+              {s}
+            </li>
+          );
+        })}
+        {pending.steps.length === 0 && !writing && (
+          <li className="step is-current"><span className="spinner" />Thinking</li>
+        )}
+      </ol>
+      {writing && <ChatMarkdown text={pending.text} />}
+    </div>
   );
 }

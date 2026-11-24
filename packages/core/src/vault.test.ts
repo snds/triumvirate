@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
-import { summarizeAccount, summarizeCharacters, summarizeProfile, VAULT_BUCKET } from './vault.ts';
+import { equippedSubclass, summarizeAccount, summarizeCharacters, summarizeProfile, VAULT_BUCKET } from './vault.ts';
 import { needsRefresh, type Tokens } from './bungie.ts';
 import type { ManifestTables } from './manifest.ts';
 
@@ -178,4 +178,32 @@ test('splits weapon sockets into frame, perks, and mods, with stat bonuses and c
   ]);
   assert.equal(gun?.crafted, true);
   assert.equal(gun?.craftedLevel, 17);
+});
+
+test('reads the equipped subclass and its slotted parts', () => {
+  const p = {
+    characterEquipment: { data: { c1: { items: [{ itemHash: 50, bucketHash: 3284755031, itemInstanceId: 's' }] } } },
+    itemComponents: { sockets: { data: { s: { sockets: [{ plugHash: 51 }, { plugHash: 52 }, { plugHash: 53 }, { plugHash: 54 }] } } } },
+  } as unknown as DestinyProfileResponse;
+  const m = {
+    items: {
+      50: { displayProperties: { name: 'Voidwalker' } },
+      51: { displayProperties: { name: 'Nova Bomb' } },
+      52: { displayProperties: { name: 'Feed the Void' } },
+      53: { displayProperties: { name: 'Echo of Persistence' } },
+      54: { displayProperties: { name: 'Empty Fragment Socket' } },
+    },
+    extras: {
+      51: { plugCategory: 'warlock.void.supers' },
+      52: { plugCategory: 'warlock.void.aspects' },
+      53: { plugCategory: 'shared.void.fragments' },
+      54: { plugCategory: 'shared.void.fragments' },
+    },
+  } as unknown as ManifestTables;
+  const sc = equippedSubclass(p, m, 'c1');
+  assert.equal(sc?.name, 'Voidwalker');
+  assert.equal(sc?.element, 'Void');
+  assert.deepEqual(Object.fromEntries(Object.entries(sc!.parts).map(([k, v]) => [k, v.map((x) => x.name)])), {
+    supers: ['Nova Bomb'], aspects: ['Feed the Void'], fragments: ['Echo of Persistence'],
+  });
 });

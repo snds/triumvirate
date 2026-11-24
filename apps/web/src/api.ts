@@ -36,11 +36,33 @@ export async function logout(): Promise<void> {
   await fetch('/api/logout', { method: 'POST' });
 }
 
-export async function askAgent(messages: ChatTurn[]): Promise<string> {
+export type AgentEvent =
+  | { type: 'status'; text: string }
+  | { type: 'text'; delta: string }
+  | { type: 'done'; text: string }
+  | { type: 'error'; message: string };
+
+/** Streams the agent's progress as newline-delimited JSON events. */
+export async function streamAgent(messages: ChatTurn[], onEvent: (e: AgentEvent) => void): Promise<void> {
   const res = await fetch('/api/agent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ messages }),
   });
-  return (await json<{ reply: string }>(res)).reply;
+  if (!res.ok || !res.body) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `Request failed (${res.status})`);
+  }
+  const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = '';
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += value;
+    // Events end with a newline; keep any partial line for the next chunk.
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) if (line.trim()) onEvent(JSON.parse(line) as AgentEvent);
+  }
+  if (buffer.trim()) onEvent(JSON.parse(buffer) as AgentEvent);
 }
