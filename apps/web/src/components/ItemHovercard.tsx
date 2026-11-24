@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
+import { ElementIcon } from './ElementIcon.tsx';
 import { ItemFacts, itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 
 const GAP = 8;
@@ -37,7 +38,7 @@ export function ItemHovercard({ item, anchor, copies }: { item: AppraisedItem; a
       </header>
       <div className="hovercard__body">
         <div className="hovercard__power">
-          {item.damageIcon && <img className="hovercard__element" src={item.damageIcon} alt="" />}
+          <ElementIcon className="hovercard__element" damage={item.damage} icon={item.damageIcon} />
           {item.power !== undefined && <span>{item.power}</span>}
           {item.damage && <span className="muted">{item.damage}</span>}
           <span className="muted hovercard__where">{item.equipped ? 'Equipped · ' : ''}{item.location}</span>

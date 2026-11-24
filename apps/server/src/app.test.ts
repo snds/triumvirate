@@ -39,3 +39,9 @@ test('agent explains how to turn it on when there is no API key', async () => {
   assert.equal(res.status, 400);
   assert.match((await res.json()).error, /ANTHROPIC_API_KEY/);
 });
+
+test('bungie image proxy rejects paths outside Bungie image folders', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tv-'))), { wishList: async () => new Map() });
+  assert.equal((await app.request('/api/bungie-img/etc/passwd')).status, 400);
+  assert.notEqual((await app.request('/api/bungie-img/common/../../x.png')).status, 200);
+});

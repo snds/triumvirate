@@ -121,6 +121,25 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return c.redirect('/');
   });
 
+  // Same-origin copy of a Bungie image. CSS masks (used to tint element icons) only accept
+  // cross-origin images that send CORS headers, so serving them from here avoids relying on that.
+  const imageCache = new Map<string, { type: string; body: ArrayBuffer }>();
+  app.get('/api/bungie-img/*', async (c) => {
+    const path = c.req.path.replace(/^\/api\/bungie-img\//, '');
+    if (!/^(common|img)\/[\w./-]+\.(png|jpg|jpeg|svg|gif|webp)$/i.test(path) || path.includes('..')) {
+      return c.text('Not a Bungie image path', 400);
+    }
+    let hit = imageCache.get(path);
+    if (!hit) {
+      const res = await fetch(`https://www.bungie.net/${path}`);
+      if (!res.ok) return c.text('Image not found', 404);
+      hit = { type: res.headers.get('content-type') ?? 'image/png', body: await res.arrayBuffer() };
+      if (imageCache.size > 500) imageCache.clear(); // element icons are few; this just caps memory
+      imageCache.set(path, hit);
+    }
+    return c.body(hit.body, 200, { 'Content-Type': hit.type, 'Cache-Control': 'public, max-age=604800, immutable' });
+  });
+
   app.post('/api/logout', async (c) => {
     await store.clearTokens();
     return c.json({ ok: true });

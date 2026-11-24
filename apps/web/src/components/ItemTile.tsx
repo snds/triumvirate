@@ -1,5 +1,6 @@
 import { useHover } from '../hover.ts';
 import { Icon, type IconName } from './Icon.tsx';
+import { ElementIcon } from './ElementIcon.tsx';
 import type { AppraisedItem, Verdict } from '@triumvirate/core';
 
 // Maps the item's rarity and element to semantic token names.
@@ -37,7 +38,7 @@ export function ItemTile({
       {item.power !== undefined && (
         <span className="tile__power">
           {item.damageIcon
-            ? <img className="tile__element-icon" src={item.damageIcon} alt="" />
+            ? <ElementIcon className="tile__element-icon" damage={item.damage} icon={item.damageIcon} />
             : item.damage && <span className="tile__element" style={{ background: elementVar(item.damage) }} />}
           {item.power}
         </span>
