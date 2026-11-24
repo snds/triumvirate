@@ -67,3 +67,23 @@ test('page loads reuse the snapshot, the browser gets 304s, and an unchanged ref
     globalThis.fetch = real;
   }
 });
+
+test('Bungie images are fetched once, kept on disk, and cached by the browser for a year', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'tri-'));
+  let fetches = 0;
+  const real = globalThis.fetch;
+  globalThis.fetch = (async () => { fetches++; return new Response(new Uint8Array([1, 2, 3]), { headers: { 'content-type': 'image/jpeg' } }); }) as typeof fetch;
+  try {
+    const make = () => createApp({ apiKey: 'k', clientId: '1', clientSecret: 's' }, createStore(dir), { wishList: async () => new Map() });
+    const first = await make().request('/api/bungie-img/common/destiny2_content/icons/abc.jpg');
+    assert.equal(first.status, 200);
+    assert.match(first.headers.get('Cache-Control') ?? '', /max-age=31536000/);
+    // A fresh server (empty memory) still serves it from disk without asking Bungie.
+    const second = await make().request('/api/bungie-img/common/destiny2_content/icons/abc.jpg');
+    assert.deepEqual(new Uint8Array(await second.arrayBuffer()), new Uint8Array([1, 2, 3]));
+    assert.equal(second.headers.get('Content-Type'), 'image/jpeg');
+    assert.equal(fetches, 1);
+  } finally {
+    globalThis.fetch = real;
+  }
+});

@@ -24,8 +24,15 @@ const SERVER_DOWN = 'The app server isn\'t responding. Check the terminal runnin
 
 class ServerDown extends Error {}
 
-async function json<T>(res: Response): Promise<T> {
-  const text = await res.text();
+/**
+ * Points every Bungie image at our own server, which keeps a copy on disk and tells the browser
+ * to cache it for a year. Reloads then draw art from the browser cache instead of popping in.
+ */
+const sameOriginImages = (text: string) => text.replaceAll('"https://www.bungie.net/', '"/api/bungie-img/');
+
+async function json<T>(res: Response, transform?: (text: string) => string): Promise<T> {
+  const raw = await res.text();
+  const text = transform ? transform(raw) : raw;
   let body: T & { error?: string };
   // The dev proxy answers with an empty 500 or 502 when the server is down or restarting.
   try { body = JSON.parse(text); } catch { throw new ServerDown(res.ok ? 'The app server sent back something unreadable.' : SERVER_DOWN); }
@@ -40,7 +47,7 @@ export async function fetchInventory(refresh = false): Promise<Inventory | null>
     try {
       const res = await fetch(`/api/inventory${refresh ? '?refresh=1' : ''}`);
       if (res.status === 401) return null;
-      return await json<Inventory>(res);
+      return await json<Inventory>(res, sameOriginImages);
     } catch (err) {
       if (!(err instanceof ServerDown) || attempt >= 5) throw err;
       await new Promise((f) => setTimeout(f, 1000 + attempt * 500));

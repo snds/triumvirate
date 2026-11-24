@@ -52,8 +52,8 @@ export const ItemTile = memo(function ItemTile({
       onPointerEnter={hover ? (e) => hover.enter(item, e.currentTarget.getBoundingClientRect()) : undefined}
       onPointerLeave={(e) => { hover?.leave(); e.currentTarget.style.removeProperty('--mx'); e.currentTarget.style.removeProperty('--my'); }}
     >
-      {item.icon && <img className="tile__icon" src={item.icon} alt="" loading="lazy" draggable={false} />}
-      {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" loading="lazy" draggable={false} />}
+      {item.icon && <img className="tile__icon" src={item.icon} alt="" decoding="async" draggable={false} />}
+      {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" decoding="async" draggable={false} />}
       {verdict && BADGE[verdict] && <span className={`tile__badge tile__badge--${verdict}`}><Icon name={BADGE[verdict]} filled /></span>}
       {item.power !== undefined && (
         <span className="tile__power">

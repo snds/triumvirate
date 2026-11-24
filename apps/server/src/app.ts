@@ -1,7 +1,8 @@
 // HTTP API for the web app. Single user: the token file on disk is the session,
 // so the server only ever listens on 127.0.0.1.
 import { randomBytes } from 'node:crypto';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Hono } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { getDestinyEntityDefinition, getProfile, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
@@ -30,6 +31,10 @@ const COMPONENTS = [
   309, // ItemPlugObjectives (crafted level, kill trackers)
   310, // ItemReusablePlugs (other perks in each column)
 ];
+
+const IMAGE_TYPES: Record<string, string> = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml',
+};
 
 export interface AppDeps {
   /** Returns the parsed community wish list; may download it. */
@@ -159,15 +164,27 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     if (!/^(common|img)\/[\w./-]+\.(png|jpg|jpeg|svg|gif|webp)$/i.test(path) || path.includes('..')) {
       return c.text('Not a Bungie image path', 400);
     }
+    // Memory first, then the disk copy, then Bungie. Bungie never changes the file at a given
+    // path (new art gets a new path), so a copy is good forever.
     let hit = imageCache.get(path);
     if (!hit) {
-      const res = await fetch(`https://www.bungie.net/${path}`);
-      if (!res.ok) return c.text('Image not found', 404);
-      hit = { type: res.headers.get('content-type') ?? 'image/png', body: await res.arrayBuffer() };
-      if (imageCache.size > 500) imageCache.clear(); // element icons are few; this just caps memory
+      const file = join(store.dataDir, 'img', path);
+      const type = IMAGE_TYPES[path.split('.').pop()!.toLowerCase()] ?? 'image/png';
+      try {
+        const buf = await readFile(file);
+        hit = { type, body: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer };
+      } catch {
+        const res = await fetch(`https://www.bungie.net/${path}`);
+        if (!res.ok) return c.text('Image not found', 404);
+        hit = { type: res.headers.get('content-type') ?? type, body: await res.arrayBuffer() };
+        await mkdir(dirname(file), { recursive: true });
+        await writeFile(file, Buffer.from(hit.body)).catch(() => {});
+      }
+      if (imageCache.size > 3000) imageCache.clear(); // caps memory; the disk copy stays
       imageCache.set(path, hit);
     }
-    return c.body(hit.body, 200, { 'Content-Type': hit.type, 'Cache-Control': 'public, max-age=604800, immutable' });
+    // A year, immutable: the browser keeps it and never asks again.
+    return c.body(hit.body, 200, { 'Content-Type': hit.type, 'Cache-Control': 'public, max-age=31536000, immutable' });
   });
 
   app.post('/api/logout', async (c) => {
