@@ -186,7 +186,7 @@ export function App() {
             aria-label={agentOpen ? 'Collapse chat' : 'Open chat'}
             title={agentOpen ? 'Collapse chat' : 'Open chat'}
           >
-            <Icon name={agentOpen ? 'panelClose' : 'panelOpen'} />
+            <Icon name="chat" filled={agentOpen} />
           </button>
         </div>
       </header>
@@ -223,7 +223,7 @@ export function App() {
         )}
       </main>
 
-      <AgentPanel enabled={inv.agentEnabled} open={agentOpen} onClose={() => setAgentOpen(false)} ask={ask} />
+      <AgentPanel enabled={inv.agentEnabled} open={agentOpen} ask={ask} />
       {selected && (
         <ItemDetail
           item={selected}

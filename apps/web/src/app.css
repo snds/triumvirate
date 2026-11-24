@@ -66,7 +66,8 @@ body {
 }
 .icon-button:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-primary); }
 .icon-button[aria-pressed='true'] { color: var(--accent); }
-.icon-button:disabled { cursor: progress; }
+.icon-button:disabled { cursor: default; opacity: 0.4; }
+.icon-button.is-busy:disabled { cursor: progress; opacity: 1; }
 .icon-button.is-busy .icon { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

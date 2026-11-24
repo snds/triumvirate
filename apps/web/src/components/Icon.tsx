@@ -5,8 +5,6 @@ const GLYPHS = {
   chevronDown: 'expand_more',
   chevronsLeft: 'keyboard_double_arrow_left',
   chevronsRight: 'keyboard_double_arrow_right',
-  panelOpen: 'right_panel_open',
-  panelClose: 'right_panel_close',
   signOut: 'logout',
   close: 'close',
   lock: 'lock',
@@ -16,6 +14,7 @@ const GLYPHS = {
   power: 'diamond',
   openExternal: 'open_in_new',
   chat: 'forum',
+  newChat: 'edit_square',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

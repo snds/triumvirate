@@ -9,8 +9,8 @@ const STARTERS = [
 ];
 
 // Stays mounted while collapsed (just hidden) so the conversation survives toggling.
-export function AgentPanel({ enabled, open, onClose, ask }: {
-  enabled: boolean; open: boolean; onClose: () => void;
+export function AgentPanel({ enabled, open, ask }: {
+  enabled: boolean; open: boolean;
   /** A question sent from elsewhere (e.g. an item panel); `id` changes on each new ask. */
   ask?: { id: number; text: string };
 }) {
@@ -54,7 +54,16 @@ export function AgentPanel({ enabled, open, onClose, ask }: {
     <aside className="agent" aria-label="Ask Triumvirate" hidden={!open}>
       <header className="agent__header">
         <strong>Ask Triumvirate</strong>
-        <button className="icon-button" onClick={onClose} aria-label="Collapse chat" title="Collapse chat"><Icon name="panelClose" /></button>
+        {/* The top bar's chat button is the only open/close control; this one starts over. */}
+        <button
+          className="icon-button"
+          onClick={() => { setTurns([]); setError(''); }}
+          disabled={busy || turns.length === 0}
+          aria-label="New chat"
+          title="New chat"
+        >
+          <Icon name="newChat" />
+        </button>
       </header>
       <div className="agent__log">
         {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}
