@@ -1,12 +1,15 @@
-import type { AppraisedItem, CharacterRow, CleanupCandidate } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, CharacterRow, CleanupCandidate } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
   displayName: string;
+  profilePicture?: string;
   syncedAt: string;
   manifestVersion: string;
   agentEnabled: boolean;
   characters: CharacterRow[];
+  /** Optional so an older server still renders. */
+  account?: AccountSummary;
   items: AppraisedItem[];
   cleanup: CleanupCandidate[];
 }

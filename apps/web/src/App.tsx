@@ -7,6 +7,11 @@ import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
 import { CleanupView } from './components/CleanupView.tsx';
 import { AgentPanel } from './components/AgentPanel.tsx';
+import { ProfileMenu } from './components/ProfileMenu.tsx';
+import { Icon } from './components/Icon.tsx';
+import { isPostmaster } from './components/CharacterColumn.tsx';
+import { SLOT_ORDER } from './inventory.ts';
+import { usePref } from './prefs.ts';
 
 type State =
   | { status: 'loading' }
@@ -27,7 +32,9 @@ export function App() {
   const [kind, setKind] = useState<Kind>('all');
   const [view, setView] = useState<'inventory' | 'cleanup'>('inventory');
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
-  const [agentOpen, setAgentOpen] = useState(false);
+  const [agentOpen, setAgentOpen] = usePref('chatOpen', true);
+  const [collapsed, setCollapsed] = usePref('charactersCollapsed', false);
+  const [tileScale, setTileScale] = usePref('tileScale', 1);
   const [, tick] = useState(0);
 
   const load = useCallback(async (refresh: boolean) => {
@@ -48,6 +55,11 @@ export function App() {
     const id = setInterval(() => tick((n) => n + 1), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // The scale lives on :root because the tile size tokens are computed there.
+  useEffect(() => {
+    document.documentElement.style.setProperty('--tile-scale', String(tileScale));
+  }, [tileScale]);
 
   const visible = useMemo(
     () => (state.status === 'ready' ? state.inv.items.filter((i) => matches(i, query, kind)) : []),
@@ -73,9 +85,24 @@ export function App() {
   }
 
   const { inv } = state;
-  const vaultTotal = inv.items.filter((i) => i.owner === 'vault').length;
+  // Characters arrive most recently played first; that one stays when the others collapse.
+  const [, ...others] = inv.characters;
+  const shown = collapsed ? inv.characters.slice(0, 1) : inv.characters;
+  const otherIds = new Set(others.map((c) => c.id));
+  // Collapsed: the other characters' gear (not their consumables or postmaster) shows in the vault.
+  const vaultItems = visible.filter(
+    (i) => i.owner === 'vault' || (collapsed && otherIds.has(i.owner) && SLOT_ORDER.includes(i.bucket)),
+  );
+  const postmasterNotes = collapsed
+    ? others
+      .map((c) => ({ c, n: inv.items.filter((i) => i.owner === c.id && isPostmaster(i)).length }))
+      .filter((x) => x.n > 0)
+      .map((x) => `${x.c.className} ${x.n}`)
+    : [];
+  const signOut = async () => { await logout(); setState({ status: 'signed-out' }); };
+
   return (
-    <div className="app">
+    <div className={`app${agentOpen ? ' app--chat' : ''}`}>
       <header className="topbar">
         <h1 className="brand">Triumvirate</h1>
         <nav className="segmented" aria-label="View">
@@ -116,43 +143,68 @@ export function App() {
           ))}
         </div>
         <div className="topbar__end">
-          <span className="muted">{inv.displayName} · synced {timeAgo(inv.syncedAt)}</span>
-          <button className="button button--primary" onClick={() => setAgentOpen((o) => !o)}>Ask</button>
-          <button className="button" onClick={() => void load(true)} disabled={syncing}>
-            {syncing ? 'Syncing…' : 'Refresh'}
-          </button>
           <button
-            className="button button--quiet"
-            onClick={async () => { await logout(); setState({ status: 'signed-out' }); }}
+            className={`icon-button${syncing ? ' is-busy' : ''}`}
+            onClick={() => void load(true)}
+            disabled={syncing}
+            aria-label={syncing ? 'Syncing' : 'Refresh from Bungie'}
+            title={syncing ? 'Syncing…' : 'Refresh from Bungie'}
           >
-            Sign out
+            <Icon name="refresh" />
+          </button>
+          <ProfileMenu
+            name={inv.displayName}
+            picture={inv.profilePicture}
+            synced={timeAgo(inv.syncedAt)}
+            tileScale={tileScale}
+            onTileScale={setTileScale}
+            onSignOut={() => void signOut()}
+          />
+          <button
+            className="icon-button"
+            onClick={() => setAgentOpen((o) => !o)}
+            aria-pressed={agentOpen}
+            aria-label={agentOpen ? 'Collapse chat' : 'Open chat'}
+            title={agentOpen ? 'Collapse chat' : 'Open chat'}
+          >
+            <Icon name="panelRight" />
           </button>
         </div>
       </header>
 
-      {view === 'inventory' ? (
-        <>
-          <div className="columns">
-            {inv.characters.map((c) => (
-              <CharacterColumn
-                key={c.id}
-                character={c}
-                items={visible.filter((i) => i.owner === c.id)}
-                onSelect={setSelected}
-              />
-            ))}
+      <main className="main">
+        {view === 'inventory' ? (
+          <div className={`inventory${collapsed ? ' inventory--collapsed' : ''}`}>
+            <div className="columns">
+              {shown.map((c) => (
+                <CharacterColumn
+                  key={c.id}
+                  character={c}
+                  items={visible.filter((i) => i.owner === c.id && !isPostmaster(i))}
+                  postmaster={inv.items.filter((i) => i.owner === c.id && isPostmaster(i))}
+                  onSelect={setSelected}
+                />
+              ))}
+            </div>
+            <VaultSection
+              items={vaultItems}
+              account={inv.account}
+              collapsed={collapsed}
+              onToggleCollapsed={() => setCollapsed((v) => !v)}
+              postmasterNotes={postmasterNotes}
+              onSelect={setSelected}
+            />
           </div>
-          <VaultSection items={visible.filter((i) => i.owner === 'vault')} total={vaultTotal} onSelect={setSelected} />
-        </>
-      ) : (
-        <CleanupView
-          cleanup={inv.cleanup.filter((c) => matches(c.item, query, kind))}
-          onSelect={setSelected}
-        />
-      )}
+        ) : (
+          <CleanupView
+            cleanup={inv.cleanup.filter((c) => matches(c.item, query, kind))}
+            onSelect={setSelected}
+          />
+        )}
+      </main>
 
+      <AgentPanel enabled={inv.agentEnabled} open={agentOpen} onClose={() => setAgentOpen(false)} />
       {selected && <ItemDetail item={selected} onClose={() => setSelected(null)} />}
-      {agentOpen && <AgentPanel enabled={inv.agentEnabled} onClose={() => setAgentOpen(false)} />}
     </div>
   );
 }

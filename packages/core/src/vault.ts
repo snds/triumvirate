@@ -3,6 +3,11 @@ import type { DestinyProfileResponse, DestinyItemComponent } from 'bungie-api-ts
 import type { ManifestTables } from './manifest.ts';
 
 export const VAULT_BUCKET = 138197802;
+/** "Lost Items": the postmaster. Lives in each character's inventory and holds 21 items. */
+export const POSTMASTER_BUCKET = 215593132;
+export const POSTMASTER_CAPACITY = 21;
+/** Character stats in in-game order (Armor 3.0 names: Weapons, Health, Class, Grenade, Super, Melee). */
+const CHARACTER_STAT_ORDER = [2996146975, 392767087, 1943323491, 1735777505, 144602215, 4244567218];
 export const CLASS_NAMES = ['Titan', 'Hunter', 'Warlock'];
 /** Index = Bungie's DamageType enum value. */
 export const DAMAGE_NAMES = ['', 'Kinetic', 'Arc', 'Solar', 'Void', 'Raid', 'Stasis', 'Strand'];
@@ -60,11 +65,39 @@ export interface CharacterRow {
   light: number;
   emblemBackground?: string;
   lastPlayed: string;
+  /** Equipped title, e.g. "Iron Lord". */
+  title?: string;
+  /** The six character stats, in-game order. */
+  stats?: CharacterStat[];
+}
+
+export interface CharacterStat {
+  name: string;
+  value: number;
+  icon?: string;
+}
+
+export interface Currency {
+  name: string;
+  quantity: number;
+  icon?: string;
+}
+
+export interface AccountSummary {
+  currencies: Currency[];
+  /** Items in the vault and how many it holds. */
+  vault: { used: number; capacity: number };
 }
 
 const bungieUrl = (path?: string) => (path ? `https://www.bungie.net${path}` : undefined);
 
-export function summarizeCharacters(profile: DestinyProfileResponse): CharacterRow[] {
+/**
+ * `manifest` adds stat names and icons; `titles` maps character id to the equipped
+ * title (looked up separately, since the record table is too big to cache whole).
+ */
+export function summarizeCharacters(
+  profile: DestinyProfileResponse, manifest?: Pick<ManifestTables, 'stats'>, titles: Record<string, string> = {},
+): CharacterRow[] {
   return Object.entries(profile.characters?.data ?? {})
     .map(([id, ch]) => ({
       id,
@@ -73,9 +106,27 @@ export function summarizeCharacters(profile: DestinyProfileResponse): CharacterR
       light: ch.light,
       emblemBackground: bungieUrl(ch.emblemBackgroundPath),
       lastPlayed: ch.dateLastPlayed,
+      title: titles[id],
+      stats: manifest
+        ? CHARACTER_STAT_ORDER.filter((h) => ch.stats?.[h] !== undefined).map((h) => ({
+          name: manifest.stats[h]?.displayProperties.name ?? '',
+          value: ch.stats[h]!,
+          icon: bungieUrl(manifest.stats[h]?.displayProperties.icon),
+        }))
+        : undefined,
     }))
     // Most recently played first, the same order the game uses.
     .sort((a, b) => b.lastPlayed.localeCompare(a.lastPlayed));
+}
+
+/** Profile-wide numbers for the vault header: currencies and vault space. */
+export function summarizeAccount(profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items' | 'buckets'>): AccountSummary {
+  const currencies = (profile.profileCurrencies?.data?.items ?? []).map((c) => {
+    const d = manifest.items[c.itemHash];
+    return { name: d?.displayProperties.name || 'Currency', quantity: c.quantity, icon: bungieUrl(d?.displayProperties.icon) };
+  });
+  const used = (profile.profileInventory?.data?.items ?? []).filter((i) => i.bucketHash === VAULT_BUCKET).length;
+  return { currencies, vault: { used, capacity: manifest.buckets[VAULT_BUCKET]?.itemCount ?? 0 } };
 }
 
 export function summarizeProfile(profile: DestinyProfileResponse, manifest: ManifestTables): ItemRow[] {

@@ -12,6 +12,10 @@ export interface Snapshot {
   membershipType: number;
   membershipId: string;
   displayName: string;
+  /** Full URL to the Bungie.net avatar. */
+  profilePicture?: string;
+  /** Character id to equipped title. */
+  titles?: Record<string, string>;
   profile: DestinyProfileResponse;
 }
 

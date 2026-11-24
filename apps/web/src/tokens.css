@@ -13,6 +13,7 @@
   --gray-300: #a3abb6;
   --gray-100: #e7eaee;
 
+  --gold-300: #e0c55a;
   --gold-400: #ceae33;   /* Exotic */
   --purple-500: #6b3f8a; /* Legendary */
   --blue-500: #5076a3;   /* Rare */
@@ -45,6 +46,10 @@
   --text-secondary: var(--gray-300);
   --text-muted: var(--gray-500);
   --accent: var(--gold-400);
+  --accent-hover: var(--gold-300);
+  --on-accent: var(--gray-950);
+  --warning: var(--orange-500);
+  --danger: #e5534b;
 
   --tier-exotic: var(--gold-400);
   --tier-legendary: var(--purple-500);
@@ -54,7 +59,7 @@
 
   --verdict-god: var(--gold-400);
   --verdict-good: var(--mint-400);
-  --verdict-bad: #e5534b;
+  --verdict-bad: var(--danger);
   --overlay-scrim: rgb(0 0 0 / 0.55);
 
   --element-kinetic: var(--white-200);
@@ -65,13 +70,26 @@
   --element-strand: var(--mint-400);
 
   /* ── Component ──────────────────────────────────────── */
-  --tile-size: 52px;
-  --tile-size-equipped: 64px;
+  /* Item size: the user setting writes --tile-scale on :root. Equipped tiles keep their ratio. */
+  --tile-scale: 1;
+  --tile-base: 52px;
+  --tile-equipped-ratio: 1.24;
+  --tile-size: calc(var(--tile-base) * var(--tile-scale));
+  --tile-size-equipped: calc(var(--tile-size) * var(--tile-equipped-ratio));
   --tile-radius: var(--radius-sm);
   --tile-border-width: 2px;
   --tile-gap: 6px;
-  --column-min-width: 300px;
+  /* Equipped tile + three carried tiles per row. */
+  --column-min-width: calc(var(--tile-size-equipped) + 3 * var(--tile-size) + 2 * var(--tile-gap) + 2 * var(--space-3) + var(--space-3) + 4px);
+  --topbar-height: 60px;
+  --icon-size: 20px;
+  --avatar-size: 32px;
   --drawer-width: 420px;
   --agent-width: 400px;
+  /* Tile indicators, in px at scale 1; tiles multiply them by their own scale (--s). */
   --badge-size: 14px;
+  --tile-power-font: 10px;
+  --tile-power-height: 14px;
+  --tile-lock-font: 9px;
+  --tile-element-size: 7px;
 }

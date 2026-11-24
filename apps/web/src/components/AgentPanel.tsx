@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { askAgent, type ChatTurn } from '../api.ts';
+import { Icon } from './Icon.tsx';
 
 const STARTERS = [
   'What should I dismantle first?',
@@ -7,7 +8,8 @@ const STARTERS = [
   'Suggest a Solar build for my Warlock using what I own.',
 ];
 
-export function AgentPanel({ enabled, onClose }: { enabled: boolean; onClose: () => void }) {
+// Stays mounted while collapsed (just hidden) so the conversation survives toggling.
+export function AgentPanel({ enabled, open, onClose }: { enabled: boolean; open: boolean; onClose: () => void }) {
   const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -37,10 +39,10 @@ export function AgentPanel({ enabled, onClose }: { enabled: boolean; onClose: ()
   };
 
   return (
-    <aside className="agent" aria-label="Ask Triumvirate">
+    <aside className="agent" aria-label="Ask Triumvirate" hidden={!open}>
       <header className="agent__header">
         <strong>Ask Triumvirate</strong>
-        <button className="button button--quiet" onClick={onClose} aria-label="Close">✕</button>
+        <button className="icon-button" onClick={onClose} aria-label="Collapse chat" title="Collapse chat"><Icon name="panelRight" /></button>
       </header>
       <div className="agent__log">
         {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}

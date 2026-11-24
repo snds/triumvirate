@@ -4,11 +4,11 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { Hono } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { getProfile } from 'bungie-api-ts/destiny2';
+import { getDestinyEntityDefinition, getProfile, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   appraise, authorizeUrl, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
-  refreshTokens, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
+  refreshTokens, summarizeAccount, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
   type ManifestTables, type Tokens, type WishList,
 } from '@triumvirate/core';
 import type { Store, Snapshot } from './store.ts';
@@ -17,6 +17,7 @@ import { askAgent, type AgentContext, type ChatTurn } from './agent.ts';
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
   100, // Profiles
+  103, // ProfileCurrencies (glimmer, bright dust, silver)
   102, // ProfileInventories (vault)
   200, // Characters
   201, // CharacterInventories
@@ -61,15 +62,41 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       loadManifestCached(http),
     ]);
     manifest = man;
+    const pic = me.bungieNetUser?.profilePicturePath;
     const snap: Snapshot = {
       syncedAt: new Date().toISOString(),
       membershipType: m.membershipType,
       membershipId: m.membershipId,
       displayName: m.bungieGlobalDisplayName || m.displayName,
+      profilePicture: pic ? (pic.startsWith('http') ? pic : `https://www.bungie.net${pic}`) : undefined,
+      titles: await characterTitles(http, profile),
       profile,
     };
     await store.saveSnapshot(snap);
     return snap;
+  }
+
+  // Titles live in the record table, which is huge, so look up only the equipped ones.
+  const titleCache = new Map<number, DestinyRecordDefinition>();
+  async function characterTitles(http: ReturnType<typeof createHttpClient>, profile: DestinyProfileResponse) {
+    const out: Record<string, string> = {};
+    for (const [id, ch] of Object.entries(profile.characters?.data ?? {})) {
+      if (!ch.titleRecordHash) continue;
+      try {
+        let rec = titleCache.get(ch.titleRecordHash);
+        if (!rec) {
+          rec = (await getDestinyEntityDefinition(http, {
+            entityType: 'DestinyRecordDefinition', hashIdentifier: ch.titleRecordHash,
+          })).Response as DestinyRecordDefinition;
+          titleCache.set(ch.titleRecordHash, rec);
+        }
+        const title = rec.titleInfo?.titlesByGenderHash?.[ch.genderHash];
+        if (title) out[id] = title;
+      } catch {
+        // A missing title is cosmetic; never fail a sync over it.
+      }
+    }
+    return out;
   }
 
   // Parsing the item table takes a second or two, so keep it in memory and only
@@ -108,6 +135,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return c.json({
       signedIn: true,
       displayName: snap.displayName,
+      profilePicture: snap.profilePicture,
       syncedAt: snap.syncedAt,
       manifestVersion: manifest!.version,
       agentEnabled: !!deps.anthropic,
@@ -139,10 +167,11 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
         ? { ...i, appraisal: appraise(i.itemHash, new Set(i.perks.flat().map((p) => p.name)), list, manifest!) }
         : i,
     );
-    const characters = summarizeCharacters(snap.profile);
+    const characters = summarizeCharacters(snap.profile, manifest!, snap.titles);
+    const account = summarizeAccount(snap.profile, manifest!);
     const cleanup = cleanupCandidates(items);
     lastView = { displayName: snap.displayName, characters, items, cleanup };
-    return { characters, items, cleanup };
+    return { characters, account, items, cleanup };
   }
 
   app.onError((err, c) => {

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
-import { summarizeCharacters, summarizeProfile, VAULT_BUCKET } from './vault.ts';
+import { summarizeAccount, summarizeCharacters, summarizeProfile, VAULT_BUCKET } from './vault.ts';
 import { needsRefresh, type Tokens } from './bungie.ts';
 import type { ManifestTables } from './manifest.ts';
 
@@ -100,4 +100,38 @@ test('refreshes a token within a minute of expiry', () => {
   const t = { accessExpiresAt: 1_000_000 } as Tokens;
   assert.equal(needsRefresh(t, 1_000_000 - 30_000), true);
   assert.equal(needsRefresh(t, 1_000_000 - 120_000), false);
+});
+
+test('adds title and stats in game order, skipping Power', () => {
+  const p = {
+    characters: { data: {
+      c1: { classType: 2, light: 2010, dateLastPlayed: '2026-11-01T00:00:00Z',
+        stats: { 1935470627: 2010, 392767087: 100, 2996146975: 30 } },
+    } },
+  } as unknown as DestinyProfileResponse;
+  const m = { stats: {
+    392767087: { displayProperties: { name: 'Health', icon: '/h.png' } },
+    2996146975: { displayProperties: { name: 'Weapons', icon: '/w.png' } },
+  } } as unknown as ManifestTables;
+  const [c] = summarizeCharacters(p, m, { c1: 'Iron Lord' });
+  assert.equal(c?.title, 'Iron Lord');
+  assert.deepEqual(c?.stats, [
+    { name: 'Weapons', value: 30, icon: 'https://www.bungie.net/w.png' },
+    { name: 'Health', value: 100, icon: 'https://www.bungie.net/h.png' },
+  ]);
+});
+
+test('summarizes currencies and vault space', () => {
+  const p = {
+    profileCurrencies: { data: { items: [{ itemHash: 1, quantity: 500000 }] } },
+    profileInventory: { data: { items: [{ bucketHash: VAULT_BUCKET }, { bucketHash: VAULT_BUCKET }, { bucketHash: 5 }] } },
+  } as unknown as DestinyProfileResponse;
+  const m = {
+    items: { 1: { displayProperties: { name: 'Glimmer', icon: '/g.png' } } },
+    buckets: { [VAULT_BUCKET]: { itemCount: 700 } },
+  } as unknown as ManifestTables;
+  assert.deepEqual(summarizeAccount(p, m), {
+    currencies: [{ name: 'Glimmer', quantity: 500000, icon: 'https://www.bungie.net/g.png' }],
+    vault: { used: 2, capacity: 700 },
+  });
 });
