@@ -101,6 +101,7 @@
   --avatar-size: 32px;
   --drawer-width: 440px;
   --hovercard-width: 360px;
+  --chat-fab-size: 56px;
   --stat-bar: var(--gray-300);
   /* Subclass accents for build cards */
   --subclass-arc: var(--cyan-300);

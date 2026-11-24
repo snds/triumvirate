@@ -37,7 +37,7 @@ export function App() {
   const [kind, setKind] = useState<Kind>('all');
   const [view, setView] = useState<'inventory' | 'cleanup'>('inventory');
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
-  const [agentOpen, setAgentOpen] = usePref('chatOpen', true);
+  const [agentOpen, setAgentOpen] = usePref('chatOpen', false);
   const [collapsed, setCollapsed] = usePref('charactersCollapsed', false);
   const [classOnly, setClassOnly] = usePref('vaultClassOnly', true);
   const [tileScale, setTileScale] = usePref('tileScale', 1);
@@ -55,6 +55,8 @@ export function App() {
 
   // Hovercard: a short delay so sweeping the mouse across the grid doesn't flash cards.
   const closeDetail = useCallback(() => setSelected(null), []);
+  // "Ask about this item" hands the chat an item; `id` changes on each ask so asking again starts fresh.
+  const [about, setAbout] = useState<{ id: number; item: AppraisedItem }>();
   const hoverTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const hoverApi = useMemo<HoverApi>(() => ({
     enter: (item, anchor) => {
@@ -324,15 +326,6 @@ export function App() {
             autoRefresh={autoRefresh}
             onAutoRefresh={setAutoRefresh}
           />
-          <button
-            className="icon-button"
-            onClick={() => setAgentOpen((o) => !o)}
-            aria-pressed={agentOpen}
-            aria-label={agentOpen ? 'Collapse chat' : 'Open chat'}
-            title={agentOpen ? 'Collapse chat' : 'Open chat'}
-          >
-            <Icon name="chat" filled={agentOpen} />
-          </button>
         </div>
       </header>
 
@@ -371,19 +364,31 @@ export function App() {
         )}
       </main>
 
+      {/* The chat floats above everything, item dialog included, and the button summons or hides it. */}
       <AgentPanel
         enabled={inv.agentEnabled}
         open={agentOpen}
+        about={about}
+        onClose={() => setAgentOpen(false)}
         width={clampChatWidth(chatWidth, windowWidth)}
         onWidth={setChatWidth}
       />
+      <button
+        className={`chat-fab${agentOpen ? ' is-open' : ''}`}
+        onClick={() => setAgentOpen((o) => !o)}
+        aria-expanded={agentOpen}
+        aria-label={agentOpen ? 'Hide chat' : 'Ask Triumvirate'}
+        title={agentOpen ? 'Hide chat' : 'Ask Triumvirate'}
+      >
+        <Icon name={agentOpen ? 'close' : 'chat'} filled />
+      </button>
       {selected && (
         <ItemDetail
           item={selected}
           onClose={closeDetail}
           copies={copiesOf(selected)}
           onSelect={setSelected}
-          chatEnabled={inv.agentEnabled}
+          onAsk={(item) => { setAbout((a) => ({ id: (a?.id ?? 0) + 1, item })); setAgentOpen(true); }}
         />
       )}
       {hovered && !selected && !dragging && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}

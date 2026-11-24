@@ -91,9 +91,8 @@ html, body, #root { height: 100%; overflow: clip; }
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(0, 1fr);
 }
-.app--chat { grid-template-columns: minmax(0, 1fr) var(--agent-width); }
 .app > .topbar { grid-column: 1 / -1; }
-.main { position: relative; overflow: auto; } /* positioned, so visually hidden text stays inside it */
+.main { position: relative; overflow: auto; padding-bottom: calc(var(--chat-fab-size) + 2 * var(--space-4)); } /* positioned, so visually hidden text stays inside it */
 
 /* Top bar */
 .topbar {
@@ -501,13 +500,48 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 
 /* Agent chat panel, docked in the app grid's right column. */
 .agent[hidden] { display: none; }
+/* The chat floats over the app, above the item dialog too, anchored over its button. */
 .agent {
-  position: relative;
-  min-height: 0;
+  position: fixed;
+  z-index: 8;
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + var(--chat-fab-size) + var(--space-3));
+  width: min(var(--agent-width), calc(100vw - 2 * var(--space-4)));
+  height: min(720px, calc(100vh - var(--chat-fab-size) - 3 * var(--space-4) - var(--space-3)));
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   background: var(--surface-panel);
-  border-left: 1px solid var(--border-subtle);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.55);
+  overflow: hidden;
+  transform-origin: bottom right;
+  animation: chat-in 140ms ease-out;
+}
+.agent[hidden] { display: none; }
+@keyframes chat-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
+@media (prefers-reduced-motion: reduce) { .agent { animation: none; } }
+.agent__subject { min-width: 0; max-width: 45%; margin-right: auto; margin-left: var(--space-2); cursor: default; }
+.agent__subject img { width: 16px; height: 16px; border-radius: 2px; }
+.agent__subject { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The chat button: always there, above the dialog, so the chat can be summoned any time. */
+.chat-fab {
+  position: fixed; z-index: 9; right: var(--space-4); bottom: var(--space-4);
+  width: var(--chat-fab-size); height: var(--chat-fab-size);
+  display: grid; place-items: center;
+  border: none; border-radius: 50%;
+  background: var(--accent); color: var(--on-accent);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+  cursor: pointer;
+  transition: transform 120ms ease, background 120ms ease;
+}
+.chat-fab .icon { font-size: 26px; }
+.chat-fab:hover { background: var(--accent-hover); transform: scale(1.05); }
+.chat-fab:focus-visible { outline: 2px solid var(--text-primary); outline-offset: 3px; }
+/* With the chat open, the item dialog shifts left so the two sit side by side when there's room. */
+@media (min-width: 1280px) {
+  .app--chat .dialog-scrim { padding-right: calc(min(var(--agent-width), 40vw) + 2 * var(--space-4)); }
 }
 .agent__header { display: flex; justify-content: space-between; align-items: center; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-subtle); }
 .agent__log { overflow-y: auto; padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); }
@@ -647,7 +681,7 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 /* Chat resize handle: a thin strip on the panel's left edge. */
 .agent__resize {
   position: absolute;
-  inset: 0 auto 0 -3px;
+  inset: 0 auto 0 0;
   z-index: 1;
   width: 7px;
   cursor: col-resize;
@@ -927,32 +961,4 @@ body.is-dragging-item .tile { pointer-events: none; }
 .legend-swatch--selected { background: var(--perk-active-fill); border-color: var(--perk-active-border); }
 .legend-swatch--owned { box-shadow: 0 0 0 2px var(--perk-active-border); border-color: transparent; }
 
-/* ── Side-chat: a small chat beside the item dialog ─────── */
-/* The dialog and its side-chat sit side by side in one centered group, so the item stays in view. */
-.dialog-group { display: flex; gap: var(--space-3); align-items: stretch; width: min(980px, 100%); max-height: min(90vh, 900px); }
-.dialog-group.has-side-chat { width: min(980px + 360px + var(--space-3), 100%); }
-.dialog-group > * { min-height: 0; }
-.dialog-group > .dialog { flex: 1 1 980px; min-width: 0; width: auto; max-height: none; }
-.side-chat {
-  flex: 0 0 360px; min-width: 0;
-  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
-  background: var(--surface-panel);
-  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
-  box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
-  overflow: hidden;
-}
-.side-chat__header {
-  display: flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
-}
-.side-chat__header > .icon { color: var(--accent); }
-.side-chat__title { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.side-chat__log { min-height: 0; }
 .button.is-selected { border-color: var(--accent); color: var(--text-primary); }
-/* Narrow windows: the side-chat moves under the dialog instead of beside it. */
-@media (max-width: 900px) {
-  .dialog-group.has-side-chat { flex-direction: column-reverse; }
-  .dialog-group.has-side-chat > .dialog { flex: 1 1 55%; }
-  .side-chat { flex: 0 0 40%; }
-}

@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { AppraisedItem } from '@triumvirate/core/browser';
 import { deleteChat, getChat, listChats, newChatId, type ChatSummary } from '../api.ts';
 import { useAgentChat, type Pending } from '../chat-session.ts';
 import { usePref } from '../prefs.ts';
@@ -13,12 +14,26 @@ const STARTERS = [
   'Build me a Void Warlock setup from what I own.',
 ];
 
-// Stays mounted while collapsed (just hidden) so the conversation survives toggling.
-export function AgentPanel({ enabled, open, ask, width, onWidth }: {
+/** Starter questions about one item, for chats opened from its dialog. */
+function itemStarters(item: AppraisedItem) {
+  return [
+    `Is my ${item.name}${item.power ? ` (${item.power})` : ''} worth keeping, and what would I use it for?`,
+    ...(item.itemType === 3
+      ? [`What's the god roll for ${item.name}, and how close is mine?`, `What pairs well with ${item.name} in a build?`]
+      : [`Which builds is this ${item.name} best for?`]),
+  ];
+}
+
+// The floating chat. Stays mounted while hidden so the conversation survives toggling.
+export function AgentPanel({ enabled, open, about, onClose, width, onWidth }: {
   enabled: boolean; open: boolean; width: number; onWidth: (w: number) => void;
-  /** A question sent from elsewhere (e.g. an item panel); `id` changes on each new ask. */
-  ask?: { id: number; text: string };
+  onClose: () => void;
+  /** An item to talk about (from "Ask about this item"); `id` changes on each ask. */
+  about?: { id: number; item: AppraisedItem };
 }) {
+  // The item this conversation is about, if it was started from an item dialog.
+  const [subject, setSubject] = useState<AppraisedItem | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState('');
   // The open conversation, remembered so a reload picks up where you left off.
   const [chatId, setChatId] = usePref<string>('chatId', newChatId());
@@ -31,7 +46,7 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
     getChat(chatId).then((c) => setTurns((t) => (t.length ? t : c.turns))).catch(() => { /* not saved yet */ });
   }, [chatId, enabled]);
 
-  const startNew = () => { setTurns([]); setError(''); setChatId(newChatId()); setHistory(null); };
+  const startNew = () => { setTurns([]); setError(''); setChatId(newChatId()); setHistory(null); setSubject(null); };
   const openHistory = async () => {
     setError('');
     try { setHistory(await listChats()); } catch (err) { setError(err instanceof Error ? err.message : String(err)); }
@@ -41,6 +56,7 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
       const c = await getChat(id);
       setTurns(c.turns);
       setChatId(id);
+      setSubject(null);
       setHistory(null);
       setError('');
       follow.current = true;
@@ -69,21 +85,35 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
   }, [turns, pending]);
 
   const send = (text: string) => {
-    if (!text.trim() || busy) return;
+    const q = text.trim();
+    if (!q || busy) return;
     setDraft('');
-    return sendTurn(text);
+    // The agent finds gear by name, so a question about the subject item that doesn't name it gets it added.
+    const named = !subject || q.toLowerCase().includes(subject.name.toLowerCase());
+    return sendTurn(named ? q : `About my ${subject.name}${subject.power ? ` (${subject.power})` : ''}: ${q}`);
   };
 
-  // Send questions handed in from outside once each.
-  const lastAsk = useRef(0);
+  // "Ask about this item": start a fresh chat about it (unless this one is already about it, still empty).
+  const lastAbout = useRef(0);
   useEffect(() => {
-    if (!ask || ask.id === lastAsk.current || !enabled) return;
-    lastAsk.current = ask.id;
-    void send(ask.text);
+    if (!about || about.id === lastAbout.current) return;
+    lastAbout.current = about.id;
+    if (turns.length > 0 || subject?.instanceId !== about.item.instanceId) {
+      setTurns([]); setError(''); setChatId(newChatId());
+    }
+    setHistory(null);
+    setSubject(about.item);
   });
+  // Opening the chat puts the cursor in the message box.
+  useEffect(() => { if (open && enabled) inputRef.current?.focus(); }, [open, enabled, about?.id]);
 
   return (
-    <aside className="agent" aria-label="Ask Triumvirate" hidden={!open}>
+    <aside
+      className="agent"
+      aria-label="Ask Triumvirate"
+      hidden={!open}
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}
+    >
       <ResizeHandle width={width} onWidth={onWidth} />
       <header className="agent__header">
         {history ? (
@@ -92,6 +122,12 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
           </button>
         ) : null}
         <strong className="agent__title">{history ? 'Past chats' : 'Ask Triumvirate'}</strong>
+        {subject && !history && (
+          <span className="chip agent__subject" title={`This chat is about your ${subject.name}`}>
+            {subject.icon && <img src={subject.icon} alt="" />}
+            {subject.name}
+          </span>
+        )}
         {/* The top bar's chat button is the only open/close control; these manage conversations. */}
         <span className="agent__tools">
           <button
@@ -112,6 +148,9 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
             title="New chat"
           >
             <Icon name="newChat" />
+          </button>
+          <button className="icon-button" onClick={onClose} aria-label="Hide chat" title="Hide chat (Esc)">
+            <Icon name="chevronDown" />
           </button>
         </span>
       </header>
@@ -141,8 +180,8 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
         {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}
         {enabled && turns.length === 0 && !busy && (
           <div className="agent__starters">
-            <p className="muted">Ask about your gear. Answers only use items you own.</p>
-            {STARTERS.map((s) => (
+            <p className="muted">{subject ? `Ask anything about your ${subject.name}.` : 'Ask about your gear. Answers only use items you own.'}</p>
+            {(subject ? itemStarters(subject) : STARTERS).map((s) => (
               <button key={s} className="button" onClick={() => void send(s)}>{s}</button>
             ))}
           </div>
@@ -160,10 +199,11 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
         onSubmit={(e) => { e.preventDefault(); void send(draft); }}
       >
         <input
+          ref={inputRef}
           className="search"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder="Ask about your vault…"
+          placeholder={subject ? `Ask about ${subject.name}…` : 'Ask about your vault…'}
           disabled={!enabled}
           aria-label="Message"
         />
