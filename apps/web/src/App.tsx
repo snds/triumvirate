@@ -52,7 +52,6 @@ export function App() {
   }, []);
   const [, tick] = useState(0);
   const [hovered, setHovered] = useState<{ item: AppraisedItem; anchor: DOMRect } | null>(null);
-  const [ask, setAsk] = useState<{ id: number; text: string }>();
 
   // Hovercard: a short delay so sweeping the mouse across the grid doesn't flash cards.
   const closeDetail = useCallback(() => setSelected(null), []);
@@ -375,7 +374,6 @@ export function App() {
       <AgentPanel
         enabled={inv.agentEnabled}
         open={agentOpen}
-        ask={ask}
         width={clampChatWidth(chatWidth, windowWidth)}
         onWidth={setChatWidth}
       />
@@ -385,7 +383,7 @@ export function App() {
           onClose={closeDetail}
           copies={copiesOf(selected)}
           onSelect={setSelected}
-          onAsk={(text) => { setAgentOpen(true); setSelected(null); setAsk((a) => ({ id: (a?.id ?? 0) + 1, text })); }}
+          chatEnabled={inv.agentEnabled}
         />
       )}
       {hovered && !selected && !dragging && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}

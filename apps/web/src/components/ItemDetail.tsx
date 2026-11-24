@@ -5,13 +5,14 @@ import { ItemHeader } from './ItemHeader.tsx';
 import { Icon } from './Icon.tsx';
 import { ItemFacts, PerkCell, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 import { ItemTile } from './ItemTile.tsx';
+import { SideChat } from './SideChat.tsx';
 import { useInventory } from '../inventory-context.ts';
 
 interface Props {
   item: AppraisedItem;
   onClose: () => void;
-  /** Sends a question about this item to the chat panel. */
-  onAsk: (question: string) => void;
+  /** Whether the agent is set up (an API key is present). */
+  chatEnabled: boolean;
   /** Other copies of the same item you own. */
   copies: AppraisedItem[];
   onSelect: (item: AppraisedItem) => void;
@@ -24,19 +25,33 @@ type Tab = 'roll' | 'all' | 'details';
  * the copy you clicked, with its own perks and stats; "All rolls" shows every perk the weapon can
  * drop with and its base stats; "Details" has the rest.
  */
-export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
+export function ItemDetail({ item, onClose, chatEnabled, copies, onSelect }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const isWeapon = item.itemType === 3;
   const [tab, setTab] = useState<Tab>('roll');
+  // The side-chat beside the dialog. It stays with the item it was opened for, so clicking an item
+  // linked in an answer shows that item here without ending the conversation.
+  const [chatItem, setChatItem] = useState<AppraisedItem | null>(null);
+  const chatOpen = chatItem !== null;
+  const setChatOpen = (open: boolean | ((o: boolean) => boolean)) => {
+    const next = typeof open === 'function' ? open(chatOpen) : open;
+    setChatItem(next ? item : null);
+  };
+  const chatOpenRef = useRef(chatOpen);
+  chatOpenRef.current = chatOpen;
   // A different item resets to its own roll; switching copies keeps the tab you were on.
   const lastHash = useRef(item.itemHash);
   useEffect(() => {
     if (lastHash.current !== item.itemHash) { setTab('roll'); lastHash.current = item.itemHash; }
   }, [item.itemHash]);
-  // Escape closes, like any dialog; focus moves in so keyboard users land here.
+  // Escape closes the side-chat first, then the dialog. Focus moves in so keyboard users land here.
   useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    if (!chatOpenRef.current) closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (chatOpenRef.current) setChatItem(null);
+      else onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [item, onClose]);
@@ -49,6 +64,8 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
   ];
   return (
     <div className="dialog-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div className={`dialog-group${chatOpen ? ' has-side-chat' : ''}`}>
+      {chatItem && <SideChat item={chatItem} enabled={chatEnabled} onClose={() => setChatItem(null)} />}
       <div className="dialog item-dialog" role="dialog" aria-modal="true" aria-label={item.name}>
         <ItemHeader item={item} size="dialog">
           <button ref={closeRef} className="icon-button item-header__close" onClick={onClose} aria-label="Close" title="Close">
@@ -58,7 +75,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
 
         <div className="item-dialog__bar">
           <div className="drawer__actions">
-            <button className="button" onClick={() => onAsk(`Tell me about my ${item.name}${item.power ? ` (${item.power})` : ''}. Is it worth keeping, and what would I use it for?`)}>
+            <button className={`button${chatOpen ? ' is-selected' : ''}`} aria-pressed={chatOpen} onClick={() => setChatOpen((o) => !o)}>
               <Icon name="chat" /> Ask about this item
             </button>
             <a className="button button--quiet" href={`https://www.light.gg/db/items/${item.itemHash}/`} target="_blank" rel="noreferrer">
@@ -138,6 +155,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
           {tab === 'all' && <AllRolls item={item} />}
           {tab === 'details' && <Details item={item} />}
         </div>
+      </div>
       </div>
     </div>
   );

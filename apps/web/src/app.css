@@ -926,3 +926,33 @@ body.is-dragging-item .tile { pointer-events: none; }
 .legend-swatch { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--border-subtle); }
 .legend-swatch--selected { background: var(--perk-active-fill); border-color: var(--perk-active-border); }
 .legend-swatch--owned { box-shadow: 0 0 0 2px var(--perk-active-border); border-color: transparent; }
+
+/* ── Side-chat: a small chat beside the item dialog ─────── */
+/* The dialog and its side-chat sit side by side in one centered group, so the item stays in view. */
+.dialog-group { display: flex; gap: var(--space-3); align-items: stretch; width: min(980px, 100%); max-height: min(90vh, 900px); }
+.dialog-group.has-side-chat { width: min(980px + 360px + var(--space-3), 100%); }
+.dialog-group > * { min-height: 0; }
+.dialog-group > .dialog { flex: 1 1 980px; min-width: 0; width: auto; max-height: none; }
+.side-chat {
+  flex: 0 0 360px; min-width: 0;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  background: var(--surface-panel);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+  overflow: hidden;
+}
+.side-chat__header {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.side-chat__header > .icon { color: var(--accent); }
+.side-chat__title { flex: 1; min-width: 0; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.side-chat__log { min-height: 0; }
+.button.is-selected { border-color: var(--accent); color: var(--text-primary); }
+/* Narrow windows: the side-chat moves under the dialog instead of beside it. */
+@media (max-width: 900px) {
+  .dialog-group.has-side-chat { flex-direction: column-reverse; }
+  .dialog-group.has-side-chat > .dialog { flex: 1 1 55%; }
+  .side-chat { flex: 0 0 40%; }
+}

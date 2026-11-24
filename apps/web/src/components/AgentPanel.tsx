@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { deleteChat, getChat, listChats, newChatId, saveChat, streamAgent, type ChatSummary, type ChatTurn } from '../api.ts';
+import { deleteChat, getChat, listChats, newChatId, type ChatSummary } from '../api.ts';
+import { useAgentChat, type Pending } from '../chat-session.ts';
 import { usePref } from '../prefs.ts';
 import { timeAgo } from '../inventory.ts';
 import { Icon } from './Icon.tsx';
@@ -12,24 +13,16 @@ const STARTERS = [
   'Build me a Void Warlock setup from what I own.',
 ];
 
-/** An assistant reply while it's being made: the steps taken so far and the text written so far. */
-interface Pending {
-  steps: string[];
-  text: string;
-}
-
 // Stays mounted while collapsed (just hidden) so the conversation survives toggling.
 export function AgentPanel({ enabled, open, ask, width, onWidth }: {
   enabled: boolean; open: boolean; width: number; onWidth: (w: number) => void;
   /** A question sent from elsewhere (e.g. an item panel); `id` changes on each new ask. */
   ask?: { id: number; text: string };
 }) {
-  const [turns, setTurns] = useState<ChatTurn[]>([]);
   const [draft, setDraft] = useState('');
-  const [pending, setPending] = useState<Pending | null>(null);
-  const [error, setError] = useState('');
   // The open conversation, remembered so a reload picks up where you left off.
   const [chatId, setChatId] = usePref<string>('chatId', newChatId());
+  const { turns, setTurns, pending, error, setError, busy, send: sendTurn } = useAgentChat(chatId, () => { follow.current = true; });
   const [history, setHistory] = useState<ChatSummary[] | null>(null);
   const restored = useRef(false);
   useEffect(() => {
@@ -61,7 +54,6 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
   const logRef = useRef<HTMLDivElement>(null);
   // Follow new output only while the reader is at the bottom; scrolling up or selecting text stops it.
   const follow = useRef(true);
-  const busy = pending !== null;
 
   const onLogScroll = () => {
     const el = logRef.current;
@@ -76,46 +68,10 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
     el.scrollTop = el.scrollHeight;
   }, [turns, pending]);
 
-  const send = async (text: string) => {
-    const question = text.trim();
-    if (!question || busy) return;
-    const next: ChatTurn[] = [...turns, { role: 'user', content: question }];
-    setTurns(next);
+  const send = (text: string) => {
+    if (!text.trim() || busy) return;
     setDraft('');
-    setError('');
-    setPending({ steps: [], text: '' });
-    follow.current = true;
-    let final = '';
-    // Text arrives in many tiny chunks; collect them and render at most once per frame.
-    let buffered = '';
-    let frame = 0;
-    const flush = () => {
-      frame = 0;
-      const delta = buffered;
-      buffered = '';
-      if (delta) setPending((p) => p && { ...p, text: p.text + delta });
-    };
-    try {
-      await streamAgent(next, (e) => {
-        if (e.type === 'status') setPending((p) => p && { ...p, steps: [...p.steps, e.text] });
-        else if (e.type === 'text') {
-          buffered += e.delta;
-          if (!frame) frame = requestAnimationFrame(flush);
-        } else if (e.type === 'done') final = e.text;
-        else if (e.type === 'error') throw new Error(e.message);
-      });
-      if (final) {
-        const done: ChatTurn[] = [...next, { role: 'assistant', content: final }];
-        setTurns(done);
-        // Saved after every answer; a failed save shouldn't interrupt the chat.
-        saveChat(chatId, done).catch(() => {});
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      if (frame) cancelAnimationFrame(frame);
-      setPending(null);
-    }
+    return sendTurn(text);
   };
 
   // Send questions handed in from outside once each.
@@ -161,7 +117,7 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
       </header>
       {/* Screen readers hear a short status, not every streamed word of the whole log. */}
       <p className="visually-hidden" role="status">
-        {busy ? (pending.text ? 'Writing the answer' : pending.steps.at(-1) ?? 'Thinking') : ''}
+        {pending ? (pending.text ? 'Writing the answer' : pending.steps.at(-1) ?? 'Thinking') : ''}
       </p>
       {history && (
         <div className="agent__history">
@@ -218,7 +174,7 @@ export function AgentPanel({ enabled, open, ask, width, onWidth }: {
 }
 
 /** The in-progress state: each step as it happens, then the answer as it streams in. */
-function Working({ pending }: { pending: Pending }) {
+export function Working({ pending }: { pending: Pending }) {
   const writing = pending.text.length > 0;
   return (
     <div className="reply reply--pending">
@@ -242,7 +198,7 @@ function Working({ pending }: { pending: Pending }) {
 }
 
 /** True when the reader has text selected inside `el`, so new output shouldn't move it. */
-function selectionInside(el: HTMLElement) {
+export function selectionInside(el: HTMLElement) {
   const sel = document.getSelection();
   return !!sel && !sel.isCollapsed && sel.rangeCount > 0 && el.contains(sel.getRangeAt(0).commonAncestorContainer);
 }
