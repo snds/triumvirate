@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 270 90" width="270" height="90" preserveAspectRatio="none">
+  <!-- Masterwork banner: a gold bar over nested 45° chevrons that fade out downward. Repeats every 270 units across. The app uses it as a mask filled with the masterwork color token, so only its shape and opacity matter there. -->
+  <defs>
+    <linearGradient id="fade" x1="0" y1="0" x2="0" y2="90" gradientUnits="userSpaceOnUse">
+      <stop offset="0.056" stop-color="#fff" stop-opacity="1"/>
+      <stop offset="0.167" stop-color="#fff" stop-opacity=".8"/>
+      <stop offset="0.244" stop-color="#fff" stop-opacity=".55"/>
+      <stop offset="0.356" stop-color="#fff" stop-opacity=".27"/>
+      <stop offset="0.533" stop-color="#fff" stop-opacity=".13"/>
+      <stop offset="0.722" stop-color="#fff" stop-opacity=".08"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="270" height="90"><rect width="270" height="90" fill="url(#fade)"/></mask>
+    <clipPath id="c"><rect y="5" width="270" height="85"/></clipPath>
+  </defs>
+  <g clip-path="url(#c)" mask="url(#m)"><g fill="none" stroke="#ccb829" opacity=".37" stroke-linecap="butt" stroke-linejoin="miter">
+    <path d="M-19 -2L0 17L19 -2" stroke-width="2"/><path d="M-22.7 -1.2L0 21.5L22.7 -1.2" stroke-width="1.2"/><path d="M-30 -3L0 27L30 -3" stroke-width="3"/><path d="M-40 -4L0 36L40 -4" stroke-width="4"/><path d="M-48.5 -3.5L0 45L48.5 -3.5" stroke-width="3.5"/><path d="M-57 -3L0 54L57 -3" stroke-width="3"/><path d="M-66 -3L0 63L66 -3" stroke-width="3"/><path d="M-98 -10L0 88L98 -10" stroke-width="10"/><path d="M251 -2L270 17L289 -2" stroke-width="2"/><path d="M247.3 -1.2L270 21.5L292.7 -1.2" stroke-width="1.2"/><path d="M240 -3L270 27L300 -3" stroke-width="3"/><path d="M230 -4L270 36L310 -4" stroke-width="4"/><path d="M221.5 -3.5L270 45L318.5 -3.5" stroke-width="3.5"/><path d="M213 -3L270 54L327 -3" stroke-width="3"/><path d="M204 -3L270 63L336 -3" stroke-width="3"/><path d="M172 -10L270 88L368 -10" stroke-width="10"/><path d="M111.5 -1.5L135 22L158.5 -1.5" stroke-width="1.5"/><path d="M95.5 -4.5L135 35L174.5 -4.5" stroke-width="4.5"/><path d="M80.5 -5L135 49.5L189.5 -5" stroke-width="5"/><path d="M67.5 -4.5L135 63L202.5 -4.5" stroke-width="4.5"/><path d="M39 -10L135 86L231 -10" stroke-width="10"/><path d="M126 5L135 13L144 5z" stroke="none" fill="#ccb829"/>
+  </g></g>
+  <rect width="270" height="5" fill="#ccb829" fill-opacity=".95"/>
+</svg>
