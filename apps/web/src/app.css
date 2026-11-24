@@ -799,24 +799,25 @@ body.is-dragging-item .tile { pointer-events: none; }
   /* Bar thickness and pattern height scale with the header; the dialog sets larger ones. */
   --mw-bar: 4px;
   --mw-pattern: 80px;
-  border-top: var(--mw-bar) solid var(--masterwork);
+  /* The original's gold top bar, drawn as the header's border in the banner color. */
+  border-top: var(--mw-bar) solid var(--masterwork-banner);
   isolation: isolate;
 }
-/* The banner: the SVG is only the chevron shape, used as a mask. The fade is a gradient of the
-   masterwork token, so the shape stays sharp at any size and follows the token's color. */
+/* The banner: the SVG is only the chevron shape (one 270-wide tile), used as a mask and tiled
+   across. A second mask layer, a gradient, fades it out downward; the two are intersected. */
 .item-header.is-masterworked::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: linear-gradient(
-    color-mix(in srgb, var(--masterwork) 38%, transparent),
-    color-mix(in srgb, var(--masterwork) 30%, transparent) 12%,
-    color-mix(in srgb, var(--masterwork) 16%, transparent) 24%,
-    color-mix(in srgb, var(--masterwork) 7%, transparent) 35%,
-    color-mix(in srgb, var(--masterwork) 5%, transparent) 55%,
-    color-mix(in srgb, var(--masterwork) 2%, transparent) 80%,
-    transparent
-  ) top / 100% var(--mw-pattern) no-repeat;
-  -webkit-mask: url('./assets/masterwork-header.svg') top left / auto var(--mw-pattern) repeat-x;
-  mask: url('./assets/masterwork-header.svg') top left / auto var(--mw-pattern) repeat-x;
+  background: var(--masterwork-banner);
+  opacity: var(--masterwork-banner-opacity);
+  --mw-fade: linear-gradient(#000, rgb(0 0 0 / 0.79) 12%, rgb(0 0 0 / 0.42) 24%, rgb(0 0 0 / 0.18) 35%, rgb(0 0 0 / 0.13) 55%, rgb(0 0 0 / 0.05) 80%, transparent);
+  -webkit-mask:
+    url('./assets/masterwork-header.svg') top left / auto var(--mw-pattern) repeat-x,
+    var(--mw-fade) top / 100% var(--mw-pattern) no-repeat;
+  -webkit-mask-composite: source-in;
+  mask:
+    url('./assets/masterwork-header.svg') top left / auto var(--mw-pattern) repeat-x,
+    var(--mw-fade) top / 100% var(--mw-pattern) no-repeat;
+  mask-composite: intersect;
 }
 .item-header--dialog.is-masterworked { --mw-bar: 5px; --mw-pattern: 104px; }
 .item-header__id { min-width: 0; }

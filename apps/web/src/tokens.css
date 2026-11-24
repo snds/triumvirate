@@ -61,6 +61,9 @@
   --tier-common: var(--stone-300);
 
   --masterwork: var(--gold-300);
+  /* Masterwork banner pattern fill, shown at --masterwork-banner-opacity. */
+  --masterwork-banner: #c1af29;
+  --masterwork-banner-opacity: 0.68;
   --tier-diamond: var(--white-200);
 
   --verdict-god: var(--gold-400);
