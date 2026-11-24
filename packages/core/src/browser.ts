@@ -5,3 +5,4 @@ export * from './vault.ts'; // type-only imports from manifest.ts, so no Node bu
 export type * from './subclass.ts';
 export * from './transfer.ts';
 export * from './rolls.ts';
+export * from './community.ts'; // pure logic; manifest import is type-only

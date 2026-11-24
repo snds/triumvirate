@@ -16,6 +16,7 @@ import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
 import { stream } from 'hono/streaming';
 import { createChatStore, validChatId } from './chats.ts';
+import { createCommunity } from './community.ts';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
@@ -41,6 +42,8 @@ export interface AppDeps {
   wishList: () => Promise<WishList>;
   /** Present when ANTHROPIC_API_KEY is set. */
   anthropic?: Anthropic;
+  /** Local hour (0-23) for the nightly community crawl; off when unset. */
+  communityCrawlHour?: number;
 }
 
 export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
@@ -262,6 +265,31 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     // Same for everyone until the next game update; let the browser keep it.
     c.header('Cache-Control', `private, max-age=86400`);
     return c.json(r);
+  });
+
+  // Community usage data from public matches (see community.ts). Uses the API key only, no sign-in.
+  const community = createCommunity({
+    dataDir: store.dataDir,
+    http: createHttpClient(cfg.apiKey),
+    manifest: async () => manifest ?? (manifest = await loadManifestCached(createHttpClient(cfg.apiKey))),
+    seed: async () => {
+      const snap = current ?? (await store.latestSnapshot());
+      return snap ? { membershipType: snap.membershipType, membershipId: snap.membershipId } : undefined;
+    },
+  });
+  if (deps.communityCrawlHour !== undefined) community.schedule(deps.communityCrawlHour);
+  app.get('/api/community/status', async (c) => c.json(await community.status()));
+  app.post('/api/community/crawl', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { maxRequests?: number };
+    const maxRequests = Math.min(Math.max(Number(body.maxRequests) || 3000, 1), 20_000);
+    community.crawl({ maxRequests }).catch((e) => console.error('Community crawl failed:', e));
+    return c.json(await community.status(), 202);
+  });
+  app.post('/api/community/stop', (c) => { community.stop(); return c.json({ ok: true }); });
+  app.get('/api/community/items/:hash', async (c) => {
+    const hash = Number(c.req.param('hash'));
+    if (!Number.isInteger(hash) || hash <= 0) return c.json({ error: 'Bad item hash.' }, 400);
+    return c.json(await community.weapon(hash));
   });
 
   // Saved conversations. Local, single user, so no sign-in check beyond the server only listening on 127.0.0.1.

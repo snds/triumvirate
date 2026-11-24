@@ -62,3 +62,17 @@ Tokens and the manifest cache live in `.data/` (git-ignored). Never commit `.env
 pnpm typecheck
 pnpm test
 ```
+
+## Community weapon data
+
+The server can build its own perk popularity data from Bungie's public API: it walks recent public
+matches, looks up the weapons players still have equipped, and counts their perks, trait combos,
+masterworks, and mods for each kind of activity (PvE endgame, PvE, patrol, PvP endgame, PvP, Gambit).
+Only legendary and exotic weapons are counted, and only item hashes are saved, never player names.
+
+- Start a crawl by hand (PowerShell): `Invoke-RestMethod -Method Post http://127.0.0.1:5444/api/community/crawl`
+- Check on it: `Invoke-RestMethod http://127.0.0.1:5444/api/community/status`
+- Run it nightly: set `COMMUNITY_CRAWL_HOUR=3` in `.env`.
+- Data for one weapon: `GET /api/community/items/<itemHash>`.
+
+Files live in `.data/community/`. A crawl makes at most 3,000 requests at 4 per second (about 15 minutes).

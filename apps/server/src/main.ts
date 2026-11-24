@@ -23,6 +23,8 @@ const app = createApp(
     wishList: createWishListCache(dataDir),
     // The SDK reads ANTHROPIC_API_KEY itself; the agent is simply off without it.
     anthropic: process.env.ANTHROPIC_API_KEY ? new Anthropic() : undefined,
+    // e.g. COMMUNITY_CRAWL_HOUR=3 crawls public matches at 3 AM while the server runs.
+    communityCrawlHour: process.env.COMMUNITY_CRAWL_HOUR ? Number(process.env.COMMUNITY_CRAWL_HOUR) : undefined,
   },
 );
 const port = Number(process.env.API_PORT ?? 5444);
