@@ -271,6 +271,11 @@ export function createCommunity(deps: CommunityDeps) {
       }
       return status;
     },
+    /** The 30-day rollup, or undefined before the first crawl. */
+    async rollup(): Promise<CommunityRollup | undefined> {
+      await loadRollups();
+      return current;
+    },
     /** Usage for one weapon: the last 30 days, plus a per-month summary for trends. */
     async weapon(itemHash: number) {
       await loadRollups();

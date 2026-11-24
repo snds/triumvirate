@@ -29,6 +29,10 @@
   --azure-500: #4d88ff;  /* Stasis */
   --mint-400: #35e366;   /* Strand */
   --white-200: #d9d9d9;  /* Kinetic */
+  --red-500: #e5534b;
+  --amber-500: #f2a01b;
+  --yellow-400: #e8d23a;
+  --lime-400: #9ad14b;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -127,4 +131,18 @@
   --tile-element-icon: 11px;
   --tile-chip: rgb(0 0 0 / 0.75);
   --tile-element-size: 7px;
+
+  /* Roll appraiser: popularity grades (F red → S green) and where a perk is favored. */
+  --grade-s: var(--mint-400);
+  --grade-a: var(--lime-400);
+  --grade-b: var(--yellow-400);
+  --grade-c: var(--amber-500);
+  --grade-d: var(--orange-500);
+  --grade-f: var(--red-500);
+  --grade-none: var(--gray-500);
+  --use-pve: var(--azure-500);
+  --use-pvp: var(--red-500);
+  --use-both: var(--gold-400);
+  --roll-perk-size: 36px;
+  --roll-rail-width: 240px;
 }

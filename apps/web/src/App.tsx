@@ -8,6 +8,7 @@ import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
 import { CleanupView } from './components/CleanupView.tsx';
+import { RollsView } from './components/RollsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { Icon } from './components/Icon.tsx';
@@ -35,7 +36,7 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind>('all');
-  const [view, setView] = useState<'inventory' | 'cleanup'>('inventory');
+  const [view, setView] = useState<'inventory' | 'cleanup' | 'rolls'>('inventory');
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
   // Always starts closed; the chat button shows when a conversation is going.
   const [agentOpen, setAgentOpen] = useState(false);
@@ -286,6 +287,13 @@ export function App() {
           >
             Cleanup <span className="muted">{inv.cleanup.length}</span>
           </button>
+          <button
+            className={`segmented__option${view === 'rolls' ? ' is-selected' : ''}`}
+            aria-current={view === 'rolls' ? 'page' : undefined}
+            onClick={() => setView('rolls')}
+          >
+            Rolls
+          </button>
         </nav>
         <input
           className="search"
@@ -358,6 +366,8 @@ export function App() {
               onSelect={setSelected}
             />
           </div>
+        ) : view === 'rolls' ? (
+          <RollsView items={visible} syncedAt={inv.syncedAt} onSelect={setSelected} onChanged={() => void load(false)} />
         ) : (
           <CleanupView
             cleanup={inv.cleanup.filter((c) => matches(c.item, query, kind))}

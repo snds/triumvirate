@@ -981,3 +981,82 @@ body.is-dragging-item .tile { pointer-events: none; }
 }
 @keyframes fab-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .chat-fab.is-busy::after { animation: none; border-color: var(--accent); } }
+
+/* ── Roll appraiser ─────────────────────────────────────── */
+.rolls { display: grid; grid-template-columns: var(--roll-rail-width) 1fr; min-height: 100%; }
+.rolls--rail-closed { grid-template-columns: auto 1fr; }
+.rolls__rail { position: sticky; top: 0; align-self: start; max-height: calc(100vh - var(--topbar-height)); overflow: auto; border-right: 1px solid var(--border-subtle); background: var(--surface-panel); padding: var(--space-2) var(--space-3); }
+.rolls__rail-head { display: flex; justify-content: space-between; align-items: center; }
+.rolls__filter { border-bottom: 1px solid var(--border-subtle); padding: var(--space-2) 0; }
+.rolls__filter summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.rolls__filter-body { display: grid; gap: var(--space-1); padding-top: var(--space-2); }
+.rolls__check { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; color: var(--text-secondary); cursor: pointer; }
+.rolls__check input { accent-color: var(--accent); }
+.rolls__check .icon { font-size: 15px; vertical-align: -3px; }
+.rolls__range { display: flex; align-items: center; gap: var(--space-2); }
+.rolls__select { background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 2px var(--space-2); }
+.rolls__main { padding: var(--space-4) var(--space-6); min-width: 0; }
+.rolls__head { margin-bottom: var(--space-3); }
+.rolls__head p { margin: var(--space-1) 0 0; font-size: 13px; }
+.rolls__group { margin-bottom: var(--space-4); }
+.rolls__group-head { display: flex; align-items: center; gap: var(--space-2); width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); font: inherit; font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: var(--space-2) 0; cursor: pointer; text-align: left; }
+.rolls__group-head .icon { transition: transform 120ms; }
+.rolls__group-head .icon.is-rotated { transform: rotate(-90deg); }
+.rolls__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-3); padding-top: var(--space-3); }
+
+.roll-card { background: var(--surface-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+.roll-card__head { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; padding: var(--space-2); background: color-mix(in srgb, var(--tier-legendary) 55%, var(--surface-panel)); }
+.roll-card.tier-exotic .roll-card__head { background: color-mix(in srgb, var(--tier-exotic) 40%, var(--surface-panel)); }
+.roll-card__title { min-width: 0; display: grid; gap: var(--space-1); }
+.roll-card__name { margin: 0; font-size: 15px; font-weight: 700; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.roll-card__badges { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.roll-card__body { display: grid; grid-template-columns: auto 1fr; gap: var(--space-2); padding: var(--space-2); }
+.roll-card__location { font-size: 11px; color: var(--text-secondary); text-transform: uppercase; writing-mode: vertical-rl; transform: rotate(180deg); text-align: center; }
+
+.grade { position: relative; display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-sm); font-size: 22px; font-weight: 800; color: var(--on-accent); background: var(--grade-none); }
+.grade--s { background: var(--grade-s); }
+.grade--a { background: var(--grade-a); }
+.grade--b { background: var(--grade-b); }
+.grade--c { background: var(--grade-c); }
+.grade--d { background: var(--grade-d); }
+.grade--f { background: var(--grade-f); }
+.grade--none { color: var(--text-secondary); background: var(--surface-raised); }
+.grade__better { position: absolute; right: -6px; top: -6px; font-size: 14px; color: var(--grade-s); background: var(--surface-page); border-radius: 50%; }
+
+.use-pill { display: inline-flex; align-items: center; gap: 2px; padding: 1px var(--space-2); border-radius: 999px; font-size: 11px; font-weight: 700; color: var(--on-accent); }
+.use-pill .icon { font-size: 13px; }
+.use-pill--both { background: var(--use-both); }
+.use-pill--pve { background: var(--use-pve); }
+.use-pill--pvp { background: var(--use-pvp); }
+.pill--neutral { background: var(--surface-raised); color: var(--text-secondary); }
+.pill--wish-god { background: color-mix(in srgb, var(--verdict-god) 20%, transparent); color: var(--verdict-god); }
+.pill--wish-good { background: color-mix(in srgb, var(--verdict-good) 20%, transparent); color: var(--verdict-good); }
+
+.roll-perks { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.roll-perks__column { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); align-content: start; }
+.roll-perks__column--frame { margin-left: auto; padding-left: var(--space-2); border-left: 1px solid var(--border-subtle); }
+.roll-perk { position: relative; width: var(--roll-perk-size); height: var(--roll-perk-size); border-radius: var(--radius-sm); border: 1px solid transparent; opacity: 0.55; }
+.roll-perk img { width: 100%; height: 100%; }
+.roll-perk.is-active { opacity: 1; border-color: var(--border-subtle); background: var(--surface-raised); }
+/* A soft glow in the favored color, like the game's highlight. */
+.roll-perk--pve { background: radial-gradient(circle, color-mix(in srgb, var(--use-pve) 45%, transparent), transparent 70%); }
+.roll-perk--pvp { background: radial-gradient(circle, color-mix(in srgb, var(--use-pvp) 45%, transparent), transparent 70%); }
+.roll-perk--both { background: radial-gradient(circle, color-mix(in srgb, var(--use-both) 45%, transparent), transparent 70%); }
+.roll-perk.is-active.roll-perk--pve { border-color: var(--use-pve); }
+.roll-perk.is-active.roll-perk--pvp { border-color: var(--use-pvp); }
+.roll-perk.is-active.roll-perk--both { border-color: var(--use-both); }
+.roll-perk__use, .roll-perk__better { position: absolute; display: grid; place-items: center; width: 15px; height: 15px; border-radius: 3px; color: var(--on-accent); }
+.roll-perk__use { right: -3px; top: -3px; }
+.roll-perk__use .icon, .roll-perk__better .icon { font-size: 12px; }
+.roll-perk__use--pve { background: var(--use-pve); }
+.roll-perk__use--pvp { background: var(--use-pvp); }
+.roll-perk__use--both { background: var(--use-both); }
+.roll-perk__better { left: -3px; bottom: -3px; background: var(--grade-s); }
+.roll-perk.is-pickable { cursor: pointer; }
+.roll-perk.is-pickable:hover { opacity: 0.9; }
+.roll-perk.is-preview { outline: 2px dashed var(--grade-s); outline-offset: 1px; }
+.grade.is-preview { outline: 2px dashed var(--text-primary); outline-offset: 2px; }
+.pill--better { display: inline-flex; align-items: center; gap: 2px; background: color-mix(in srgb, var(--grade-s) 20%, transparent); color: var(--grade-s); }
+.pill--better .icon { font-size: 13px; }
+.roll-card__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); padding: 0 var(--space-2) var(--space-2); }
+.roll-card__error { margin: 0; flex-basis: 100%; font-size: 12px; color: var(--danger); }
