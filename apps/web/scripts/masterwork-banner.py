@@ -21,6 +21,9 @@ def lit(x, y):
     if y < BAR or y >= H or env[y] < 3: return False
     return A[y][x % P] / env[y] >= LIT
 PAD = 4
+GAP = 0
+TOP_SNAP = float(sys.argv[5]) if len(sys.argv) > 5 else 3   # px below the bar that still counts as touching it
+MIN_LEN = float(sys.argv[6]) if len(sys.argv) > 6 else 5    # shortest band kept, in px
 xs = range(-PAD - H, P + PAD + H)
 f = lambda n: f'{n:.1f}'.rstrip('0').rstrip('.')
 bands = []   # (family, m, p0, p1): family 1 "\" has m = x - y; family 2 "/" has m = x + y
@@ -35,10 +38,13 @@ for fam, (dx, dy) in ((1, (1, 1)), (2, (-1, 1))):
             # A pixel counts for this family only if its line neighbor is lit too (it's part of
             # a run along this direction, not just a crossing of the other family).
             if on and not (lit(x + dx, y + 1) or lit(x - dx, y - 1)): on = False
-            if on and run is None: run = y
-            if not on and run is not None:
-                bands.append((fam, m, run, y - 1)); run = None
-        if run is not None: bands.append((fam, m, run, H - 1))
+            # Short dropouts (antialiasing at 1 px) don't break a line: bridge gaps up to GAP px.
+            if on:
+                if run is None: run = y
+                last = y
+            elif run is not None and y - last > GAP:
+                bands.append((fam, m, run, last)); run = None
+        if run is not None: bands.append((fam, m, run, last))
 # Merge neighboring lines (m, m+1) whose runs line up into one wide band.
 from collections import defaultdict
 paths = []
@@ -60,8 +66,13 @@ for fam in (1, 2):
             # Band covers lattice lines m..m1: edges at m-0.5 and m1+0.5 (in x∓y units).
             # Ends: the first and last pixel rows, averaged across the band so the end is square.
             a0 = sum(ys0) / len(ys0) - 0.5; a1 = sum(ys1) / len(ys1) + 0.5
-            # Specks: a band shorter than 2 px along and only a line or two wide is antialiasing noise.
-            if a1 - a0 < 2.5 and m1 - m <= 1: continue
+            # Every line runs up past the top edge, so a band that reaches the bar bleeds off it
+            # instead of ending in a block. Short bands that don't are low-resolution noise.
+            if a0 <= BAR + TOP_SNAP:
+                # Tiny stubs right under the bar are where two lines meet the bar's edge, not lines.
+                if a1 - BAR < MIN_LEN: continue
+                a0 = -H
+            elif a1 - a0 < MIN_LEN: continue
             lo, hi = m - 0.5, m1 + 0.5
             # Corners in x,y: family 1 lines are x - y = c; family 2 are x + y = c.
             # Use the band's centerline y-range [a0, a1]; ends perpendicular to the band.
