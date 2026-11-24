@@ -80,6 +80,41 @@ export function App() {
   }, []);
 
   useEffect(() => { void load(false); }, [load]);
+  // Quiet auto refresh: only while the tab is visible and nothing is being dragged or moved.
+  // A failure is skipped silently; the next tick (or the button) tries again.
+  const [autoRefresh, setAutoRefresh] = usePref<number>('autoRefresh', 0);
+  const quietBusy = useRef(false);
+  const autoRef = useRef({ state, dragging: false, moving: 0 });
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const due = () => {
+      const { state: s, dragging: d, moving: m } = autoRef.current;
+      if (s.status !== 'ready' || d || m > 0 || quietBusy.current || document.visibilityState !== 'visible') return false;
+      return Date.now() - Date.parse(s.inv.syncedAt) >= autoRefresh * 60_000;
+    };
+    const run = async () => {
+      if (!due()) return;
+      quietBusy.current = true;
+      setSyncing(true);
+      try {
+        const inv = await fetchInventory(true);
+        if (inv && autoRef.current.moving === 0 && !autoRef.current.dragging) {
+          setState({ status: 'ready', inv });
+          // Keep an open item panel pointed at the fresh copy of the same item.
+          setSelected((sel) => (sel?.instanceId ? inv.items.find((i) => i.instanceId === sel.instanceId) ?? sel : sel));
+        }
+      } catch { /* try again next time */ } finally {
+        quietBusy.current = false;
+        setSyncing(false);
+      }
+    };
+    const id = setInterval(() => void run(), 15_000);
+    // Coming back to the tab catches up straight away if a refresh is overdue.
+    const onVisible = () => void run();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVisible); };
+  }, [autoRefresh]);
+
   // Re-render every 30 s so "synced 3 min ago" stays true.
   useEffect(() => {
     const id = setInterval(() => tick((n) => n + 1), 30_000);
@@ -176,6 +211,7 @@ export function App() {
     if (inventoryApi.check(item, to).ok) inventoryApi.move(item, to);
   });
   const dragging = drag.state;
+  autoRef.current = { state, dragging: !!dragging, moving: moving.size };
 
   const visible = useMemo(
     () => (state.status === 'ready' ? state.inv.items.filter((i) => matches(i, query, kind)) : []),
@@ -282,6 +318,8 @@ export function App() {
             tileScale={tileScale}
             onTileScale={setTileScale}
             onSignOut={() => void signOut()}
+            autoRefresh={autoRefresh}
+            onAutoRefresh={setAutoRefresh}
           />
           <button
             className="icon-button"

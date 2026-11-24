@@ -30,3 +30,12 @@ export const TILE_SCALES = [
 export const CHAT_WIDTH = { min: 340, max: 760, default: 460 } as const;
 export const clampChatWidth = (w: number, windowWidth = window.innerWidth) =>
   Math.round(Math.max(CHAT_WIDTH.min, Math.min(w, CHAT_WIDTH.max, windowWidth * 0.55)));
+
+/** Auto refresh choices, in minutes; 0 is off. Bungie updates profiles about once a minute at best. */
+export const AUTO_REFRESH = [
+  { label: 'Off', value: 0 },
+  { label: '1 min', value: 1 },
+  { label: '2 min', value: 2 },
+  { label: '5 min', value: 5 },
+  { label: '15 min', value: 15 },
+] as const;
