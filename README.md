@@ -1,4 +1,4 @@
-# Waypoint
+# Triumvirate
 
 A personal Destiny 2 companion: builds from your vault, god roll appraisal, vault cleanup,
 farming and vendor picks, and an agent that learns how you play. Single-user (just me).

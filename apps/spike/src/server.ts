@@ -20,7 +20,7 @@ const COMPONENTS = [
 import {
   authorizeUrl, createHttpClient, exchangeCode, loadManifest, needsRefresh, refreshTokens,
   summarizeProfile, type BungieConfig, type Tokens,
-} from '@waypoint/core';
+} from '@triumvirate/core';
 
 const env = (k: string) => {
   const v = process.env[k];
@@ -51,7 +51,7 @@ async function getTokens(): Promise<Tokens | undefined> {
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const page = (body: string) =>
-  `<!doctype html><meta charset="utf-8"><title>Waypoint spike</title>
+  `<!doctype html><meta charset="utf-8"><title>Triumvirate spike</title>
   <style>body{font:14px system-ui;margin:24px;background:#111;color:#eee}table{border-collapse:collapse}
   td,th{padding:4px 10px;border-bottom:1px solid #333;text-align:left}a{color:#7cf}</style>${body}`;
 
@@ -112,4 +112,4 @@ createServer({ key: pems.private, cert: pems.cert }, async (req, res) => {
     console.error(err);
     send(500, page(`<pre>${esc(err instanceof Error ? err.message : err)}</pre>`));
   }
-}).listen(port, () => console.log(`Waypoint spike on https://localhost:${port}`));
+}).listen(port, () => console.log(`Triumvirate spike on https://localhost:${port}`));

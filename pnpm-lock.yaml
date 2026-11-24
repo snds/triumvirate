@@ -20,7 +20,7 @@ importers:
 
   apps/spike:
     dependencies:
-      '@waypoint/core':
+      '@triumvirate/core':
         specifier: workspace:*
         version: link:../../packages/core
       bungie-api-ts:
