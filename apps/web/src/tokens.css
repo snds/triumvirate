@@ -1,0 +1,69 @@
+/*
+ * Design tokens, three tiers: global (raw values) → semantic (meaning) → component.
+ * Components only read semantic or component tokens, never globals.
+ */
+:root {
+  /* ── Global ─────────────────────────────────────────── */
+  --gray-950: #0b0d10;
+  --gray-900: #12151a;
+  --gray-850: #181c22;
+  --gray-800: #1f242c;
+  --gray-700: #2c333d;
+  --gray-500: #5d6673;
+  --gray-300: #a3abb6;
+  --gray-100: #e7eaee;
+
+  --gold-400: #ceae33;   /* Exotic */
+  --purple-500: #6b3f8a; /* Legendary */
+  --blue-500: #5076a3;   /* Rare */
+  --green-600: #366f42;  /* Uncommon */
+  --stone-300: #c3bcb4;  /* Common */
+
+  --cyan-300: #7aecf3;   /* Arc */
+  --orange-500: #f2721b; /* Solar */
+  --violet-400: #b185df; /* Void */
+  --azure-500: #4d88ff;  /* Stasis */
+  --mint-400: #35e366;   /* Strand */
+  --white-200: #d9d9d9;  /* Kinetic */
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* ── Semantic ───────────────────────────────────────── */
+  --surface-page: var(--gray-950);
+  --surface-panel: var(--gray-900);
+  --surface-raised: var(--gray-850);
+  --surface-hover: var(--gray-800);
+  --border-subtle: var(--gray-700);
+  --text-primary: var(--gray-100);
+  --text-secondary: var(--gray-300);
+  --text-muted: var(--gray-500);
+  --accent: var(--gold-400);
+
+  --tier-exotic: var(--gold-400);
+  --tier-legendary: var(--purple-500);
+  --tier-rare: var(--blue-500);
+  --tier-uncommon: var(--green-600);
+  --tier-common: var(--stone-300);
+
+  --element-kinetic: var(--white-200);
+  --element-arc: var(--cyan-300);
+  --element-solar: var(--orange-500);
+  --element-void: var(--violet-400);
+  --element-stasis: var(--azure-500);
+  --element-strand: var(--mint-400);
+
+  /* ── Component ──────────────────────────────────────── */
+  --tile-size: 52px;
+  --tile-size-equipped: 64px;
+  --tile-radius: var(--radius-sm);
+  --tile-border-width: 2px;
+  --tile-gap: 6px;
+  --column-min-width: 300px;
+}

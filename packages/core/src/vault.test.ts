@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
-import { summarizeProfile, VAULT_BUCKET } from './vault.ts';
+import { summarizeCharacters, summarizeProfile, VAULT_BUCKET } from './vault.ts';
 import { needsRefresh, type Tokens } from './bungie.ts';
 import type { ManifestTables } from './manifest.ts';
 
@@ -19,13 +19,13 @@ const manifest = {
 
 const profile = {
   profileInventory: { data: { items: [
-    { itemHash: 1, bucketHash: VAULT_BUCKET, itemInstanceId: 'a' },
+    { itemHash: 1, bucketHash: VAULT_BUCKET, itemInstanceId: 'a', state: 1 },
     { itemHash: 99, bucketHash: 375726501 }, // consumable bucket: must be skipped
   ] } },
   characters: { data: { c1: { classType: 2, light: 2010 } } },
-  characterEquipment: { data: { c1: { items: [{ itemHash: 2, bucketHash: 20, itemInstanceId: 'b' }] } } },
+  characterEquipment: { data: { c1: { items: [{ itemHash: 2, bucketHash: 20, itemInstanceId: 'b', state: 0 }] } } },
   characterInventories: { data: { c1: { items: [] } } },
-  itemComponents: { instances: { data: { a: { primaryStat: { value: 1990 } }, b: { primaryStat: { value: 2010 } } } } },
+  itemComponents: { instances: { data: { a: { primaryStat: { value: 1990 }, damageType: 2 }, b: { primaryStat: { value: 2010 } } } } },
 } as unknown as DestinyProfileResponse;
 
 test('lists vault items with their real bucket and power', () => {
@@ -33,7 +33,11 @@ test('lists vault items with their real bucket and power', () => {
   assert.equal(rows.length, 2);
   assert.deepEqual(
     { ...rows[0] },
-    { location: 'Vault', name: 'Fatebringer', type: 'Hand Cannon', bucket: 'Kinetic Weapons', power: 1990, equipped: false, itemHash: 1, instanceId: 'a' },
+    {
+      location: 'Vault', owner: 'vault', name: 'Fatebringer', type: 'Hand Cannon', bucket: 'Kinetic Weapons', bucketHash: 10,
+      power: 1990, equipped: false, itemHash: 1, instanceId: 'a', icon: undefined, watermark: undefined,
+      tier: '', itemType: 0, classType: 3, damage: 'Arc', locked: true,
+    },
   );
 });
 
@@ -42,6 +46,20 @@ test('labels character gear by class and marks it equipped', () => {
   assert.equal(row?.location, 'Warlock (2010)');
   assert.equal(row?.equipped, true);
   assert.equal(row?.bucket, 'Power Weapons');
+  assert.equal(row?.owner, 'c1');
+  assert.equal(row?.locked, false);
+});
+
+test('orders characters by most recently played', () => {
+  const p = {
+    characters: { data: {
+      old: { classType: 0, light: 10, dateLastPlayed: '2026-01-01T00:00:00Z' },
+      new: { classType: 1, light: 20, dateLastPlayed: '2026-11-01T00:00:00Z', emblemBackgroundPath: '/e.jpg' },
+    } },
+  } as unknown as DestinyProfileResponse;
+  const chars = summarizeCharacters(p);
+  assert.deepEqual(chars.map((c) => c.className), ['Hunter', 'Titan']);
+  assert.equal(chars[0]?.emblemBackground, 'https://www.bungie.net/e.jpg');
 });
 
 test('refreshes a token within a minute of expiry', () => {

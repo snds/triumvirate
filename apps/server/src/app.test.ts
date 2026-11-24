@@ -1,0 +1,33 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createApp } from './app.ts';
+import { createStore } from './store.ts';
+
+const cfg = { apiKey: 'k', clientId: '123', clientSecret: 's' };
+
+test('inventory says signed out when there is no token', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))));
+  const res = await app.request('/api/inventory');
+  assert.equal(res.status, 401);
+  assert.deepEqual(await res.json(), { signedIn: false });
+});
+
+test('login redirects to Bungie with a state value', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))));
+  const res = await app.request('/auth/login');
+  assert.equal(res.status, 302);
+  const loc = new URL(res.headers.get('location')!);
+  assert.equal(loc.host, 'www.bungie.net');
+  assert.equal(loc.searchParams.get('client_id'), '123');
+  assert.match(loc.searchParams.get('state') ?? '', /^[0-9a-f]{32}$/);
+});
+
+test('callback rejects a mismatched state', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))));
+  await app.request('/auth/login');
+  const res = await app.request('/auth/callback?code=abc&state=wrong');
+  assert.equal(res.status, 400);
+});

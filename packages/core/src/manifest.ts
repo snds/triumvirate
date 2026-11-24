@@ -21,8 +21,19 @@ const TABLES = {
   buckets: 'DestinyInventoryBucketDefinition',
 } as const;
 
-export async function loadManifest(http: HttpClient, cacheDir: string, lang = 'en'): Promise<ManifestTables> {
+/**
+ * Returns the manifest tables, or undefined when `currentVersion` is already the
+ * live version (so a caller holding the tables in memory can skip re-parsing).
+ */
+export async function loadManifest(http: HttpClient, cacheDir: string, lang?: string): Promise<ManifestTables>;
+export async function loadManifest(
+  http: HttpClient, cacheDir: string, lang: string, currentVersion: string | undefined,
+): Promise<ManifestTables | undefined>;
+export async function loadManifest(
+  http: HttpClient, cacheDir: string, lang = 'en', currentVersion?: string,
+): Promise<ManifestTables | undefined> {
   const { Response: m } = await getDestinyManifest(http);
+  if (currentVersion && currentVersion === m.version) return undefined;
   const dir = join(cacheDir, m.version.replace(/[^\w.-]/g, '_'));
   await mkdir(dir, { recursive: true });
   const paths = m.jsonWorldComponentContentPaths[lang];
