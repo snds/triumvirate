@@ -1,0 +1,12 @@
+{
+  "name": "@waypoint/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": { ".": "./src/index.ts" },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "node --import tsx --test src/*.test.ts"
+  },
+  "dependencies": { "bungie-api-ts": "^5.10.0" }
+}

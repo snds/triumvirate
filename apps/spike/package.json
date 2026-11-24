@@ -1,0 +1,16 @@
+{
+  "name": "@waypoint/spike",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file=../../.env --import tsx src/server.ts",
+    "typecheck": "tsc -p .",
+    "test": "echo \"no tests\""
+  },
+  "dependencies": {
+    "@waypoint/core": "workspace:*",
+    "bungie-api-ts": "^5.10.0",
+    "selfsigned": "^5.5.0"
+  }
+}
