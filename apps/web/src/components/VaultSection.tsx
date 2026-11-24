@@ -14,11 +14,16 @@ interface Props {
   /** Collapsed characters with items waiting at the postmaster. */
   postmasterNotes: string[];
   onSelect: (i: AppraisedItem) => void;
+  /** The active character's class, e.g. "Warlock". */
+  className?: string;
+  /** When on, other classes' armor is hidden. */
+  classOnly: boolean;
+  onToggleClassOnly: () => void;
 }
 
 const fmt = new Intl.NumberFormat('en-US');
 
-export function VaultSection({ items, account, collapsed, onToggleCollapsed, postmasterNotes, onSelect }: Props) {
+export function VaultSection({ items, account, collapsed, onToggleCollapsed, postmasterNotes, onSelect, className, classOnly, onToggleClassOnly }: Props) {
   const { recentMoves } = useInventory();
   const groups = groupBySlot(items, true, recentMoves);
   const drop = useDropZone('vault');
@@ -57,6 +62,18 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
         )}
       </header>
       <div className="vault__body">
+      {className && (
+        <div className="vault__filters">
+          <button
+            className={`chip${classOnly ? ' is-selected' : ''}`}
+            aria-pressed={classOnly}
+            onClick={onToggleClassOnly}
+            title={classOnly ? `Showing armor ${className}s can wear. Click to show every class.` : `Showing every class. Click to show only ${className} armor.`}
+          >
+            {classOnly && <Icon name="check" />}{className} gear only
+          </button>
+        </div>
+      )}
       {postmasterNotes.length > 0 && <p className="postmaster__note">Postmaster: {postmasterNotes.join(', ')}</p>}
       {groups.length === 0 && <p className="empty">Nothing in the vault matches.</p>}
       {groups.map((g) => (

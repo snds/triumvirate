@@ -153,6 +153,8 @@ const bungieUrl = (path?: string) => (path ? `https://www.bungie.net${path}` : u
  * title (looked up separately, since the record table is too big to cache whole).
  */
 export const SUBCLASS_BUCKET = 3284755031;
+/** Plug categories of ornament sockets, e.g. armor_skins_warlock_head or a weapon's *_skins. */
+const ORNAMENT_PLUG = /skins/i;
 /** TransferStatuses.NotTransferrable. */
 const TRANSFER_NOT_TRANSFERRABLE = 2;
 const SUBCLASS_PLUG = /^(?:titan|hunter|warlock|shared)\.(\w+)\.(supers|grenades|melee|class_abilities|movement|aspects|fragments)$/;
@@ -339,6 +341,15 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     return bungieUrl(d?.transparentIconPath || d?.displayProperties.icon);
   };
   const rows: ItemRow[] = [];
+  /** The plug in an ornament ("skins") socket, if one other than the default is slotted. */
+  const ornamentPlug = (instanceId?: string) => {
+    if (!instanceId) return undefined;
+    for (const socket of sockets[instanceId]?.sockets ?? []) {
+      const h = socket.plugHash;
+      if (h && ORNAMENT_PLUG.test(manifest.extras?.[h]?.plugCategory ?? '')) return h;
+    }
+    return undefined;
+  };
 
   const toRow = (item: DestinyItemComponent, location: string, owner: string, equipped: boolean): ItemRow => {
     const def = manifest.items[item.itemHash];
@@ -353,8 +364,11 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     const notTransferrable = (item.transferStatus & TRANSFER_NOT_TRANSFERRABLE) !== 0;
     // Postmaster items can always be pulled; anything else needs Bungie's go-ahead.
     // An ornament swaps the art, like in game. "Default" ornaments and same-art styles change nothing.
-    const styleDef = item.overrideStyleItemHash && item.overrideStyleItemHash !== item.itemHash
-      ? manifest.items[item.overrideStyleItemHash] : undefined;
+    // Bungie names it in overrideStyleItemHash; if that's missing (seen on some vault items),
+    // fall back to the plug in the item's ornament socket.
+    const styleHash = item.overrideStyleItemHash && item.overrideStyleItemHash !== item.itemHash
+      ? item.overrideStyleItemHash : ornamentPlug(id);
+    const styleDef = styleHash ? manifest.items[styleHash] : undefined;
     const styleIcon = styleDef?.displayProperties.icon;
     const ornament = styleDef && styleIcon && styleIcon !== def?.displayProperties.icon
       && !/^default/i.test(styleDef.displayProperties.name) ? styleDef : undefined;

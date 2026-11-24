@@ -39,6 +39,7 @@ export function App() {
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
   const [agentOpen, setAgentOpen] = usePref('chatOpen', true);
   const [collapsed, setCollapsed] = usePref('charactersCollapsed', false);
+  const [classOnly, setClassOnly] = usePref('vaultClassOnly', true);
   const [tileScale, setTileScale] = usePref('tileScale', 1);
   // Kept while the chat is collapsed, so it reopens at the same width.
   const [chatWidth, setChatWidth] = usePref<number>('chatWidth', CHAT_WIDTH.default);
@@ -242,8 +243,11 @@ export function App() {
   const shown = collapsed ? inv.characters.slice(0, 1) : inv.characters;
   const otherIds = new Set(others.map((c) => c.id));
   // Collapsed: the other characters' gear (not their consumables or postmaster) shows in the vault.
+  // The active class is whoever you played last; other classes' armor is hidden unless you turn the filter off.
+  const activeClass = inv.characters[0];
   const vaultItems = visible.filter(
-    (i) => i.owner === 'vault' || (collapsed && otherIds.has(i.owner) && SLOT_ORDER.includes(i.bucket)),
+    (i) => (i.owner === 'vault' || (collapsed && otherIds.has(i.owner) && SLOT_ORDER.includes(i.bucket)))
+      && (!classOnly || !activeClass || i.classType === 3 || i.classType === activeClass.classType),
   );
   const postmasterNotes = collapsed
     ? others
@@ -354,6 +358,9 @@ export function App() {
               collapsed={collapsed}
               onToggleCollapsed={() => setCollapsed((v) => !v)}
               postmasterNotes={postmasterNotes}
+              className={activeClass?.className}
+              classOnly={classOnly}
+              onToggleClassOnly={() => setClassOnly((v) => !v)}
               onSelect={setSelected}
             />
           </div>

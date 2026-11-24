@@ -772,3 +772,12 @@ body.is-dragging-item .tile { pointer-events: none; }
 
 .menu__hint { font-size: 11px; color: var(--text-muted); }
 .profile__auto { font-size: 12px; vertical-align: -2px; }
+
+.vault__filters { display: flex; gap: var(--space-1); padding: var(--space-2) 0 0; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px; padding: 2px var(--space-2); border-radius: 999px;
+  border: 1px solid var(--border-subtle); background: none; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer;
+}
+.chip .icon { font-size: 14px; }
+.chip:hover { background: var(--surface-hover); }
+.chip.is-selected { border-color: var(--accent); color: var(--text-primary); }

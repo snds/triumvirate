@@ -231,3 +231,22 @@ test('an applied ornament replaces the tile art; default ornaments do not', () =
     assert.equal(plain?.ornament, undefined);
   }
 });
+
+test('an ornament in the ornament socket counts when Bungie leaves overrideStyleItemHash empty', () => {
+  const m = {
+    ...manifest,
+    items: {
+      ...manifest.items,
+      1: { displayProperties: { name: 'Fatebringer', icon: '/base.png' }, itemTypeDisplayName: 'Hand Cannon', inventory: { bucketTypeHash: 10 } },
+      7: { displayProperties: { name: 'Timelost Finish', icon: '/orn.png' } },
+    },
+    extras: { 7: { plugCategory: 'v400.weapon_skins' } },
+  } as unknown as ManifestTables;
+  const p = {
+    profileInventory: { data: { items: [{ itemHash: 1, bucketHash: VAULT_BUCKET, itemInstanceId: 'a', state: 0 }] } },
+    itemComponents: { sockets: { data: { a: { sockets: [{ plugHash: 7, isEnabled: true, isVisible: true }] } } } },
+  } as unknown as DestinyProfileResponse;
+  const [row] = summarizeProfile(p, m);
+  assert.equal(row?.ornament?.name, 'Timelost Finish');
+  assert.equal(row?.icon, 'https://www.bungie.net/orn.png');
+});
