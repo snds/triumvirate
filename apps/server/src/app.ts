@@ -47,6 +47,11 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   let subclassFor = '';
   /** The snapshot the app is showing; moves are recorded into it. */
   let current: Snapshot | undefined;
+  /** Bumped whenever `current` is replaced or edited, so cached views know they're stale. */
+  let snapVersion = 0;
+  const setCurrent = (snap: Snapshot) => { if (snap !== current) { current = snap; snapVersion++; } };
+  /** The last built view, reused until the snapshot, manifest, or wish list changes. */
+  let viewCache: { key: string; list: WishList; view: View; body?: string; etag?: string } | undefined;
   /** Moves run one at a time: Bungie asks for a pause between actions, and each one edits `current`. */
   let moveQueue: Promise<unknown> = Promise.resolve();
 
@@ -60,29 +65,45 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return t;
   }
 
+  /**
+   * Pulls a fresh profile from Bungie. Who you are (membership, name, avatar) is reused from the
+   * last snapshot, so a refresh costs one profile call plus a tiny manifest version check.
+   * When Bungie says nothing changed since the last pull, the existing snapshot is kept as is.
+   */
   async function sync(t: Tokens): Promise<Snapshot> {
     const http = createHttpClient(cfg.apiKey, t.accessToken);
-    const { Response: me } = await getMembershipDataForCurrentUser(http);
-    // Cross-save accounts name a primary membership; otherwise take the first one.
-    const m = me.destinyMemberships.find((x) => x.membershipId === me.primaryMembershipId) ?? me.destinyMemberships[0];
-    if (!m) throw new Error('No Destiny 2 account found on this Bungie profile.');
+    const prev = current ?? (await store.latestSnapshot());
+    let who: Pick<Snapshot, 'membershipType' | 'membershipId' | 'displayName' | 'profilePicture'>;
+    if (prev) {
+      who = { membershipType: prev.membershipType, membershipId: prev.membershipId, displayName: prev.displayName, profilePicture: prev.profilePicture };
+    } else {
+      const { Response: me } = await getMembershipDataForCurrentUser(http);
+      // Cross-save accounts name a primary membership; otherwise take the first one.
+      const m = me.destinyMemberships.find((x) => x.membershipId === me.primaryMembershipId) ?? me.destinyMemberships[0];
+      if (!m) throw new Error('No Destiny 2 account found on this Bungie profile.');
+      const pic = me.bungieNetUser?.profilePicturePath;
+      who = {
+        membershipType: m.membershipType,
+        membershipId: m.membershipId,
+        displayName: m.bungieGlobalDisplayName || m.displayName,
+        profilePicture: pic ? (pic.startsWith('http') ? pic : `https://www.bungie.net${pic}`) : undefined,
+      };
+    }
     const [{ Response: profile }, man] = await Promise.all([
-      getProfile(http, { membershipType: m.membershipType, destinyMembershipId: m.membershipId, components: COMPONENTS }),
+      getProfile(http, { membershipType: who.membershipType, destinyMembershipId: who.membershipId, components: COMPONENTS }),
       loadManifestCached(http),
     ]);
     manifest = man;
-    const pic = me.bungieNetUser?.profilePicturePath;
-    const snap: Snapshot = {
-      syncedAt: new Date().toISOString(),
-      membershipType: m.membershipType,
-      membershipId: m.membershipId,
-      displayName: m.bungieGlobalDisplayName || m.displayName,
-      profilePicture: pic ? (pic.startsWith('http') ? pic : `https://www.bungie.net${pic}`) : undefined,
-      titles: await characterTitles(http, profile),
-      profile,
-    };
+    const now = new Date().toISOString();
+    // Bungie stamps each profile response; the same stamps mean the same data.
+    if (prev && sameProfile(prev.profile, profile)) {
+      prev.syncedAt = now;
+      setCurrent(prev);
+      return prev;
+    }
+    const snap: Snapshot = { syncedAt: now, ...who, titles: await characterTitles(http, profile), profile };
     await store.saveSnapshot(snap);
-    current = snap;
+    setCurrent(snap);
     return snap;
   }
 
@@ -157,20 +178,33 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   app.get('/api/inventory', async (c) => {
     const t = await validTokens();
     if (!t) return c.json({ signedIn: false }, 401);
-    let snap = c.req.query('refresh') ? undefined : await store.latestSnapshot();
+    // Page loads read the snapshot in memory; only Refresh (or a cold server) asks Bungie.
+    let snap = c.req.query('refresh') ? undefined : current ?? (await store.latestSnapshot());
     // The item table is needed to name items, so a cold server always syncs once.
     if (!snap || !manifest) snap = await sync(t);
-    current = snap;
+    setCurrent(snap);
     const view = await buildView(snap);
-    return c.json({
-      signedIn: true,
-      displayName: snap.displayName,
-      profilePicture: snap.profilePicture,
-      syncedAt: snap.syncedAt,
-      manifestVersion: manifest!.version,
-      agentEnabled: !!deps.anthropic,
-      ...view,
-    });
+    const cache = viewCache!;
+    // "synced 3 min ago" is part of the body, so it's in the tag too.
+    const etag = `"${cache.key}|${snap.syncedAt}"`;
+    if (cache.etag !== etag) {
+      cache.body = JSON.stringify({
+        signedIn: true,
+        displayName: snap.displayName,
+        profilePicture: snap.profilePicture,
+        syncedAt: snap.syncedAt,
+        manifestVersion: manifest!.version,
+        agentEnabled: !!deps.anthropic,
+        ...view,
+      });
+      cache.etag = etag;
+    }
+    // The browser keeps the last copy and asks "changed?"; unchanged answers are empty 304s.
+    c.header('ETag', etag);
+    c.header('Cache-Control', 'no-cache');
+    if (c.req.header('If-None-Match') === etag) return c.body(null, 304);
+    c.header('Content-Type', 'application/json');
+    return c.body(cache.body!);
   });
 
   app.post('/api/agent', async (c) => {
@@ -232,11 +266,12 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     if (!instanceId || !to) return c.json({ error: 'Say which item and where it goes.' }, 400);
     const run = moveQueue.then(async () => {
       if (!current || !lastView) {
-        current = (await store.latestSnapshot()) ?? (await sync(t));
+        setCurrent((await store.latestSnapshot()) ?? (await sync(t)));
         if (!manifest) await sync(t);
-        await buildView(current);
+        await buildView(current!);
       }
       const snap = current!;
+      snapVersion++; // the steps below edit it in place
       const item = lastView!.items.find((i) => i.instanceId === instanceId);
       if (!item) return { status: 404 as const, body: { error: 'That item isn\'t there anymore. Refresh and try again.' } };
       if (to !== 'vault' && !lastView!.characters.some((ch) => ch.id === to)) return { status: 400 as const, body: { error: 'Unknown destination.' } };
@@ -267,8 +302,10 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   });
 
   // Turns a raw snapshot into what the web app and the agent see: items with roll verdicts, plus cleanup picks.
-  async function buildView(snap: Snapshot) {
+  async function buildView(snap: Snapshot): Promise<View> {
     const list = await deps.wishList();
+    const key = `${snapVersion}.${manifest!.version}`;
+    if (viewCache && viewCache.key === key && viewCache.list === list && lastView) return viewCache.view;
     const items: AppraisedItem[] = summarizeProfile(snap.profile, manifest!).map((i) =>
       i.itemType === 3 && i.perks
         ? { ...i, appraisal: appraise(i.itemHash, new Set(i.perks.flat().map((p) => p.name)), list, manifest!) }
@@ -283,7 +320,9 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       subclassFor = manifest!.version;
     }
     lastView = { displayName: snap.displayName, characters, items, cleanup, subclass };
-    return { characters, account, items, cleanup };
+    const view = { characters, account, items, cleanup };
+    viewCache = { key, list, view };
+    return view;
   }
 
   app.onError((err, c) => {
@@ -305,4 +344,17 @@ export function friendlyMoveError(err: unknown): string {
   if (code === 1663) return 'Bungie won\'t allow that right now. Try again from orbit or a social space.';
   if (code === 31 || code === 36) return 'Bungie asked us to slow down. Wait a moment and try again.';
   return msg;
+}
+
+interface View {
+  characters: ReturnType<typeof summarizeCharacters>;
+  account: ReturnType<typeof summarizeAccount>;
+  items: AppraisedItem[];
+  cleanup: ReturnType<typeof cleanupCandidates>;
+}
+
+/** Bungie stamps when it built each part of a profile; matching stamps mean nothing changed. */
+export function sameProfile(a: DestinyProfileResponse, b: DestinyProfileResponse): boolean {
+  return !!a.responseMintedTimestamp && a.responseMintedTimestamp === b.responseMintedTimestamp
+    && a.secondaryComponentsMintedTimestamp === b.secondaryComponentsMintedTimestamp;
 }

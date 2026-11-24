@@ -53,3 +53,12 @@ test('move needs a sign-in, and explains a missing Bungie permission', async () 
   assert.match(friendlyMoveError(new Error('Bungie API error 2108: nope')), /Move or equip Destiny gear/);
   assert.match(friendlyMoveError(new Error('Bungie API error 1642: full')), /no room/);
 });
+
+test('a profile with the same Bungie stamps counts as unchanged', async () => {
+  const { sameProfile } = await import('./app.ts');
+  const p = (a: string, b: string) => ({ responseMintedTimestamp: a, secondaryComponentsMintedTimestamp: b }) as never;
+  assert.equal(sameProfile(p('t1', 's1'), p('t1', 's1')), true);
+  assert.equal(sameProfile(p('t1', 's1'), p('t2', 's1')), false);
+  assert.equal(sameProfile(p('t1', 's1'), p('t1', 's2')), false);
+  assert.equal(sameProfile(p('', ''), p('', '')), false);
+});
