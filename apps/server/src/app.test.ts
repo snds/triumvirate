@@ -62,3 +62,13 @@ test('a profile with the same Bungie stamps counts as unchanged', async () => {
   assert.equal(sameProfile(p('t1', 's1'), p('t1', 's2')), false);
   assert.equal(sameProfile(p('', ''), p('', '')), false);
 });
+
+test('community routes report status and reject a bad item hash', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  const res = await app.request('/api/community/status');
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).running, false);
+  assert.equal((await app.request('/api/community/items/abc')).status, 400);
+  const w = await (await app.request('/api/community/items/123')).json();
+  assert.deepEqual(w, { samples: 0, weapon: null, trend: [] });
+});
