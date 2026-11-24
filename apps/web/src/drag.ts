@@ -10,8 +10,12 @@ export interface DragApi {
   end: () => void;
 }
 
+/** Stable start/end for tiles. Tiles never read the dragged item, so a drag doesn't re-render all of them. */
+export const DragActionsContext = createContext<Pick<DragApi, 'start' | 'end'>>({ start: () => {}, end: () => {} });
+/** The dragged item, for the few drop zones. */
 export const DragContext = createContext<DragApi>({ item: null, start: () => {}, end: () => {} });
 export const useDrag = () => useContext(DragContext);
+export const useDragActions = () => useContext(DragActionsContext);
 
 /** Props and state for one drop target: a character column or the vault. */
 export function useDropZone(to: string) {

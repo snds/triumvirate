@@ -1,5 +1,6 @@
 import { useHover } from '../hover.ts';
-import { useDrag } from '../drag.ts';
+import { memo, useState } from 'react';
+import { useDragActions } from '../drag.ts';
 import { useInventory } from '../inventory-context.ts';
 import { Icon, type IconName } from './Icon.tsx';
 import { ElementIcon } from './ElementIcon.tsx';
@@ -18,11 +19,13 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
 };
 const BADGE: Partial<Record<Verdict, IconName>> = { god: 'star', good: 'check', meh: 'cross', trash: 'cross' };
 
-export function ItemTile({
+// Memoized: a vault can hold over a thousand tiles, and drags re-render the columns around them.
+export const ItemTile = memo(function ItemTile({
   item, size = 'md', onSelect,
 }: { item: AppraisedItem; size?: 'md' | 'lg'; onSelect?: (i: AppraisedItem) => void }) {
   const hover = useHover();
-  const drag = useDrag();
+  const drag = useDragActions();
+  const [dragging, setDragging] = useState(false);
   const { moving } = useInventory();
   const isMoving = !!item.instanceId && moving.has(item.instanceId);
   const draggable = !!item.movable && !item.equipped && !isMoving;
@@ -32,23 +35,30 @@ export function ItemTile({
   return (
     <button
       type="button"
-      className={`tile tile--${size} ${tierClass(item.tier)}${isMoving ? ' is-moving' : ''}${drag.item === item ? ' is-dragging' : ''}`}
+      className={`tile tile--${size} ${tierClass(item.tier)}${isMoving ? ' is-moving' : ''}${dragging ? ' is-dragging' : ''}`}
       aria-label={label}
       aria-busy={isMoving || undefined}
       draggable={draggable}
       onDragStart={draggable ? (e) => {
-        hover?.leave();
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', item.name);
-        drag.start(item);
+        // The tile itself is the picture that follows the pointer.
+        e.dataTransfer.setDragImage(e.currentTarget, e.nativeEvent.offsetX, e.nativeEvent.offsetY);
+        // Change nothing on the page until the browser has started the drag. Chrome (notably on
+        // Windows) can stall the drag when the page re-renders inside dragstart.
+        setTimeout(() => {
+          hover?.leave();
+          setDragging(true);
+          drag.start(item);
+        }, 0);
       } : undefined}
-      onDragEnd={draggable ? () => drag.end() : undefined}
+      onDragEnd={draggable ? () => { setDragging(false); drag.end(); } : undefined}
       onClick={onSelect ? () => { hover?.leave(); onSelect(item); } : undefined}
       onPointerEnter={hover ? (e) => hover.enter(item, e.currentTarget.getBoundingClientRect()) : undefined}
       onPointerLeave={hover ? () => hover.leave() : undefined}
     >
-      {item.icon && <img className="tile__icon" src={item.icon} alt="" loading="lazy" />}
-      {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" loading="lazy" />}
+      {item.icon && <img className="tile__icon" src={item.icon} alt="" loading="lazy" draggable={false} />}
+      {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" loading="lazy" draggable={false} />}
       {verdict && BADGE[verdict] && <span className={`tile__badge tile__badge--${verdict}`}><Icon name={BADGE[verdict]} filled /></span>}
       {item.power !== undefined && (
         <span className="tile__power">
@@ -62,4 +72,4 @@ export function ItemTile({
       {isMoving && <span className="tile__moving"><span className="spinner" /></span>}
     </button>
   );
-}
+});

@@ -3,7 +3,7 @@ import { fetchInventory, logout, moveItem, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
 import { checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
-import { DragContext, type DragApi } from './drag.ts';
+import { DragActionsContext, DragContext, type DragApi } from './drag.ts';
 import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
@@ -104,7 +104,17 @@ export function App() {
 
   // ── Moving items ────────────────────────────────────────────
   const [dragging, setDragging] = useState<AppraisedItem | null>(null);
-  const dragApi = useMemo<DragApi>(() => ({ item: dragging, start: setDragging, end: () => setDragging(null) }), [dragging]);
+  const dragActions = useMemo(() => ({ start: setDragging, end: () => setDragging(null) }), []);
+  const dragApi = useMemo<DragApi>(() => ({ item: dragging, ...dragActions }), [dragging, dragActions]);
+  // Belt and braces: if the browser never sends dragend (it can be lost), the next click or Escape clears it.
+  useEffect(() => {
+    if (!dragging) return;
+    const clear = () => setDragging(null);
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && clear();
+    window.addEventListener('pointerdown', clear);
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('pointerdown', clear); window.removeEventListener('keydown', onKey); };
+  }, [dragging]);
   const [moving, setMoving] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState<{ id: number; text: string }>();
   useEffect(() => {
@@ -196,6 +206,7 @@ export function App() {
   return (
     <HoverContext.Provider value={hoverApi}>
     <InventoryContext.Provider value={inventoryApi}>
+    <DragActionsContext.Provider value={dragActions}>
     <DragContext.Provider value={dragApi}>
     <div
       className={`app${agentOpen ? ' app--chat' : ''}`}
@@ -327,6 +338,7 @@ export function App() {
       )}
     </div>
     </DragContext.Provider>
+    </DragActionsContext.Provider>
     </InventoryContext.Provider>
     </HoverContext.Provider>
   );
