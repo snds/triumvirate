@@ -45,6 +45,7 @@ export const ItemTile = memo(function ItemTile({
       aria-label={label}
       aria-busy={isMoving || undefined}
       data-movable={draggable || undefined}
+      data-instance={item.instanceId}
       onPointerDown={draggable ? (e) => drag.press(e, item) : undefined}
       onPointerMove={hover ? tilt : undefined}
       onClick={onSelect ? () => { hover?.leave(); onSelect(item); } : undefined}

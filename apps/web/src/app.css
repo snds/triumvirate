@@ -740,3 +740,11 @@ body.is-dragging-item .tile { pointer-events: none; }
   background: var(--surface-raised); border: 1px solid var(--danger); color: var(--text-primary);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
 }
+
+/* A just-moved tile pulses a gold ring so it's easy to spot in a long vault. */
+[data-just-moved].tile { animation: just-moved 2.4s ease-out; z-index: 3; }
+@keyframes just-moved {
+  0%, 40% { box-shadow: 0 0 0 3px var(--accent), 0 0 18px 4px color-mix(in srgb, var(--accent) 60%, transparent); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@media (prefers-reduced-motion: reduce) { [data-just-moved].tile { animation-duration: 4s; } }

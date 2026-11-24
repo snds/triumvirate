@@ -121,6 +121,20 @@ export function App() {
     setSelected((sel) => (sel?.instanceId === instanceId ? next : sel));
   }, []);
 
+  /** Scrolls a moved item into view and makes it glow briefly, so it's easy to find in a long vault. */
+  const spotlight = useCallback((id: string) => {
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(`.main [data-instance="${CSS.escape(id)}"]`);
+      if (!el) return;
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      // A data attribute, not a class: React rewrites className when the tile re-renders.
+      delete el.dataset.justMoved;
+      void el.offsetWidth; // restart the animation if it's already running
+      el.dataset.justMoved = '';
+      setTimeout(() => { delete el.dataset.justMoved; }, 2400);
+    });
+  }, []);
+
   const move = useCallback(async (item: AppraisedItem, to: string) => {
     if (state.status !== 'ready' || !item.instanceId) return;
     const id = item.instanceId;
@@ -133,12 +147,14 @@ export function App() {
       patchItem(id, { ...item, owner: to, location: ch ? `${ch.className} (${ch.light})` : 'Vault' },
         inv.account && { ...inv.account, vault: { ...inv.account.vault, used: inv.account.vault.used + delta } });
     }
+    spotlight(id);
     const res = await moveItem(id, to);
     // The server's copy is the truth: where it landed, or where it stopped if a step failed.
     patchItem(id, res.item ?? item, res.account);
+    spotlight(id);
     if (res.error) setToast({ id: Date.now(), text: `Couldn't move ${item.name}: ${res.error}` });
     setMoving((m) => { const n = new Set(m); n.delete(id); return n; });
-  }, [state, patchItem]);
+  }, [state, patchItem, spotlight]);
 
   const inventoryApi = useMemo<InventoryApi>(() => {
     const inv = state.status === 'ready' ? state.inv : undefined;
