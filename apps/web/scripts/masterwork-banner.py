@@ -1,109 +1,85 @@
 # Regenerates apps/web/src/assets/masterwork-header.svg from the PNG art:
 #   python3 apps/web/scripts/masterwork-banner.py <masterwork-header.png> apps/web/src/assets/masterwork-header.svg 271
-# The last argument is the width of one repeat block in pixels.
-# Traces masterwork-header.png into an SVG. The art is made only of 45° stripes, so it is sampled
-# on a grid turned 45°, thresholded, and merged into rectangles that are rotated back: every edge
-# comes out at an exact 45° angle. The downward fade is kept separately as a gradient mask.
+# 271 is the width in pixels of one repeat block of the pattern.
+# Rebuilds the masterwork pattern as clean geometry on the art's own pixel lattice.
+# The art was drawn with 45° lines on a pixel grid, so every lit pixel belongs to a "\" or "/"
+# line. Along each line direction, runs of lit pixels become one band with straight 45° edges
+# (no staircase). Hairlines stay 1 px; wide bands stay wide. Output is shape only.
 import sys, math
 from PIL import Image
-src, out = sys.argv[1], sys.argv[2]
-im = Image.open(src).convert('RGBA'); W, H = im.size
-FULL = [[im.getpixel((x, y))[3] / 255 for x in range(W)] for y in range(H)]
-# The art repeats every P pixels (measured: shifting by 271 matches almost exactly), so keep one
-# block, averaging the two copies the image holds where both exist.
-P = int(sys.argv[3]) if len(sys.argv) > 3 else W
-A = [[(row[x] + row[x + P]) / 2 if x + P < W else row[x] for x in range(P)] for row in FULL]
-W = P
-PAD = 3
-BAR = 5
-# Fade envelope: the strong stripe alpha per row (90th percentile of lit pixels), kept falling.
+src, out, P = sys.argv[1], sys.argv[2], int(sys.argv[3])
+im = Image.open(src).convert('RGBA'); W0, H = im.size; BAR = 5
+raw = [[im.getpixel((x, y))[3] for x in range(W0)] for y in range(H)]
+A = [[(r[x] + r[x + P]) / 2 if x + P < W0 else r[x] for x in range(P)] for r in raw]
 env = []
 for y in range(H):
-    lit = sorted(a for a in A[y] if a > 0.004)
+    lit = sorted(v for v in A[y] if v > 1)
     env.append(lit[int(len(lit) * 0.9)] if len(lit) > 4 else 0)
 for y in range(H - 2, BAR - 1, -1): env[y] = max(env[y], env[y + 1])
-env = [sum(env[max(BAR, y - 2):y + 3]) / len(env[max(BAR, y - 2):y + 3]) if y >= BAR else env[y] for y in range(H)]
-def a(x, y):
-    # Wraps sideways, so stripes run across the block's edges; the clip trims them to the block.
-    if x < -PAD or x > W + PAD or y < 0 or y > H - 1: return 0
-    x0, y0 = math.floor(x), int(y); fx, fy = x - x0, y - y0
-    x1, y1 = (x0 + 1) % W, min(y0 + 1, H - 1); x0 %= W
-    v = (A[y0][x0] * (1 - fx) + A[y0][x1] * fx) * (1 - fy) + (A[y1][x0] * (1 - fx) + A[y1][x1] * fx) * fy
-    e = env[min(int(round(y)), H - 1)]
-    return v / e if e > 0.02 else 0
-S = 0.5 / math.sqrt(2) * math.sqrt(2)  # grid step in rotated units (0.5 px)
-r2 = math.sqrt(2)
-# u along "\" direction, v along "/" direction: x = (u + v)/√2, y = (u - v)/√2 ... use u=(x+y)/√2, v=(x-y)/√2
-umin, umax = -PAD / r2, (W + PAD + H) / r2
-vmin, vmax = (-PAD - H) / r2, (W + PAD) / r2
-nu, nv = int((umax - umin) / S) + 1, int((vmax - vmin) / S) + 1
-# Each stripe family is found on its own: "\\" stripes run along u, "/" stripes along v. A cell
-# belongs to a family when the art stays lit along that direction (averaged over ~2 px, which
-# smooths the pixel stair-steps of 1 px hairlines) for at least MIN_RUN px. Crossings of the
-# other family are too short to count, so they don't fatten the stripes.
-T, MIN_RUN = 0.45, 3.0
-OFF = (-0.9, -0.45, 0, 0.45, 0.9)
-def xy(i, j):
-    u, v = umin + (i + 0.5) * S, vmin + (j + 0.5) * S
-    return (u + v) / r2, (u - v) / r2
-d1 = [[False] * nu for _ in range(nv)]
-d2 = [[False] * nu for _ in range(nv)]
-for j in range(nv):
-    for i in range(nu):
-        x, y = xy(i, j)
-        if y < BAR - 0.5: continue
-        d1[j][i] = sum(a(x + t, y + t) for t in OFF) / 5 >= T
-        d2[j][i] = sum(a(x + t, y - t) for t in OFF) / 5 >= T
-need = int(MIN_RUN / S)
-grid = [[False] * nu for _ in range(nv)]
-for j in range(nv):          # family 1: runs along i
-    i = 0
-    while i < nu:
-        if d1[j][i]:
-            k = i
-            while k < nu and d1[j][k]: k += 1
-            if k - i >= need:
-                for t in range(i, k): grid[j][t] = True
-            i = k
-        else: i += 1
-for i in range(nu):          # family 2: runs along j
-    j = 0
-    while j < nv:
-        if d2[j][i]:
-            k = j
-            while k < nv and d2[k][i]: k += 1
-            if k - j >= need:
-                for t in range(j, k): grid[t][i] = True
-            j = k
-        else: j += 1
-# Greedy rectangles: horizontal runs per row, extended down while the same run repeats.
-used = [[False] * nu for _ in range(nv)]
-rects = []
-for j in range(nv):
-    i = 0
-    while i < nu:
-        if grid[j][i] and not used[j][i]:
-            k = i
-            while k < nu and grid[j][k] and not used[j][k]: k += 1
-            h = 1
-            while j + h < nv and all(grid[j + h][t] and not used[j + h][t] for t in range(i, k)): h += 1
-            for jj in range(j, j + h):
-                for t in range(i, k): used[jj][t] = True
-            rects.append((umin + i * S, vmin + j * S, (k - i) * S, h * S))
-            i = k
-        else: i += 1
-# The file holds only the shape: no fade and no bar. The app fills it with a CSS gradient and draws
-# the bar itself, so each can be sized for where it's used. The fade stops are printed for the CSS.
-top = max(env[BAR:BAR + 4]) or 1
-print('peak opacity', round(top, 3))
-print('fade stops:', ', '.join(f'{min(1, env[y] / top):.2f} {(y - BAR) / (H - BAR) * 100:.0f}%' for y in range(BAR, H, 5)))
-f = lambda n: f'{n:.2f}'.rstrip('0').rstrip('.')
-# One path, so neighboring rectangles fill as one shape with no hairline seams between them.
-body = ''.join(f'M{f(u)} {f(v)}h{f(w)}v{f(h)}h{f(-w)}z' for u, v, w, h in rects)
-svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 {BAR} {W} {H - BAR}" width="{W}" height="{H - BAR}">
-<!-- Masterwork banner pattern, traced from the original art: 45 degree chevron stripes, one repeat block {W} units wide. Shape only; the app adds the fade and the gold bar. Regenerate with apps/web/scripts/masterwork-banner.py. -->
-<clipPath id="c"><rect y="{BAR}" width="{W}" height="{H - BAR}"/></clipPath>
-<g clip-path="url(#c)"><path fill="#ccb829" transform="matrix({1/r2:.6f} {1/r2:.6f} {1/r2:.6f} {-1/r2:.6f} 0 0)" d="{body}"/></g>
+LIT = float(sys.argv[4]) if len(sys.argv) > 4 else 0.5
+def lit(x, y):
+    if y < BAR or y >= H or env[y] < 3: return False
+    return A[y][x % P] / env[y] >= LIT
+PAD = 4
+xs = range(-PAD - H, P + PAD + H)
+f = lambda n: f'{n:.1f}'.rstrip('0').rstrip('.')
+bands = []   # (family, m, p0, p1): family 1 "\" has m = x - y; family 2 "/" has m = x + y
+for fam, (dx, dy) in ((1, (1, 1)), (2, (-1, 1))):
+    # Each lattice line: all pixels with the same m. Walk it and collect runs of lit pixels.
+    ms = range(-H - PAD, P + PAD + 1) if fam == 1 else range(BAR - PAD, P + H + PAD)
+    for m in ms:
+        run = None
+        for y in range(BAR, H):
+            x = m + y if fam == 1 else m - y
+            on = -PAD <= x < P + PAD and lit(x, y)
+            # A pixel counts for this family only if its line neighbor is lit too (it's part of
+            # a run along this direction, not just a crossing of the other family).
+            if on and not (lit(x + dx, y + 1) or lit(x - dx, y - 1)): on = False
+            if on and run is None: run = y
+            if not on and run is not None:
+                bands.append((fam, m, run, y - 1)); run = None
+        if run is not None: bands.append((fam, m, run, H - 1))
+# Merge neighboring lines (m, m+1) whose runs line up into one wide band.
+from collections import defaultdict
+paths = []
+for fam in (1, 2):
+    rows = defaultdict(list)
+    for fm, m, y0, y1 in bands:
+        if fm == fam: rows[m].append([y0, y1])
+    done = set(); 
+    for m in sorted(rows):
+        for r in rows[m]:
+            key = (m, r[0], r[1])
+            if key in done: continue
+            done.add(key); m1 = m; ys0 = [r[0]]; ys1 = [r[1]]
+            while True:
+                nxt = next((q for q in rows.get(m1 + 1, []) if (m1 + 1, q[0], q[1]) not in done
+                            and abs(q[0] - ys0[-1]) <= 1 and abs(q[1] - ys1[-1]) <= 1), None)
+                if not nxt: break
+                m1 += 1; done.add((m1, nxt[0], nxt[1])); ys0.append(nxt[0]); ys1.append(nxt[1])
+            # Band covers lattice lines m..m1: edges at m-0.5 and m1+0.5 (in x∓y units).
+            # Ends: the first and last pixel rows, averaged across the band so the end is square.
+            a0 = sum(ys0) / len(ys0) - 0.5; a1 = sum(ys1) / len(ys1) + 0.5
+            # Specks: a band shorter than 2 px along and only a line or two wide is antialiasing noise.
+            if a1 - a0 < 2.5 and m1 - m <= 1: continue
+            lo, hi = m - 0.5, m1 + 0.5
+            # Corners in x,y: family 1 lines are x - y = c; family 2 are x + y = c.
+            # Use the band's centerline y-range [a0, a1]; ends perpendicular to the band.
+            if fam == 1:
+                # point on line c at "along" s: x = c + s, y = s; perpendicular end through mid-line.
+                def pt(c, s): return (c + s, s)
+                mid = (lo + hi) / 2
+                # convert y-range at centerline to along s (= y) and keep ends perpendicular:
+                # perpendicular direction to (1,1) is (1,-1): moving c by d shifts s by -d/2.
+                corners = [pt(lo, a0 + (mid - lo) / 2), pt(hi, a0 - (hi - mid) / 2), pt(hi, a1 - (hi - mid) / 2), pt(lo, a1 + (mid - lo) / 2)]
+            else:
+                def pt(c, s): return (c - s, s)
+                mid = (lo + hi) / 2
+                corners = [pt(lo, a0 - (mid - lo) / 2), pt(hi, a0 + (hi - mid) / 2), pt(hi, a1 + (hi - mid) / 2), pt(lo, a1 - (mid - lo) / 2)]
+            paths.append('M' + 'L'.join(f'{f(x + 0.5)} {f(y + 0.5)}' for x, y in corners) + 'z')
+svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 {BAR} {P} {H - BAR}" width="{P}" height="{H - BAR}">
+<!-- Masterwork banner pattern, one repeat block {P} units wide: 45 degree bands and hairlines. Shape only; the app adds the fade and the gold bar. Regenerate with apps/web/scripts/masterwork-banner.py. -->
+<clipPath id="c"><rect y="{BAR}" width="{P}" height="{H - BAR}"/></clipPath>
+<path clip-path="url(#c)" fill="#ccb829" d="{''.join(paths)}"/>
 </svg>'''
-open(out, 'w').write(svg)
-print(len(rects), 'rects', len(svg), 'bytes')
+open(out, 'w').write(svg); print(len(paths), 'bands', len(svg), 'bytes')
