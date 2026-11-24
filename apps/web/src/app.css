@@ -829,7 +829,7 @@ body.is-dragging-item .tile { pointer-events: none; }
   background: var(--band);
   color: var(--text-primary);
 }
-.item-header.is-masterworked {
+.item-header.is-masterworked, .roll-card__head.is-masterworked {
   /* Bar thickness and pattern height scale with the header; the dialog sets larger ones. */
   --mw-bar: 4px;
   --mw-pattern: 80px;
@@ -839,7 +839,7 @@ body.is-dragging-item .tile { pointer-events: none; }
 }
 /* The banner: the SVG is only the chevron shape (one 270-wide tile), used as a mask and tiled
    across. A second mask layer, a gradient, fades it out downward; the two are intersected. */
-.item-header.is-masterworked::before {
+.item-header.is-masterworked::before, .roll-card__head.is-masterworked::before {
   content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: var(--masterwork-banner);
   opacity: var(--masterwork-banner-opacity);
@@ -1005,8 +1005,7 @@ body.is-dragging-item .tile { pointer-events: none; }
 .rolls__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-3); padding-top: var(--space-3); }
 
 .roll-card { background: var(--surface-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
-.roll-card__head { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; padding: var(--space-2); background: color-mix(in srgb, var(--tier-legendary) 55%, var(--surface-panel)); }
-.roll-card.tier-exotic .roll-card__head { background: color-mix(in srgb, var(--tier-exotic) 40%, var(--surface-panel)); }
+.roll-card__head { position: relative; display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-2); align-items: center; padding: var(--space-2); background: color-mix(in srgb, var(--tile-tier) 72%, var(--surface-page)); }
 .roll-card__title { min-width: 0; display: grid; gap: var(--space-1); }
 .roll-card__name { margin: 0; font-size: 15px; font-weight: 700; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .roll-card__badges { display: flex; flex-wrap: wrap; gap: var(--space-1); }

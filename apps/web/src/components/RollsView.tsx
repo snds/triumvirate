@@ -180,7 +180,7 @@ function RollCard({ item, c, onSelect, onChanged }: {
     : `Not enough community data yet (${c?.copies ?? 0} copies seen)`;
   return (
     <article className={`roll-card tier-${item.tier.toLowerCase()}${previewing ? ' is-previewing' : ''}`}>
-      <header className="roll-card__head">
+      <header className={`roll-card__head${item.masterworked ? ' is-masterworked' : ''}`}>
         <ItemTile item={item} onSelect={onSelect} />
         <div className="roll-card__title">
           <h3 className="roll-card__name" title={item.name}>{item.name}</h3>
