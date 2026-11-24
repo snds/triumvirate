@@ -39,3 +39,12 @@ test('formats sync age', () => {
   assert.equal(timeAgo('2026-11-24T11:55:00Z', now), '5 min ago');
   assert.equal(timeAgo('2026-11-24T09:00:00Z', now), '3 hr ago');
 });
+
+test('recently moved items lead their slot, newest first', () => {
+  const groups = groupBySlot([
+    item({ name: 'High', bucket: 'Kinetic Weapons', power: 50, instanceId: '1' }),
+    item({ name: 'Moved', bucket: 'Kinetic Weapons', power: 5, instanceId: '2' }),
+    item({ name: 'Newest', bucket: 'Kinetic Weapons', power: 1, instanceId: '3' }),
+  ], false, { 2: 100, 3: 200 });
+  assert.deepEqual(groups[0]?.items.map((i) => i.name), ['Newest', 'Moved', 'High']);
+});

@@ -14,10 +14,12 @@ export interface InventoryApi {
   /** Whether `item` can go to `to` (a character id or 'vault'), and why not. */
   check: (item: AppraisedItem, to: string) => MoveCheck;
   move: (item: AppraisedItem, to: string) => void;
+  /** Instance id to when you last moved it, for sorting. */
+  recentMoves: Record<string, number>;
 }
 
 export const InventoryContext = createContext<InventoryApi>({
   byId: new Map(), select: () => {}, characters: [], moving: new Set(),
-  check: () => ({ ok: false, reason: 'Not ready' }), move: () => {},
+  check: () => ({ ok: false, reason: 'Not ready' }), move: () => {}, recentMoves: {},
 });
 export const useInventory = () => useContext(InventoryContext);

@@ -105,6 +105,8 @@ export function App() {
   // ── Moving items ────────────────────────────────────────────
 
   const [moving, setMoving] = useState<Set<string>>(() => new Set());
+  // Remembered across reloads so a raid shuffle stays at the front; only the last 60 moves are kept.
+  const [recentMoves, setRecentMoves] = usePref<Record<string, number>>('recentMoves', {});
   const [toast, setToast] = useState<{ id: number; text: string }>();
   useEffect(() => {
     if (!toast) return;
@@ -140,6 +142,7 @@ export function App() {
     const id = item.instanceId;
     const { inv } = state;
     setMoving((m) => new Set(m).add(id));
+    setRecentMoves((r) => Object.fromEntries([...Object.entries({ ...r, [id]: Date.now() })].sort((a, b) => b[1] - a[1]).slice(0, 60)));
     // Show it in place right away; postmaster items wait, since their real slot comes from the server.
     if (item.bucketHash !== POSTMASTER_BUCKET) {
       const ch = inv.characters.find((c) => c.id === to);
@@ -154,7 +157,7 @@ export function App() {
     spotlight(id);
     if (res.error) setToast({ id: Date.now(), text: `Couldn't move ${item.name}: ${res.error}` });
     setMoving((m) => { const n = new Set(m); n.delete(id); return n; });
-  }, [state, patchItem, spotlight]);
+  }, [state, patchItem, spotlight, setRecentMoves]);
 
   const inventoryApi = useMemo<InventoryApi>(() => {
     const inv = state.status === 'ready' ? state.inv : undefined;
@@ -165,8 +168,9 @@ export function App() {
       moving,
       check: (item, to) => (inv ? checkMove(item, to, inv.characters, inv.items, inv.account) : { ok: false, reason: 'Not loaded' }),
       move: (item, to) => void move(item, to),
+      recentMoves,
     };
-  }, [state, moving, move]);
+  }, [state, moving, move, recentMoves]);
   // Dropping re-checks the move, so a drop on a red column does nothing.
   const drag = useItemDrag((item, to) => {
     if (inventoryApi.check(item, to).ok) inventoryApi.move(item, to);

@@ -30,7 +30,12 @@ export interface SlotGroup<T extends ItemRow = ItemRow> {
  * Groups items by slot in game order; "Other" collects the rest when `includeOther`.
  * Within a slot: equipped first, then highest power, then name.
  */
-export function groupBySlot<T extends ItemRow>(items: T[], includeOther: boolean): SlotGroup<T>[] {
+/**
+ * `recent` maps instance id to when you last moved it. Recently moved items sort to the front of
+ * their slot (newest first), like DIM, since moves usually mean you're about to use them.
+ */
+export function groupBySlot<T extends ItemRow>(items: T[], includeOther: boolean, recent: Record<string, number> = {}): SlotGroup<T>[] {
+  const movedAt = (i: T) => (i.instanceId && recent[i.instanceId]) || 0;
   const bySlot = new Map<string, T[]>();
   for (const item of items) {
     const slot = SLOT_ORDER.includes(item.bucket) ? item.bucket : 'Other';
@@ -42,7 +47,8 @@ export function groupBySlot<T extends ItemRow>(items: T[], includeOther: boolean
     .map((slot) => ({
       slot,
       items: bySlot.get(slot)!.sort(
-        (a, b) => Number(b.equipped) - Number(a.equipped) || (b.power ?? 0) - (a.power ?? 0) || a.name.localeCompare(b.name),
+        (a, b) => Number(b.equipped) - Number(a.equipped) || movedAt(b) - movedAt(a)
+          || (b.power ?? 0) - (a.power ?? 0) || a.name.localeCompare(b.name),
       ),
     }));
 }

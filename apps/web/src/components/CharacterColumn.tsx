@@ -3,6 +3,7 @@ import { groupBySlot } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { useDropZone } from '../drag.ts';
+import { useInventory } from '../inventory-context.ts';
 
 interface Props {
   character: CharacterRow;
@@ -14,7 +15,8 @@ interface Props {
 }
 
 export function CharacterColumn({ character, items, postmaster, onSelect }: Props) {
-  const groups = groupBySlot(items, false);
+  const { recentMoves } = useInventory();
+  const groups = groupBySlot(items, false, recentMoves);
   // Lost items start being deleted when the postmaster is full; warn a few slots early.
   const drop = useDropZone(character.id);
   const pmLevel = postmaster.length >= POSTMASTER_CAPACITY ? 'full' : postmaster.length >= POSTMASTER_CAPACITY - 3 ? 'warn' : '';

@@ -3,6 +3,7 @@ import { groupBySlot } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { useDropZone } from '../drag.ts';
+import { useInventory } from '../inventory-context.ts';
 
 interface Props {
   items: AppraisedItem[];
@@ -18,7 +19,8 @@ interface Props {
 const fmt = new Intl.NumberFormat('en-US');
 
 export function VaultSection({ items, account, collapsed, onToggleCollapsed, postmasterNotes, onSelect }: Props) {
-  const groups = groupBySlot(items, true);
+  const { recentMoves } = useInventory();
+  const groups = groupBySlot(items, true, recentMoves);
   const drop = useDropZone('vault');
   return (
     <section className={`column vault${drop.className}`} aria-label="Vault" {...drop.props}>
