@@ -4,10 +4,10 @@ import { randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { Hono } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { getDestinyEntityDefinition, getProfile, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
+import { getDestinyEntityDefinition, getProfile, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  appraise, authorizeUrl, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
+  applyStep, appraise, authorizeUrl, planMove, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, type AppraisedItem, type BungieConfig,
   type ManifestTables, type Tokens, type WishList,
 } from '@triumvirate/core';
@@ -44,6 +44,10 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   let manifest: ManifestTables | undefined;
   let subclass: ReturnType<typeof buildSubclassIndex> | undefined;
   let subclassFor = '';
+  /** The snapshot the app is showing; moves are recorded into it. */
+  let current: Snapshot | undefined;
+  /** Moves run one at a time: Bungie asks for a pause between actions, and each one edits `current`. */
+  let moveQueue: Promise<unknown> = Promise.resolve();
 
   async function validTokens(): Promise<Tokens | undefined> {
     let t = await store.readTokens();
@@ -77,6 +81,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       profile,
     };
     await store.saveSnapshot(snap);
+    current = snap;
     return snap;
   }
 
@@ -154,6 +159,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     let snap = c.req.query('refresh') ? undefined : await store.latestSnapshot();
     // The item table is needed to name items, so a cold server always syncs once.
     if (!snap || !manifest) snap = await sync(t);
+    current = snap;
     const view = await buildView(snap);
     return c.json({
       signedIn: true,
@@ -194,6 +200,50 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     });
   });
 
+  // Moves one item to a character or the vault. The item's real owner comes from the server's own
+  // copy, so an item shown in the collapsed vault still leaves the character that actually holds it.
+  app.post('/api/move', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { instanceId?: string; to?: string };
+    const { instanceId, to } = body;
+    if (!instanceId || !to) return c.json({ error: 'Say which item and where it goes.' }, 400);
+    const run = moveQueue.then(async () => {
+      if (!current || !lastView) {
+        current = (await store.latestSnapshot()) ?? (await sync(t));
+        if (!manifest) await sync(t);
+        await buildView(current);
+      }
+      const snap = current!;
+      const item = lastView!.items.find((i) => i.instanceId === instanceId);
+      if (!item) return { status: 404 as const, body: { error: 'That item isn\'t there anymore. Refresh and try again.' } };
+      if (to !== 'vault' && !lastView!.characters.some((ch) => ch.id === to)) return { status: 400 as const, body: { error: 'Unknown destination.' } };
+      if (item.equipped) return { status: 400 as const, body: { error: 'Equipped items can\'t be moved.' } };
+      const http = createHttpClient(cfg.apiKey, t.accessToken);
+      const base = { itemReferenceHash: item.itemHash, stackSize: 1, itemId: instanceId, membershipType: snap.membershipType };
+      let error: string | undefined;
+      for (const step of planMove(item, to)) {
+        try {
+          if (step.kind === 'pull') await pullFromPostmaster(http, { ...base, characterId: step.characterId });
+          else await transferItem(http, { ...base, characterId: step.characterId, transferToVault: step.kind === 'toVault' });
+        } catch (err) {
+          error = friendlyMoveError(err);
+          break;
+        }
+        applyStep(snap.profile, instanceId, step, manifest!);
+        await new Promise((f) => setTimeout(f, 120));
+      }
+      await store.saveSnapshot(snap);
+      // Rebuild once so the agent and the next page load see where the item really is now.
+      const view = await buildView(snap);
+      const moved = view.items.find((i) => i.instanceId === instanceId);
+      return { status: error ? 409 as const : 200 as const, body: { error, item: moved, account: view.account } };
+    });
+    moveQueue = run.catch(() => {});
+    const out = await run;
+    return c.json(out.body, out.status);
+  });
+
   // Turns a raw snapshot into what the web app and the agent see: items with roll verdicts, plus cleanup picks.
   async function buildView(snap: Snapshot) {
     const list = await deps.wishList();
@@ -220,4 +270,17 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   });
 
   return app;
+}
+
+/** Turns Bungie's action errors into a sentence that says what to do. */
+export function friendlyMoveError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const code = Number(/Bungie API error (\d+)/.exec(msg)?.[1]);
+  if (code === 2108) return 'Your Bungie app needs the "Move or equip Destiny gear" permission. Turn it on at bungie.net/en/Application, then sign out and sign back in here.';
+  if (code === 1642) return 'There\'s no room there.';
+  if (code === 1623) return 'Bungie can\'t find that item where we expected. Refresh and try again.';
+  if (code === 1660 || code === 1673) return 'Bungie won\'t let this item move.';
+  if (code === 1663) return 'Bungie won\'t allow that right now. Try again from orbit or a social space.';
+  if (code === 31 || code === 36) return 'Bungie asked us to slow down. Wait a moment and try again.';
+  return msg;
 }

@@ -67,6 +67,10 @@ export interface ItemRow {
   craftedLevel?: number;
   killTracker?: { label: string; count: number };
   flavorText?: string;
+  /** Can be dragged somewhere: instanced, not equipped, and Bungie allows moving it. */
+  movable?: boolean;
+  /** A postmaster item Bungie won't transfer: it can only be pulled to its own character. */
+  pullOnly?: boolean;
 }
 
 export interface PerkOption {
@@ -144,7 +148,9 @@ const bungieUrl = (path?: string) => (path ? `https://www.bungie.net${path}` : u
  * `manifest` adds stat names and icons; `titles` maps character id to the equipped
  * title (looked up separately, since the record table is too big to cache whole).
  */
-const SUBCLASS_BUCKET = 3284755031;
+export const SUBCLASS_BUCKET = 3284755031;
+/** TransferStatuses.NotTransferrable. */
+const TRANSFER_NOT_TRANSFERRABLE = 2;
 const SUBCLASS_PLUG = /^(?:titan|hunter|warlock|shared)\.(\w+)\.(supers|grenades|melee|class_abilities|movement|aspects|fragments)$/;
 
 /** Reads the subclass a character has equipped and every plug slotted into it. */
@@ -339,6 +345,10 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     const extras = id && isWeapon ? weaponExtras(id, item.itemHash) : undefined;
     const progress = id && isWeapon ? weaponProgress(id) : undefined;
     const crafted = (item.state & STATE_CRAFTED) !== 0;
+    const inPostmaster = item.bucketHash === POSTMASTER_BUCKET;
+    const notTransferrable = (item.transferStatus & TRANSFER_NOT_TRANSFERRABLE) !== 0;
+    // Postmaster items can always be pulled; anything else needs Bungie's go-ahead.
+    const movable = !!id && !equipped && item.bucketHash !== SUBCLASS_BUCKET && (inPostmaster || !notTransferrable);
     return {
       location,
       owner,
@@ -369,6 +379,8 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       ...(progress?.craftedLevel !== undefined ? { craftedLevel: progress.craftedLevel } : {}),
       ...(progress?.killTracker ? { killTracker: progress.killTracker } : {}),
       ...(manifest.extras?.[item.itemHash]?.flavorText ? { flavorText: manifest.extras[item.itemHash]!.flavorText } : {}),
+      ...(movable ? { movable } : {}),
+      ...(movable && inPostmaster && notTransferrable ? { pullOnly: true } : {}),
     };
   };
 

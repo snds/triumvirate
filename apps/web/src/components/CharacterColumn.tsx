@@ -2,6 +2,7 @@ import { POSTMASTER_BUCKET, POSTMASTER_CAPACITY, type AppraisedItem, type Charac
 import { groupBySlot } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
+import { useDropZone } from '../drag.ts';
 
 interface Props {
   character: CharacterRow;
@@ -15,9 +16,11 @@ interface Props {
 export function CharacterColumn({ character, items, postmaster, onSelect }: Props) {
   const groups = groupBySlot(items, false);
   // Lost items start being deleted when the postmaster is full; warn a few slots early.
+  const drop = useDropZone(character.id);
   const pmLevel = postmaster.length >= POSTMASTER_CAPACITY ? 'full' : postmaster.length >= POSTMASTER_CAPACITY - 3 ? 'warn' : '';
   return (
-    <section className="column" aria-label={`${character.className} gear`}>
+    <section className={`column${drop.className}`} aria-label={`${character.className} gear`} {...drop.props}>
+      {drop.note && <p className="drop-note" role="status">{drop.note}</p>}
       <header className="character">
         <div
           className="character__banner"

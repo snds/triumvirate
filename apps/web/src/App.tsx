@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchInventory, logout, type Inventory } from './api.ts';
+import { fetchInventory, logout, moveItem, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
+import { checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
+import { DragContext, type DragApi } from './drag.ts';
 import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
@@ -100,10 +102,56 @@ export function App() {
     [byHash],
   );
 
-  const inventoryApi = useMemo<InventoryApi>(() => ({
-    byId: new Map(state.status === 'ready' ? state.inv.items.filter((i) => i.instanceId).map((i) => [i.instanceId!, i]) : []),
-    select: setSelected,
-  }), [state]);
+  // ── Moving items ────────────────────────────────────────────
+  const [dragging, setDragging] = useState<AppraisedItem | null>(null);
+  const dragApi = useMemo<DragApi>(() => ({ item: dragging, start: setDragging, end: () => setDragging(null) }), [dragging]);
+  const [moving, setMoving] = useState<Set<string>>(() => new Set());
+  const [toast, setToast] = useState<{ id: number; text: string }>();
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(undefined), 8000);
+    return () => clearTimeout(id);
+  }, [toast]);
+
+  /** Swaps one item in the loaded inventory (matched by instance id), keeping the item panel in step. */
+  const patchItem = useCallback((instanceId: string, next: AppraisedItem, account?: Inventory['account']) => {
+    setState((s) => s.status !== 'ready' ? s : {
+      ...s,
+      inv: { ...s.inv, account: account ?? s.inv.account, items: s.inv.items.map((i) => (i.instanceId === instanceId ? next : i)) },
+    });
+    setSelected((sel) => (sel?.instanceId === instanceId ? next : sel));
+  }, []);
+
+  const move = useCallback(async (item: AppraisedItem, to: string) => {
+    if (state.status !== 'ready' || !item.instanceId) return;
+    const id = item.instanceId;
+    const { inv } = state;
+    setMoving((m) => new Set(m).add(id));
+    // Show it in place right away; postmaster items wait, since their real slot comes from the server.
+    if (item.bucketHash !== POSTMASTER_BUCKET) {
+      const ch = inv.characters.find((c) => c.id === to);
+      const delta = (to === 'vault' ? 1 : 0) - (item.owner === 'vault' ? 1 : 0);
+      patchItem(id, { ...item, owner: to, location: ch ? `${ch.className} (${ch.light})` : 'Vault' },
+        inv.account && { ...inv.account, vault: { ...inv.account.vault, used: inv.account.vault.used + delta } });
+    }
+    const res = await moveItem(id, to);
+    // The server's copy is the truth: where it landed, or where it stopped if a step failed.
+    patchItem(id, res.item ?? item, res.account);
+    if (res.error) setToast({ id: Date.now(), text: `Couldn't move ${item.name}: ${res.error}` });
+    setMoving((m) => { const n = new Set(m); n.delete(id); return n; });
+  }, [state, patchItem]);
+
+  const inventoryApi = useMemo<InventoryApi>(() => {
+    const inv = state.status === 'ready' ? state.inv : undefined;
+    return {
+      byId: new Map(inv ? inv.items.filter((i) => i.instanceId).map((i) => [i.instanceId!, i]) : []),
+      select: setSelected,
+      characters: inv?.characters ?? [],
+      moving,
+      check: (item, to) => (inv ? checkMove(item, to, inv.characters, inv.items, inv.account) : { ok: false, reason: 'Not loaded' }),
+      move: (item, to) => void move(item, to),
+    };
+  }, [state, moving, move]);
 
   const visible = useMemo(
     () => (state.status === 'ready' ? state.inv.items.filter((i) => matches(i, query, kind)) : []),
@@ -148,6 +196,7 @@ export function App() {
   return (
     <HoverContext.Provider value={hoverApi}>
     <InventoryContext.Provider value={inventoryApi}>
+    <DragContext.Provider value={dragApi}>
     <div
       className={`app${agentOpen ? ' app--chat' : ''}`}
       style={{ '--agent-width': `${clampChatWidth(chatWidth, windowWidth)}px` } as React.CSSProperties}
@@ -269,8 +318,15 @@ export function App() {
           onAsk={(text) => { setAgentOpen(true); setSelected(null); setAsk((a) => ({ id: (a?.id ?? 0) + 1, text })); }}
         />
       )}
-      {hovered && !selected && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
+      {hovered && !selected && !dragging && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
+      {toast && (
+        <div className="toast" role="alert" key={toast.id}>
+          <span>{toast.text}</span>
+          <button className="icon-button" onClick={() => setToast(undefined)} aria-label="Dismiss" title="Dismiss"><Icon name="close" /></button>
+        </div>
+      )}
     </div>
+    </DragContext.Provider>
     </InventoryContext.Provider>
     </HoverContext.Provider>
   );

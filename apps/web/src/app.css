@@ -692,3 +692,28 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .agent__resize:hover::after, .agent__resize:focus-visible::after, .agent__resize.is-dragging::after { background: var(--accent); }
 .agent__resize:focus-visible { outline: none; }
 .app.is-resizing { cursor: col-resize; user-select: none; }
+
+/* ── Moving items ─────────────────────────────────────────── */
+.column { position: relative; transition: box-shadow 120ms ease; }
+/* While dragging: every place it can go gets a faint ring, the one under the pointer a strong one. */
+.column.is-drop-candidate { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
+.column.is-drop-ok { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface-panel)); }
+.column.is-drop-blocked { box-shadow: inset 0 0 0 2px var(--danger); }
+.drop-note {
+  position: absolute; z-index: 5; top: var(--space-2); left: 50%; transform: translateX(-50%);
+  margin: 0; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm);
+  background: var(--danger); color: var(--text-primary); font-size: 0.8rem; white-space: nowrap; pointer-events: none;
+}
+.tile[draggable='true'] { cursor: grab; }
+.tile.is-dragging { opacity: 0.4; }
+.tile.is-moving { opacity: 0.6; }
+.tile__moving { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / 0.35); }
+.move-to { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.move-to__label { color: var(--text-muted); font-size: 0.85rem; margin-right: var(--space-1); }
+.toast {
+  position: fixed; z-index: 50; bottom: var(--space-4); left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: var(--space-2); max-width: min(560px, calc(100vw - 32px));
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); border-radius: var(--radius-md);
+  background: var(--surface-raised); border: 1px solid var(--danger); color: var(--text-primary);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+}

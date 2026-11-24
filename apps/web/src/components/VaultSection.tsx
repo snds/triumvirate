@@ -2,6 +2,7 @@ import type { AccountSummary, AppraisedItem } from '@triumvirate/core/browser';
 import { groupBySlot } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
+import { useDropZone } from '../drag.ts';
 
 interface Props {
   items: AppraisedItem[];
@@ -18,8 +19,10 @@ const fmt = new Intl.NumberFormat('en-US');
 
 export function VaultSection({ items, account, collapsed, onToggleCollapsed, postmasterNotes, onSelect }: Props) {
   const groups = groupBySlot(items, true);
+  const drop = useDropZone('vault');
   return (
-    <section className="column vault" aria-label="Vault">
+    <section className={`column vault${drop.className}`} aria-label="Vault" {...drop.props}>
+      {drop.note && <p className="drop-note" role="status">{drop.note}</p>}
       <header className="vault__header">
         <button
           className="icon-button"

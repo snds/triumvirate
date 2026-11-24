@@ -1,4 +1,6 @@
 import { useHover } from '../hover.ts';
+import { useDrag } from '../drag.ts';
+import { useInventory } from '../inventory-context.ts';
 import { Icon, type IconName } from './Icon.tsx';
 import { ElementIcon } from './ElementIcon.tsx';
 import type { AppraisedItem, Verdict } from '@triumvirate/core';
@@ -20,14 +22,27 @@ export function ItemTile({
   item, size = 'md', onSelect,
 }: { item: AppraisedItem; size?: 'md' | 'lg'; onSelect?: (i: AppraisedItem) => void }) {
   const hover = useHover();
+  const drag = useDrag();
+  const { moving } = useInventory();
+  const isMoving = !!item.instanceId && moving.has(item.instanceId);
+  const draggable = !!item.movable && !item.equipped && !isMoving;
   const verdict = item.appraisal?.verdict;
   const label = [item.name, item.type, item.damage, item.power && `${item.power} power`,
     verdict && VERDICT_LABEL[verdict], item.locked && 'locked'].filter(Boolean).join(' · ');
   return (
     <button
       type="button"
-      className={`tile tile--${size} ${tierClass(item.tier)}`}
+      className={`tile tile--${size} ${tierClass(item.tier)}${isMoving ? ' is-moving' : ''}${drag.item === item ? ' is-dragging' : ''}`}
       aria-label={label}
+      aria-busy={isMoving || undefined}
+      draggable={draggable}
+      onDragStart={draggable ? (e) => {
+        hover?.leave();
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', item.name);
+        drag.start(item);
+      } : undefined}
+      onDragEnd={draggable ? () => drag.end() : undefined}
       onClick={onSelect ? () => { hover?.leave(); onSelect(item); } : undefined}
       onPointerEnter={hover ? (e) => hover.enter(item, e.currentTarget.getBoundingClientRect()) : undefined}
       onPointerLeave={hover ? () => hover.leave() : undefined}
@@ -44,6 +59,7 @@ export function ItemTile({
         </span>
       )}
       {item.locked && <span className="tile__lock"><Icon name="lock" filled /></span>}
+      {isMoving && <span className="tile__moving"><span className="spinner" /></span>}
     </button>
   );
 }

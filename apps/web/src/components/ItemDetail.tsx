@@ -3,6 +3,7 @@ import type { AppraisedItem } from '@triumvirate/core/browser';
 import { Icon } from './Icon.tsx';
 import { ItemFacts, itemSummary, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 import { ItemTile } from './ItemTile.tsx';
+import { useInventory } from '../inventory-context.ts';
 
 interface Props {
   item: AppraisedItem;
@@ -57,6 +58,8 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
             Open on light.gg <Icon name="openExternal" />
           </a>
         </div>
+
+        <MoveButtons item={item} />
 
         <ItemFacts item={item} copies={copies.length} />
 
@@ -115,5 +118,34 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
         </section>
       </div>
     </aside>
+  );
+}
+
+/** The keyboard-friendly way to move an item: one button per place it could go. */
+function MoveButtons({ item }: { item: AppraisedItem }) {
+  const inv = useInventory();
+  if (!item.movable || item.equipped) return null;
+  const busy = !!item.instanceId && inv.moving.has(item.instanceId);
+  const places = [...inv.characters.map((c) => ({ id: c.id, label: c.className })), { id: 'vault', label: 'Vault' }];
+  const options = places
+    .map((p) => ({ ...p, check: inv.check(item, p.id) }))
+    .filter((p) => p.check.ok || !p.check.quiet);
+  if (options.length === 0) return null;
+  return (
+    <div className="move-to" role="group" aria-label="Move to">
+      <span className="move-to__label">Move to</span>
+      {options.map((p) => (
+        <button
+          key={p.id}
+          className="button button--quiet"
+          disabled={busy || !p.check.ok}
+          title={p.check.ok ? `Move to ${p.label}` : p.check.reason}
+          onClick={() => inv.move(item, p.id)}
+        >
+          {p.label}
+        </button>
+      ))}
+      {busy && <span className="spinner" aria-label="Moving" />}
+    </div>
   );
 }

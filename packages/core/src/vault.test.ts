@@ -37,7 +37,7 @@ test('lists vault items with their real bucket and power', () => {
       location: 'Vault', owner: 'vault', name: 'Fatebringer', type: 'Hand Cannon', bucket: 'Kinetic Weapons', bucketHash: 10,
       power: 1990, equipped: false, itemHash: 1, instanceId: 'a', icon: undefined, watermark: undefined,
       tier: '', itemType: 0, classType: 3, damage: 'Arc', locked: true,
-      gearTier: undefined, perks: undefined, stats: undefined, damageIcon: undefined,
+      gearTier: undefined, perks: undefined, stats: undefined, damageIcon: undefined, movable: true,
     },
   );
 });

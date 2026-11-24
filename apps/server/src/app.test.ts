@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createApp } from './app.ts';
+import { createApp, friendlyMoveError } from './app.ts';
 import { createStore } from './store.ts';
 
 const cfg = { apiKey: 'k', clientId: '123', clientSecret: 's' };
@@ -44,4 +44,12 @@ test('bungie image proxy rejects paths outside Bungie image folders', async () =
   const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tv-'))), { wishList: async () => new Map() });
   assert.equal((await app.request('/api/bungie-img/etc/passwd')).status, 400);
   assert.notEqual((await app.request('/api/bungie-img/common/../../x.png')).status, 200);
+});
+
+test('move needs a sign-in, and explains a missing Bungie permission', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  const res = await app.request('/api/move', { method: 'POST', body: JSON.stringify({ instanceId: '1', to: 'vault' }) });
+  assert.equal(res.status, 401);
+  assert.match(friendlyMoveError(new Error('Bungie API error 2108: nope')), /Move or equip Destiny gear/);
+  assert.match(friendlyMoveError(new Error('Bungie API error 1642: full')), /no room/);
 });

@@ -4,3 +4,4 @@ export * from './vault.ts';
 export * from './wishlist.ts';
 export * from './cleanup.ts';
 export * from './subclass.ts';
+export * from './transfer.ts';

@@ -32,6 +32,29 @@ export async function fetchInventory(refresh = false): Promise<Inventory | null>
   return json<Inventory>(res);
 }
 
+export interface MoveResult {
+  /** The item as it is now; on a failed move, wherever it ended up. */
+  item?: AppraisedItem;
+  account?: AccountSummary;
+  error?: string;
+}
+
+/** Moves one item to a character id or 'vault'. Never throws; a failure comes back as `error`. */
+export async function moveItem(instanceId: string, to: string): Promise<MoveResult> {
+  try {
+    const res = await fetch('/api/move', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ instanceId, to }),
+    });
+    const body = (await res.json().catch(() => ({}))) as MoveResult;
+    if (!res.ok && !body.error) body.error = res.status === 401 ? 'Sign in again to move items.' : `Move failed (${res.status})`;
+    return body;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function logout(): Promise<void> {
   await fetch('/api/logout', { method: 'POST' });
 }
