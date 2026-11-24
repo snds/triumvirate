@@ -34,7 +34,7 @@ export const useDragActions = () => useContext(DragActionsContext);
 export function useItemDrag(onDrop: (item: AppraisedItem, zone: string) => void) {
   const [state, setState] = useState<DragState | null>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
-  const ghost = useRef<{ icon?: string; tier: string; size: number } | null>(null);
+  const ghost = useRef<{ icon?: string; tier: string; width: number; height: number } | null>(null);
   const onDropRef = useRef(onDrop);
   onDropRef.current = onDrop;
   const cleanup = useRef<() => void>(() => {});
@@ -82,7 +82,7 @@ export function useItemDrag(onDrop: (item: AppraisedItem, zone: string) => void)
     const begin = () => {
       dragging = true;
       const rect = tile.getBoundingClientRect();
-      ghost.current = { icon: item.icon, tier: item.tier.toLowerCase() || 'common', size: rect.width };
+      ghost.current = { icon: item.icon, tier: item.tier.toLowerCase() || 'common', width: rect.width, height: rect.height };
       document.body.classList.add('is-dragging-item');
       tile.classList.add('is-drag-source');
       window.getSelection()?.removeAllRanges();
@@ -148,7 +148,7 @@ export function useItemDrag(onDrop: (item: AppraisedItem, zone: string) => void)
     ? createElement('div', {
       ref: ghostRef,
       className: `drag-ghost tile tier-${g.tier}`,
-      style: { width: g.size, height: g.size },
+      style: { width: g.width, height: g.height },
       'aria-hidden': true,
     }, g.icon ? createElement('img', { className: 'tile__icon', src: g.icon, alt: '' }) : null)
     : null;

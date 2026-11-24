@@ -257,9 +257,11 @@ html, body, #root { height: 100%; overflow: clip; }
   --tile-tier: var(--tier-common);
   /* Local scale: every indicator below multiplies by it, so they grow with the tile. */
   --s: var(--tile-scale);
+  /* The square art area inside the border; the power bar sits below it, not over it. */
+  --art: calc(var(--tile-base) * var(--s) - 2 * var(--tile-border-width));
   position: relative;
   width: calc(var(--tile-base) * var(--s));
-  height: calc(var(--tile-base) * var(--s));
+  height: calc(var(--tile-base) * var(--s) + var(--tile-power-height) * var(--s));
   flex: none;
   border: var(--tile-border-width) solid var(--tile-tier);
   border-radius: var(--tile-radius);
@@ -273,7 +275,7 @@ html, body, #root { height: 100%; overflow: clip; }
 .tier-rare { --tile-tier: var(--tier-rare); }
 .tier-uncommon { --tile-tier: var(--tier-uncommon); }
 .tier-common { --tile-tier: var(--tier-common); }
-.tile__icon, .tile__watermark { position: absolute; inset: 0; width: 100%; height: 100%; }
+.tile__icon, .tile__watermark { position: absolute; inset: 0 0 auto 0; width: 100%; height: var(--art); }
 .tile__power {
   position: absolute;
   inset: auto 0 0 0;
@@ -282,7 +284,7 @@ html, body, #root { height: 100%; overflow: clip; }
   justify-content: flex-end;
   gap: calc(3px * var(--s));
   padding: 0 calc(3px * var(--s));
-  background: rgb(0 0 0 / 0.7);
+  background: var(--surface-page);
   font-size: calc(var(--tile-power-font) * var(--s));
   font-weight: 600;
   line-height: calc(var(--tile-power-height) * var(--s));
@@ -791,15 +793,21 @@ body.is-dragging-item .tile { pointer-events: none; }
   box-shadow: 0 0 0 1px rgb(0 0 0 / 0.55);
 }
 .tier-diamonds.is-masterworked .tier-diamonds__d { background: var(--masterwork); }
-.tile__tier { position: absolute; z-index: 1; left: calc(3px * var(--s)); top: calc(4px * var(--s)); pointer-events: none; }
-/* The big equipped tile keeps diamonds at the regular size. */
-.tile--lg .tile__tier { --s: var(--tile-scale); }
+/* On tiles, diamonds sit under the release icon Bungie bakes into the art's top-left corner, centered
+   on its vertical bar (about 12.5% in from the left edge; first diamond about 30% down). Sizes are
+   fractions of the art, so they line up at every tile size, including the larger equipped tile. */
+.tile__tier {
+  position: absolute; z-index: 1; pointer-events: none;
+  left: calc(var(--art) * 0.125); top: calc(var(--art) * 0.3); transform: translateX(-50%);
+  gap: calc(var(--art) * 0.045); align-items: center;
+}
+.tile__tier .tier-diamonds__d { width: calc(var(--art) * 0.075); height: calc(var(--art) * 0.075); }
 .tier-diamonds--inline { --s: 1.3; flex-direction: row; gap: 5px; align-items: center; margin-right: 10px; vertical-align: middle; }
 
 /* Masterwork: a gold frame plus Bungie-style holofoil shimmer over the art. */
 .tile.is-masterworked { border-color: var(--masterwork); }
 .tile__holofoil {
-  position: absolute; inset: 0; pointer-events: none;
+  position: absolute; inset: 0 0 auto 0; height: var(--art); pointer-events: none;
   background: url('./assets/holofoil.apng') center / cover;
   mix-blend-mode: overlay; opacity: 0.55;
 }
