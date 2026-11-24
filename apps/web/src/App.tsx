@@ -3,7 +3,7 @@ import { fetchInventory, logout, moveItem, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
 import { checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
-import { DragActionsContext, DragContext, type DragApi } from './drag.ts';
+import { DragActionsContext, DragContext, useItemDrag } from './drag.ts';
 import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
@@ -103,18 +103,7 @@ export function App() {
   );
 
   // ── Moving items ────────────────────────────────────────────
-  const [dragging, setDragging] = useState<AppraisedItem | null>(null);
-  const dragActions = useMemo(() => ({ start: setDragging, end: () => setDragging(null) }), []);
-  const dragApi = useMemo<DragApi>(() => ({ item: dragging, ...dragActions }), [dragging, dragActions]);
-  // Belt and braces: if the browser never sends dragend (it can be lost), the next click or Escape clears it.
-  useEffect(() => {
-    if (!dragging) return;
-    const clear = () => setDragging(null);
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && clear();
-    window.addEventListener('pointerdown', clear);
-    window.addEventListener('keydown', onKey);
-    return () => { window.removeEventListener('pointerdown', clear); window.removeEventListener('keydown', onKey); };
-  }, [dragging]);
+
   const [moving, setMoving] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState<{ id: number; text: string }>();
   useEffect(() => {
@@ -162,6 +151,11 @@ export function App() {
       move: (item, to) => void move(item, to),
     };
   }, [state, moving, move]);
+  // Dropping re-checks the move, so a drop on a red column does nothing.
+  const drag = useItemDrag((item, to) => {
+    if (inventoryApi.check(item, to).ok) inventoryApi.move(item, to);
+  });
+  const dragging = drag.state;
 
   const visible = useMemo(
     () => (state.status === 'ready' ? state.inv.items.filter((i) => matches(i, query, kind)) : []),
@@ -206,8 +200,8 @@ export function App() {
   return (
     <HoverContext.Provider value={hoverApi}>
     <InventoryContext.Provider value={inventoryApi}>
-    <DragActionsContext.Provider value={dragActions}>
-    <DragContext.Provider value={dragApi}>
+    <DragActionsContext.Provider value={drag.actions}>
+    <DragContext.Provider value={drag.state}>
     <div
       className={`app${agentOpen ? ' app--chat' : ''}`}
       style={{ '--agent-width': `${clampChatWidth(chatWidth, windowWidth)}px` } as React.CSSProperties}
@@ -330,6 +324,7 @@ export function App() {
         />
       )}
       {hovered && !selected && !dragging && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
+      {drag.ghost}
       {toast && (
         <div className="toast" role="alert" key={toast.id}>
           <span>{toast.text}</span>

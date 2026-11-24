@@ -704,8 +704,31 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   margin: 0; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm);
   background: var(--danger); color: var(--text-primary); font-size: 0.8rem; white-space: nowrap; pointer-events: none;
 }
-.tile[draggable='true'] { cursor: grab; }
-.tile.is-dragging { opacity: 0.4; }
+.tile[data-movable] { cursor: grab; }
+.tile.is-drag-source { opacity: 0.35; }
+/* While dragging: no text selection, a grabbing hand everywhere, and no hover lift underneath. */
+body.is-dragging-item { cursor: grabbing; user-select: none; }
+body.is-dragging-item .tile { pointer-events: none; }
+.drag-ghost {
+  position: fixed; z-index: 100; top: 0; left: 0; pointer-events: none;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 0.55), 0 0 0 1px rgb(255 255 255 / 0.08);
+  will-change: transform;
+}
+
+/* Hover lift: the tile grows a little, casts a shadow, and leans toward the pointer.
+   --mx and --my run from -1 to 1 across the tile and are set as the pointer moves. */
+.tile { transition: transform 140ms ease, box-shadow 140ms ease; }
+@media (hover: hover) {
+  .tile:hover {
+    z-index: 2;
+    transform: translate(calc(var(--mx, 0) * 2px), calc(var(--my, 0) * 2px)) scale(1.08);
+    box-shadow: calc(var(--mx, 0) * -3px) calc(4px + var(--my, 0) * -3px) 14px rgb(0 0 0 / 0.55);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile { transition: box-shadow 140ms ease; }
+  .tile:hover { transform: none; }
+}
 .tile.is-moving { opacity: 0.6; }
 .tile__moving { position: absolute; inset: 0; display: grid; place-items: center; background: rgb(0 0 0 / 0.35); }
 .move-to { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
