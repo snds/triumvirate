@@ -25,3 +25,8 @@ export const TILE_SCALES = [
   { label: 'L', value: 1.2 },
   { label: 'XL', value: 1.45 },
 ] as const;
+
+/** Chat panel width limits, in px. The max also never exceeds 55% of the window. */
+export const CHAT_WIDTH = { min: 340, max: 760, default: 460 } as const;
+export const clampChatWidth = (w: number, windowWidth = window.innerWidth) =>
+  Math.round(Math.max(CHAT_WIDTH.min, Math.min(w, CHAT_WIDTH.max, windowWidth * 0.55)));

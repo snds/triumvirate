@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { streamAgent, type ChatTurn } from '../api.ts';
 import { Icon } from './Icon.tsx';
 import { ChatMarkdown } from './ChatMarkdown.tsx';
+import { ResizeHandle } from './ResizeHandle.tsx';
 
 const STARTERS = [
   'What should I dismantle first?',
@@ -16,8 +17,8 @@ interface Pending {
 }
 
 // Stays mounted while collapsed (just hidden) so the conversation survives toggling.
-export function AgentPanel({ enabled, open, ask }: {
-  enabled: boolean; open: boolean;
+export function AgentPanel({ enabled, open, ask, width, onWidth }: {
+  enabled: boolean; open: boolean; width: number; onWidth: (w: number) => void;
   /** A question sent from elsewhere (e.g. an item panel); `id` changes on each new ask. */
   ask?: { id: number; text: string };
 }) {
@@ -66,6 +67,7 @@ export function AgentPanel({ enabled, open, ask }: {
 
   return (
     <aside className="agent" aria-label="Ask Triumvirate" hidden={!open}>
+      <ResizeHandle width={width} onWidth={onWidth} />
       <header className="agent__header">
         <strong>Ask Triumvirate</strong>
         {/* The top bar's chat button is the only open/close control; this one starts over. */}

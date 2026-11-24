@@ -107,7 +107,7 @@
   --perk-enhanced: var(--gold-400);
   --perk-active-fill: var(--blue-500);
   --perk-active-border: var(--gray-100);
-  --agent-width: 460px;
+  --agent-width: 460px; /* default; the user's drag overrides it */
   /* Tile indicators, in px at scale 1; tiles multiply them by their own scale (--s). */
   --badge-size: 14px;
   --tile-power-font: 10px;

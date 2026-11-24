@@ -11,7 +11,7 @@ import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './components/CharacterColumn.tsx';
 import { SLOT_ORDER } from './inventory.ts';
-import { usePref } from './prefs.ts';
+import { clampChatWidth, CHAT_WIDTH, usePref } from './prefs.ts';
 import { HoverContext, type HoverApi } from './hover.ts';
 import { InventoryContext, type InventoryApi } from './inventory-context.ts';
 import { ItemHovercard } from './components/ItemHovercard.tsx';
@@ -38,6 +38,15 @@ export function App() {
   const [agentOpen, setAgentOpen] = usePref('chatOpen', true);
   const [collapsed, setCollapsed] = usePref('charactersCollapsed', false);
   const [tileScale, setTileScale] = usePref('tileScale', 1);
+  // Kept while the chat is collapsed, so it reopens at the same width.
+  const [chatWidth, setChatWidth] = usePref<number>('chatWidth', CHAT_WIDTH.default);
+  // Re-clamp when the window shrinks so the panel never crowds out the inventory.
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const onResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
   const [, tick] = useState(0);
   const [hovered, setHovered] = useState<{ item: AppraisedItem; anchor: DOMRect } | null>(null);
   const [ask, setAsk] = useState<{ id: number; text: string }>();
@@ -139,7 +148,10 @@ export function App() {
   return (
     <HoverContext.Provider value={hoverApi}>
     <InventoryContext.Provider value={inventoryApi}>
-    <div className={`app${agentOpen ? ' app--chat' : ''}`}>
+    <div
+      className={`app${agentOpen ? ' app--chat' : ''}`}
+      style={{ '--agent-width': `${clampChatWidth(chatWidth, windowWidth)}px` } as React.CSSProperties}
+    >
       <header className="topbar">
         <h1 className="brand">Triumvirate</h1>
         <nav className="segmented" aria-label="View">
@@ -241,7 +253,13 @@ export function App() {
         )}
       </main>
 
-      <AgentPanel enabled={inv.agentEnabled} open={agentOpen} ask={ask} />
+      <AgentPanel
+        enabled={inv.agentEnabled}
+        open={agentOpen}
+        ask={ask}
+        width={clampChatWidth(chatWidth, windowWidth)}
+        onWidth={setChatWidth}
+      />
       {selected && (
         <ItemDetail
           item={selected}
