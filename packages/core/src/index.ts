@@ -7,6 +7,7 @@ export * from './subclass.ts';
 export * from './transfer.ts';
 export * from './loadouts.ts';
 export * from './optimizer.ts';
+export * from './digest.ts';
 export * from './rolls.ts';
 export * from './community.ts';
 export * from './vendors.ts';

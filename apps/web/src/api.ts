@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, CommunityAppraisal, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, CommunityAppraisal, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -216,6 +216,12 @@ export const setLocked = (instanceId: string, locked: boolean) =>
   act<{ item?: AppraisedItem; error?: string }>('/api/lock', { instanceId, locked }, 'lock items');
 
 export type LoadoutDraft = Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes' | 'subclass' | 'artifact'>;
+export type DigestView = Omit<Digest, 'seen'>;
+export interface DigestResponse { digest: DigestView | null; dates: string[]; building?: boolean; error?: string }
+export const fetchDigest = async (date?: string): Promise<DigestResponse> =>
+  json(await fetch(`/api/digest${date ? `?date=${encodeURIComponent(date)}` : ''}`), sameOriginImages);
+/** Builds today's digest now (syncs from Bungie first, so it takes a few seconds). */
+export const runDigest = () => act<DigestResponse>('/api/digest/run', {}, 'build the digest');
 export const listLoadouts = async (): Promise<SavedLoadout[]> => json(await fetch('/api/loadouts'), sameOriginImages);
 export const createLoadout = async (l: LoadoutDraft): Promise<SavedLoadout> => json(await fetch('/api/loadouts', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(l),

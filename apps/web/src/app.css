@@ -1691,3 +1691,27 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .optimizer__track { position: relative; display: flex; flex: 1; height: 8px; background: var(--surface-hover); }
 .optimizer__goal { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--optimizer-goal); }
 .optimizer__meta { margin: 0; font-size: 12px; color: var(--text-secondary); }
+
+/* ── Daily digest ─────────────────────────────────────────── */
+.topbar__digest { position: relative; }
+.topbar__dot {
+  position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--digest-new); box-shadow: 0 0 0 2px var(--surface-page);
+}
+.digest { display: grid; gap: var(--space-4); max-width: 760px; margin: 0 auto; width: 100%; }
+.digest[aria-busy] { opacity: 0.6; }
+.digest__head { display: grid; gap: 2px; }
+.digest__date { margin: 0; font-size: 20px; }
+.digest__built, .digest__none { margin: 0; font-size: 12px; }
+.digest__lede { margin: 0; font-size: 15px; line-height: 1.5; padding-left: var(--space-3); border-left: 3px solid var(--digest-new); }
+.digest__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin: 0; }
+.digest__facts > div { padding: var(--space-2) var(--space-3); background: var(--surface-raised); border-radius: var(--radius-md); }
+.digest__facts dt { font-size: 12px; color: var(--text-secondary); }
+.digest__facts dd { margin: 0; font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.digest__sub { display: block; font-size: 12px; font-weight: 400; color: var(--text-secondary); }
+.digest__section { display: grid; gap: var(--space-2); }
+.digest__section .drawer__section { margin: 0; }
+.digest__art { display: grid; place-items: center; overflow: hidden; }
+.digest__art img { width: 100%; height: 100%; object-fit: cover; }
+.digest__empty { display: grid; gap: var(--space-2); }
+.digest__dates { width: auto; margin-right: auto; }
