@@ -1,0 +1,24 @@
+# Runs Triumvirate on a home server (Unraid or anything with Docker) behind a Cloudflare Tunnel.
+# Nothing is opened on your router: cloudflared dials out to Cloudflare, and Cloudflare Access
+# lets only you in. Full steps: deploy/README.md.
+services:
+  app:
+    image: ghcr.io/snds/triumvirate:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      API_PORT: 8080
+      DATA_DIR: /data
+    volumes:
+      - /mnt/user/appdata/triumvirate:/data
+    # No ports are published on purpose: only the tunnel below can reach the app.
+
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - app

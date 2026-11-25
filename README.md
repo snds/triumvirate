@@ -45,6 +45,11 @@ The full product plan lives in the "Destiny Companion — Product Plan" doc in t
    **Refresh** pulls a fresh copy of your profile and saves it as a snapshot (the last 50 are kept).
    The community wish list (about 30 MB) downloads on first use and refreshes once a day.
 
+## Host it on Unraid
+
+The app can also run on a home server at `https://triumvirate.snds-server.com`, as a Docker container behind a
+Cloudflare Tunnel, with Cloudflare Access letting only you in. Step-by-step setup: [deploy/README.md](deploy/README.md).
+
 ## How the features work
 
 - **Roll badges:** ★ god roll, ✓ recommended, ✕ no recommended roll matches. Perks are compared by name,
