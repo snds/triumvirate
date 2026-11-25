@@ -2,7 +2,7 @@
 // The tools return only data from your account, which keeps answers tied to items you own.
 import Anthropic from '@anthropic-ai/sdk';
 import { betaTool } from '@anthropic-ai/sdk/helpers/beta/json-schema';
-import type { AppraisedItem, CharacterRow, CleanupCandidate, SubclassIndex, SubclassPart } from '@triumvirate/core';
+import { ARMOR_STATS, optimizeArmor, type AppraisedItem, type ArmorSet, type ArmorStat, type CharacterRow, type CleanupCandidate, type SubclassIndex, type SubclassPart } from '@triumvirate/core';
 
 export interface AgentContext {
   displayName: string;
@@ -11,6 +11,8 @@ export interface AgentContext {
   cleanup: CleanupCandidate[];
   /** Supers, abilities, aspects, and fragments from the manifest; absent until the full manifest loads. */
   subclass?: SubclassIndex;
+  /** Armor sets the player owns pieces of, for set bonuses. */
+  itemSets?: Record<string, ArmorSet>;
 }
 
 /** What the chat panel receives while the agent works. */
@@ -35,6 +37,7 @@ Formatting (the app renders Markdown):
 - Use short sections with ### headings, bullet lists, and **bold** for key words. Use a table when comparing items.
 - inventory_summary includes each character's equipped subclass (super, abilities, aspects, fragments) and stats. Start builds from that real setup when it fits.
 - Every time you mention an item the player owns, write it as a link to its id: [Fatebringer](item:6917529123456789). The app turns these into item chips with a hover preview, so don't also repeat the location unless it matters.
+- For stat goals ("120 Grenade, 100 Health"), call optimize_armor and use its armor ids and mods in the build instead of guessing.
 - When you suggest a build, put it in one fenced code block with the language "build" holding JSON, and keep prose around it short. Shape:
   {"name": "...", "class": "Warlock", "subclass": "Void", "tags": ["PvE", "Ad-clear"], "summary": "one or two sentences",
    "super": "Nova Bomb", "abilities": {"grenade": "...", "melee": "...", "class": "...", "movement": "..."},
@@ -153,6 +156,64 @@ export function buildTools(ctx: () => AgentContext, onStatus: (text: string) => 
         return JSON.stringify({
           total: list.length,
           items: list.slice(0, 60).map((c) => ({ ...brief(c.item), reason: c.reason, confidence: c.confidence })),
+        });
+      },
+    }),
+    betaTool({
+      name: 'optimize_armor',
+      description:
+        'Finds the best five armor pieces the player owns for one class, plus the +10 stat mods to slot, to reach minimum stat values (Armor 3.0 stats, 0-200 each). ' +
+        'Stats are base rolls; masterwork and tuning add a little on top in game. Use for build stat questions instead of guessing from item lists.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          class: { type: 'string', enum: ['Titan', 'Hunter', 'Warlock'] },
+          targets: {
+            type: 'object',
+            description: 'Minimum value per stat, e.g. {"Grenade": 150, "Health": 70}.',
+            properties: Object.fromEntries(ARMOR_STATS.map((s) => [s, { type: 'integer', minimum: 0, maximum: 200 }])),
+            additionalProperties: false,
+          },
+          priority: { type: 'array', items: { type: 'string', enum: [...ARMOR_STATS] }, description: 'Stats in order of importance, for spare points.' },
+          exotic: { type: 'string', description: 'An exotic armor name to build around, "none" for no exotic, or leave out for any.' },
+          set: { type: 'string', description: 'An armor set name whose bonus is wanted.' },
+          setPieces: { type: 'integer', enum: [2, 4], description: 'Pieces of that set to wear (default 2).' },
+          mods: { type: 'integer', minimum: 0, maximum: 5, description: 'How many +10 stat mods may be used (default 5).' },
+        },
+        required: ['class'],
+        additionalProperties: false,
+      },
+      run: async (args) => {
+        onStatus('Optimizing armor stats');
+        const c = ctx();
+        const classType = ['Titan', 'Hunter', 'Warlock'].indexOf(args.class);
+        let exotic: 'any' | 'none' | number = 'any';
+        if (args.exotic && /^none$/i.test(args.exotic)) exotic = 'none';
+        else if (args.exotic) {
+          const hit = c.items.find((i) => i.tier === 'Exotic' && i.itemType === 2 && i.name.toLowerCase() === args.exotic!.toLowerCase());
+          if (!hit) return JSON.stringify({ error: `No exotic armor named ${args.exotic} found.` });
+          exotic = hit.itemHash;
+        }
+        let set: { hash: number; pieces: number } | undefined;
+        if (args.set) {
+          const hit = Object.entries(c.itemSets ?? {}).find(([, s]) => s.name.toLowerCase() === args.set!.toLowerCase());
+          if (!hit) return JSON.stringify({ error: `No armor set named ${args.set} among owned armor.` });
+          set = { hash: Number(hit[0]), pieces: args.setPieces ?? 2 };
+        }
+        const out = optimizeArmor({
+          items: c.items, classType, targets: (args.targets ?? {}) as Partial<Record<ArmorStat, number>>,
+          priority: args.priority as ArmorStat[] | undefined, exotic, set, modSlots: args.mods ?? 5, limit: 3,
+        }, c.itemSets);
+        const named = (xs: number[]) => Object.fromEntries(ARMOR_STATS.map((s, k) => [s, xs[k]]));
+        return JSON.stringify({
+          error: out.reason,
+          results: out.results.map((r) => ({
+            armor: r.pieces.map((p) => ({ id: p.instanceId, name: p.name, slot: p.slot, exotic: p.exotic || undefined })),
+            totals: named(r.total),
+            mods: Object.fromEntries(ARMOR_STATS.map((s, k) => [s, r.mods[k]]).filter(([, n]) => n)),
+            sets: r.sets.length ? r.sets : undefined,
+            wastedOver200: r.wasted || undefined,
+          })),
         });
       },
     }),

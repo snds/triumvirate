@@ -530,11 +530,16 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   app.post('/api/equip', async (c) => {
     const t = await validTokens();
     if (!t) return c.json({ signedIn: false }, 401);
-    const { instanceId, characterId } = (await c.req.json().catch(() => ({}))) as { instanceId?: string; characterId?: string };
-    if (!instanceId || !characterId) return c.json({ error: 'Say which item and which character.' }, 400);
+    // One item (`instanceId`) or several at once (`instanceIds`, e.g. an optimizer result).
+    const body = (await c.req.json().catch(() => ({}))) as { instanceId?: string; instanceIds?: unknown; characterId?: string };
+    const ids = Array.isArray(body.instanceIds)
+      ? body.instanceIds.filter((x): x is string => typeof x === 'string' && /^\d{1,20}$/.test(x)).slice(0, 12)
+      : body.instanceId ? [body.instanceId] : [];
+    const { characterId } = body;
+    if (!ids.length || !characterId) return c.json({ error: 'Say which item and which character.' }, 400);
     const out = await runPlan(t, (view, account) => {
-      if (!view.characters.some((ch) => ch.id === characterId)) return { steps: [], skipped: [{ instanceId, reason: 'Unknown character.' }] };
-      return planEquip([instanceId], characterId, view.items, view.characters, account);
+      if (!view.characters.some((ch) => ch.id === characterId)) return { steps: [], skipped: [{ instanceId: ids[0]!, reason: 'Unknown character.' }] };
+      return planEquip(ids, characterId, view.items, view.characters, account);
     });
     return c.json(out.body, out.status);
   });
@@ -662,7 +667,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       subclass = buildSubclassIndex(manifest!);
       subclassFor = manifest!.version;
     }
-    lastView = { displayName: snap.displayName, characters, items, cleanup, subclass };
+    lastView = { displayName: snap.displayName, characters, items, cleanup, subclass, itemSets };
     const view = { characters, account, items, cleanup, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets };
     viewCache = { key, list, view };
     return view;

@@ -210,6 +210,8 @@ async function act<T extends { error?: string }>(path: string, body: unknown, wh
 const sameOriginJson = <T>(text: string): T => { try { return JSON.parse(sameOriginImages(text)) as T; } catch { return {} as T; } };
 
 export const equipItem = (instanceId: string, characterId: string) => act<ActionResult>('/api/equip', { instanceId, characterId }, 'equip items');
+/** Several items at once (e.g. an optimizer result): moved over first, then equipped together. */
+export const equipItems = (instanceIds: string[], characterId: string) => act<ActionResult>('/api/equip', { instanceIds, characterId }, 'equip items');
 export const setLocked = (instanceId: string, locked: boolean) =>
   act<{ item?: AppraisedItem; error?: string }>('/api/lock', { instanceId, locked }, 'lock items');
 
