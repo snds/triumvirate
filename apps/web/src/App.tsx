@@ -18,6 +18,9 @@ import { clampChatWidth, CHAT_WIDTH, usePref } from './prefs.ts';
 import { HoverContext, type HoverApi } from './hover.ts';
 import { InventoryContext, type InventoryApi } from './inventory-context.ts';
 import { ItemHovercard } from './components/ItemHovercard.tsx';
+import { StoreSwitcher } from './components/StoreSwitcher.tsx';
+import { TabBar, type View } from './components/TabBar.tsx';
+import { useCompact } from './media.ts';
 
 type State =
   | { status: 'loading' }
@@ -36,7 +39,10 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind>('all');
-  const [view, setView] = useState<'inventory' | 'cleanup' | 'rolls'>('inventory');
+  const [view, setView] = useState<View>('inventory');
+  // Phones show one store (a character or the vault) at a time; this is the one on screen.
+  const compact = useCompact();
+  const [store, setStore] = usePref<string>('phoneStore', '');
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
   // Always starts closed; the chat button shows when a conversation is going.
   const [agentOpen, setAgentOpen] = useState(false);
@@ -244,16 +250,22 @@ export function App() {
   const { inv } = state;
   // Characters arrive most recently played first; that one stays when the others collapse.
   const [, ...others] = inv.characters;
-  const shown = collapsed ? inv.characters.slice(0, 1) : inv.characters;
+  // On a phone the vault is its own page, so nothing collapses into it.
+  const isCollapsed = collapsed && !compact;
+  const phoneStore = store === 'vault' || inv.characters.some((c) => c.id === store) ? store : inv.characters[0]?.id ?? 'vault';
+  const shown = compact
+    ? inv.characters.filter((c) => c.id === phoneStore)
+    : isCollapsed ? inv.characters.slice(0, 1) : inv.characters;
+  const showVault = !compact || phoneStore === 'vault';
   const otherIds = new Set(others.map((c) => c.id));
   // Collapsed: the other characters' gear (not their consumables or postmaster) shows in the vault.
   // The active class is whoever you played last; other classes' armor is hidden unless you turn the filter off.
   const activeClass = inv.characters[0];
   const vaultItems = visible.filter(
-    (i) => (i.owner === 'vault' || (collapsed && otherIds.has(i.owner) && SLOT_ORDER.includes(i.bucket)))
+    (i) => (i.owner === 'vault' || (isCollapsed && otherIds.has(i.owner) && SLOT_ORDER.includes(i.bucket)))
       && (!classOnly || !activeClass || i.classType === 3 || i.classType === activeClass.classType),
   );
-  const postmasterNotes = collapsed
+  const postmasterNotes = isCollapsed
     ? others
       .map((c) => ({ c, n: inv.items.filter((i) => i.owner === c.id && isPostmaster(i)).length }))
       .filter((x) => x.n > 0)
@@ -267,12 +279,13 @@ export function App() {
     <DragActionsContext.Provider value={drag.actions}>
     <DragContext.Provider value={drag.state}>
     <div
-      className={`app${agentOpen ? ' app--chat' : ''}`}
+      className={`app${agentOpen ? ' app--chat' : ''}${compact ? ' app--compact' : ''}`}
       style={{ '--agent-width': `${clampChatWidth(chatWidth, windowWidth)}px` } as React.CSSProperties}
     >
       <header className="topbar">
         <h1 className="brand">Triumvirate</h1>
-        <nav className="segmented" aria-label="View">
+        {/* On a phone the views move to the tab bar at the bottom, in thumb reach. */}
+        {!compact && <nav className="segmented" aria-label="View">
           <button
             className={`segmented__option${view === 'inventory' ? ' is-selected' : ''}`}
             aria-current={view === 'inventory' ? 'page' : undefined}
@@ -294,7 +307,7 @@ export function App() {
           >
             Rolls
           </button>
-        </nav>
+        </nav>}
         <input
           className="search"
           type="search"
@@ -303,7 +316,7 @@ export function App() {
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search items"
         />
-        <div className="segmented" role="radiogroup" aria-label="Item kind">
+        <div className="segmented topbar__kind" role="radiogroup" aria-label="Item kind">
           {KINDS.map((k) => (
             <button
               key={k.value}
@@ -335,15 +348,26 @@ export function App() {
             onSignOut={() => void signOut()}
             autoRefresh={autoRefresh}
             onAutoRefresh={setAutoRefresh}
+            compact={compact}
           />
         </div>
       </header>
 
       <main className="main" onScroll={hovered ? hoverApi.leave : undefined}>
         {view === 'inventory' ? (
+          <>
+          {compact && (
+            <StoreSwitcher
+              characters={inv.characters}
+              vaultCount={inv.account?.vault.used}
+              value={phoneStore}
+              onChange={setStore}
+            />
+          )}
           <div
-            className={`inventory${collapsed ? ' inventory--collapsed' : ''}`}
+            className={`inventory${isCollapsed ? ' inventory--collapsed' : ''}`}
             style={{ '--character-count': shown.length } as React.CSSProperties}
+            {...(compact ? { role: 'tabpanel', id: 'store-panel' } : {})}
           >
             {shown.map((c) => (
                 <CharacterColumn
@@ -354,18 +378,19 @@ export function App() {
                   onSelect={setSelected}
                 />
             ))}
-            <VaultSection
+            {showVault && <VaultSection
               items={vaultItems}
               account={inv.account}
-              collapsed={collapsed}
-              onToggleCollapsed={() => setCollapsed((v) => !v)}
+              collapsed={isCollapsed}
+              onToggleCollapsed={compact ? undefined : () => setCollapsed((v) => !v)}
               postmasterNotes={postmasterNotes}
               className={activeClass?.className}
               classOnly={classOnly}
               onToggleClassOnly={() => setClassOnly((v) => !v)}
               onSelect={setSelected}
-            />
+            />}
           </div>
+          </>
         ) : view === 'rolls' ? (
           <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} />
         ) : (
@@ -386,7 +411,17 @@ export function App() {
         width={clampChatWidth(chatWidth, windowWidth)}
         onWidth={setChatWidth}
       />
-      <button
+      {compact ? (
+        <TabBar
+          view={view}
+          onView={(v) => { setView(v); setAgentOpen(false); }}
+          cleanupCount={inv.cleanup.length}
+          chatOpen={agentOpen}
+          onChat={() => setAgentOpen((o) => !o)}
+          chatStatus={chatStatus}
+          chatNote={fabNote(chatStatus)}
+        />
+      ) : <button
         className={`chat-fab${agentOpen ? ' is-open' : ''}${chatStatus.busy ? ' is-busy' : ''}`}
         onClick={() => setAgentOpen((o) => !o)}
         aria-expanded={agentOpen}
@@ -397,7 +432,7 @@ export function App() {
         {/* Hidden chat indicators: a count of new answers, or a dot for a conversation in progress. */}
         {!agentOpen && chatStatus.unread > 0 && <span className="chat-fab__badge">{chatStatus.unread}</span>}
         {!agentOpen && chatStatus.unread === 0 && chatStatus.active && <span className="chat-fab__dot" />}
-      </button>
+      </button>}
       {selected && (
         <ItemDetail
           item={selected}
@@ -407,7 +442,7 @@ export function App() {
           onAsk={(item) => { setAbout((a) => ({ id: (a?.id ?? 0) + 1, item })); setAgentOpen(true); }}
         />
       )}
-      {hovered && !selected && !dragging && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
+      {hovered && !selected && !dragging && !compact && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
       {drag.ghost}
       {toast && (
         <div className="toast" role="alert" key={toast.id}>

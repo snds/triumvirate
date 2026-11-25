@@ -10,7 +10,8 @@ interface Props {
   account?: AccountSummary;
   /** True when other characters are collapsed and their gear is shown here. */
   collapsed: boolean;
-  onToggleCollapsed: () => void;
+  /** Absent on a phone, where the vault is its own page and nothing collapses into it. */
+  onToggleCollapsed?: () => void;
   /** Collapsed characters with items waiting at the postmaster. */
   postmasterNotes: string[];
   onSelect: (i: AppraisedItem) => void;
@@ -31,7 +32,7 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
     <section className={`column vault${drop.className}`} aria-label="Vault" {...drop.props}>
       {drop.note && <p className="drop-note" role="status">{drop.note}</p>}
       <header className="vault__header">
-        <button
+        {onToggleCollapsed && <button
           className="icon-button"
           onClick={onToggleCollapsed}
           aria-pressed={collapsed}
@@ -40,7 +41,7 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
         >
           {/* Points the way the characters will move. */}
           <Icon name={collapsed ? 'chevronsRight' : 'chevronsLeft'} />
-        </button>
+        </button>}
         <span className="vault__name">
           <h2 className="vault__title">Vault</h2>
           {account && (

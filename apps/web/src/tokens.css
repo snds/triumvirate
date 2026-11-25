@@ -41,6 +41,7 @@
   --space-6: 24px;
   --radius-sm: 4px;
   --radius-md: 8px;
+  --radius-lg: 16px;
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* ── Semantic ───────────────────────────────────────── */
@@ -85,6 +86,17 @@
   --scrollbar-thumb: var(--gray-700);
   --scrollbar-thumb-hover: var(--gray-500);
   --scrollbar-track: transparent;
+
+  /* Layout and touch. --page-gutter is the space between content and the screen edge;
+     --control-size is the smallest tappable control (36px with a mouse, 44px on touch, Apple's minimum).
+     --safe-* are the notch and home indicator insets; 0 everywhere except a phone with viewport-fit=cover. */
+  --page-gutter: var(--space-6);
+  --control-size: 36px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --surface-sheet: var(--surface-panel);
 
   /* ── Component ──────────────────────────────────────── */
   /* Item size: the user setting writes --tile-scale on :root. Equipped tiles keep their ratio. */
@@ -145,4 +157,36 @@
   --use-both: var(--gold-400);
   --roll-perk-size: 36px;
   --roll-rail-width: 240px;
+
+  /* Phone chrome: the bottom tab bar, the store switcher above the inventory, and bottom sheets. */
+  --tabbar-height: 56px;
+  --tabbar-icon-size: 24px;
+  --store-switcher-height: 52px;
+  --sheet-radius: var(--radius-lg);
+  --sheet-max-height: 82dvh;
+  --sheet-handle: var(--gray-500);
+  --input-font-size: 14px;
+}
+
+/*
+ * Breakpoints (also in media.ts; custom properties can't be used inside @media):
+ *   compact  max-width 640px   phones: one store at a time, tab bar, full-screen chat and item sheets
+ *   touch    pointer: coarse   any touch screen, phone or tablet: 44px controls
+ * Only semantic and component tokens change here; components pick the new values up untouched.
+ */
+@media (pointer: coarse) {
+  :root {
+    --control-size: 44px;
+    /* 16px stops iOS Safari from zooming the page when a text field is focused. */
+    --input-font-size: 16px;
+    --roll-perk-size: 40px;
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --page-gutter: var(--space-3);
+    --topbar-height: auto;
+    --tile-gap: 5px;
+    --hovercard-width: min(360px, calc(100vw - 2 * var(--space-4)));
+  }
 }

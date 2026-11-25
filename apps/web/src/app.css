@@ -8,8 +8,10 @@
 ::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 ::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-thumb-hover); }
 ::-webkit-scrollbar-corner { background: transparent; }
+html { -webkit-text-size-adjust: 100%; }
 body {
   margin: 0;
+  -webkit-tap-highlight-color: transparent;
   background: var(--surface-page);
   color: var(--text-primary);
   font: 14px/1.4 var(--font-sans);
@@ -64,8 +66,8 @@ body {
 .icon-button {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: var(--control-size);
+  height: var(--control-size);
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
@@ -96,13 +98,14 @@ html, body, #root { height: 100%; overflow: clip; }
 
 /* Top bar */
 .topbar {
-  z-index: 1;
+  /* Above the scrolling content (sticky bars, tile badges) so its menus open over them. */
+  z-index: 5;
   min-height: var(--topbar-height);
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-3) var(--space-6);
+  padding: var(--space-3) var(--page-gutter);
   background: var(--surface-panel);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -166,6 +169,7 @@ html, body, #root { height: 100%; overflow: clip; }
   background: var(--surface-page);
   color: var(--text-primary);
   font: inherit;
+  font-size: var(--input-font-size);
 }
 .segmented { display: flex; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); overflow: hidden; }
 .segmented__option {
@@ -185,7 +189,7 @@ html, body, #root { height: 100%; overflow: clip; }
   grid-template-columns: repeat(var(--character-count, 3), var(--column-min-width)) minmax(var(--vault-min-width), 1fr);
   gap: var(--space-4);
   align-items: start;
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--page-gutter);
 }
 
 
@@ -480,7 +484,7 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 .hovercard__hint { margin: 0; font-size: 11px; color: var(--text-muted); }
 
 /* Cleanup view */
-.cleanup { padding: var(--space-4) var(--space-6); max-width: 960px; }
+.cleanup { padding: var(--space-4) var(--page-gutter); max-width: 960px; }
 .cleanup__header { display: flex; gap: var(--space-4); align-items: flex-start; justify-content: space-between; }
 .cleanup__header p { margin: 0; max-width: 60ch; }
 .cleanup__list { list-style: none; padding: 0; margin: var(--space-4) 0 0; display: grid; gap: var(--space-2); }
@@ -995,7 +999,7 @@ body.is-dragging-item .tile { pointer-events: none; }
 .rolls__check .icon { font-size: 15px; vertical-align: -3px; }
 .rolls__range { display: flex; align-items: center; gap: var(--space-2); }
 .rolls__select { background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); padding: 2px var(--space-2); }
-.rolls__main { padding: var(--space-4) var(--space-6); min-width: 0; }
+.rolls__main { padding: var(--space-4) var(--page-gutter); min-width: 0; }
 .rolls__head { margin-bottom: var(--space-3); }
 .rolls__head p { margin: var(--space-1) 0 0; font-size: 13px; }
 .rolls__group { margin-bottom: var(--space-4); }
@@ -1100,3 +1104,216 @@ body.is-dragging-item .tile { pointer-events: none; }
 .activity__meta .icon { font-size: 12px; vertical-align: -2px; }
 .grade--sm { width: 26px; height: 26px; font-size: 15px; }
 .activity__refresh .is-spinning { animation: spin 900ms linear infinite; }
+
+/* ── Touch ─────────────────────────────────────────────────
+   Any coarse pointer (phone or tablet): every control reaches --control-size (44px), and taps
+   don't wait for a double-tap zoom. Sizes grow by padding and min-height, so the look stays put. */
+button, a, label, summary, select, [role='button'] { touch-action: manipulation; }
+@media (pointer: coarse) {
+  .button, .segmented__option, .menu__item, .tabs__tab, .rolls__select, .profile__trigger { min-height: var(--control-size); }
+  .segmented__option { padding-inline: var(--space-4); }
+  .chip { min-height: 32px; padding-inline: var(--space-3); }
+  /* Filter rows become full-width tap rows. */
+  .rolls__check { min-height: var(--control-size); }
+  .rolls__check input { width: 20px; height: 20px; }
+  .rolls__filter summary { display: flex; align-items: center; min-height: var(--control-size); }
+  .rolls__panel-tab { width: var(--control-size); height: var(--control-size); }
+  .agent__form .button { min-width: 64px; justify-content: center; }
+  /* Delete buttons in past chats can't hide behind hover on a touch screen. */
+  .chat-list__item .icon-button { opacity: 1; }
+}
+
+/* ── Phone (compact, max-width 640px) ──────────────────────
+   One idea drives the layout: one thing at a time, full width, with navigation at the bottom
+   edge where a thumb rests. The tokens already shrank the gutter and grew the controls;
+   these rules rearrange the shell around them. */
+@media (max-width: 640px) {
+  /* Shell: top bar, scrolling content, tab bar. dvh follows Safari's toolbar as it shows and hides. */
+  .app { height: 100dvh; grid-template-rows: auto minmax(0, 1fr) auto; }
+  .main { padding-bottom: var(--space-4); }
+
+  /* Top bar, two rows: brand with refresh and profile, then search with the kind filter.
+     Padding clears the notch when the app runs full screen from the home screen. */
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: 'brand end' 'search kind';
+    align-items: center;
+    gap: var(--space-2);
+    padding: calc(var(--space-2) + var(--safe-top)) calc(var(--page-gutter) + var(--safe-right)) var(--space-2) calc(var(--page-gutter) + var(--safe-left));
+  }
+  .topbar .brand { grid-area: brand; font-size: 15px; }
+  .topbar__end { grid-area: end; justify-self: end; margin-left: 0; }
+  .topbar .search { grid-area: search; min-width: 0; }
+  .topbar__kind { grid-area: kind; }
+  .topbar__kind .segmented__option { padding-inline: var(--space-3); }
+  .profile__trigger { padding: var(--space-1); border-radius: 50%; }
+  .menu { min-width: min(320px, calc(100vw - 2 * var(--page-gutter))); }
+  .menu .segmented__option { flex: 1; white-space: nowrap; padding-inline: var(--space-2); }
+  .menu__who { display: grid; gap: 2px; padding-top: 0; }
+
+  /* Bottom tab bar: views plus the chat. Labels stay visible; icons alone are guesswork. */
+  .tabbar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
+    background: var(--surface-panel);
+    border-top: 1px solid var(--border-subtle);
+    z-index: 2;
+  }
+  .tabbar__tab {
+    display: grid; justify-items: center; align-content: center; gap: 2px;
+    height: var(--tabbar-height);
+    padding: 0; border: 0; background: none;
+    color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 600;
+    cursor: pointer;
+  }
+  .tabbar__tab.is-selected { color: var(--accent); }
+  .tabbar__icon { position: relative; display: grid; place-items: center; }
+  .tabbar__icon .icon { font-size: var(--tabbar-icon-size); }
+  .tabbar__count {
+    position: absolute; top: -4px; left: calc(100% - 8px);
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+    background: var(--surface-hover); color: var(--text-secondary);
+    font-size: 10px; font-weight: 700; line-height: 18px; text-align: center;
+  }
+  .tabbar__count--alert { background: var(--danger); color: var(--text-primary); }
+  .tabbar__dot { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--text-primary); box-shadow: 0 0 0 2px var(--surface-panel); }
+  /* While an answer is being written, the chat tab's icon pulses, like the button's ring on desktop. */
+  .tabbar__tab--chat.is-busy .tabbar__icon .icon { color: var(--accent); animation: tab-pulse 1.2s ease-in-out infinite; }
+  @keyframes tab-pulse { 50% { opacity: 0.45; } }
+
+  /* Store switcher: sticks under the top bar as the store scrolls. */
+  .store-switcher {
+    position: sticky; top: 0; z-index: 3;
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-1);
+    padding: var(--space-2) var(--page-gutter);
+    background: color-mix(in srgb, var(--surface-page) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  /* Each character tab wears its emblem banner, like the character select screen: the emblem's
+     icon square shows at the left, a scrim keeps the name readable over the art. */
+  .store-switcher__tab {
+    position: relative; isolation: isolate;
+    display: grid; align-content: center; min-width: 0;
+    height: var(--store-switcher-height); padding: 0 var(--space-2);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden;
+    background: var(--surface-raised); color: var(--text-secondary); font: inherit; text-align: left; cursor: pointer;
+    text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
+  }
+  .store-switcher__tab.is-selected { border-color: var(--accent); color: var(--text-primary); box-shadow: inset 0 0 0 1px var(--accent); }
+  .store-switcher__emblem {
+    position: absolute; inset: 0; z-index: -1;
+    background: var(--surface-raised) left center / cover no-repeat;
+    opacity: 0.55;
+  }
+  /* A scrim under the text, light enough that the emblem still reads. */
+  .store-switcher__emblem::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.1)); }
+  .store-switcher__tab.is-selected .store-switcher__emblem { opacity: 1; }
+  .store-switcher__emblem--vault { left: auto; width: 40px; display: grid; place-items: center; opacity: 0.5; color: var(--text-secondary); background: none; }
+  .store-switcher__emblem--vault::after { display: none; }
+  .store-switcher__emblem--vault .icon { font-size: 28px; }
+  .store-switcher__text { display: grid; min-width: 0; line-height: 1.2; }
+  .store-switcher__name { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .store-switcher__meta { display: flex; align-items: center; gap: 1px; font-size: 12px; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+  .store-switcher__meta .icon { font-size: 10px; }
+  .store-switcher__tab:last-child .store-switcher__meta { color: var(--text-muted); font-weight: 600; }
+
+  /* Inventory: the chosen store fills the width. */
+  .inventory { grid-template-columns: minmax(0, 1fr); padding-top: var(--space-3); }
+  .vault__header .currencies { margin-left: 0; flex-basis: 100%; }
+
+  /* Item dialog: a full-screen sheet. Header and body clear the notch and the home indicator. */
+  .dialog-scrim { padding: 0; place-items: stretch; }
+  .dialog { width: 100%; height: 100dvh; max-height: none; border: 0; border-radius: 0; }
+  .item-header--dialog {
+    --art: 72px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: var(--space-3);
+    min-height: 0;
+    padding: calc(var(--space-3) + var(--safe-top)) var(--space-2) var(--space-3) var(--space-4);
+  }
+  .item-header--dialog .item-header__name { font-size: 19px; }
+  .item-header--dialog .item-header__kind { font-size: 12px; }
+  .item-header--dialog .item-header__flavor { display: none; }
+  .item-header--dialog .item-header__stats { grid-column: 2; grid-row: 2; justify-items: start; display: flex; align-items: center; gap: var(--space-2); }
+  .item-header--dialog .item-header__power { font-size: 26px; }
+  .item-header--dialog .item-header__icon { width: 20px; height: 20px; }
+  .item-header--dialog .item-header__art { grid-row: span 2; }
+  .item-header--dialog .item-header__close { grid-column: 3; grid-row: 1; }
+  .item-dialog__bar { padding: var(--space-2) var(--space-3); }
+  .move-to { width: 100%; }
+  .tabs { padding: 0 var(--space-3); overflow-x: auto; }
+  .tabs__tab { flex: none; }
+  .item-dialog__body { padding: var(--space-3) var(--space-3) calc(var(--space-6) + var(--safe-bottom)); }
+  .stats__row { grid-template-columns: 104px minmax(0, 1fr); }
+  .stats__track { flex: 1 1 auto; width: auto; min-width: 0; }
+  .perks-block--named .perk-cell:first-child { min-width: 0; flex-basis: 100%; }
+  .details { grid-template-columns: 1fr 1fr; }
+
+  /* Chat: full screen above everything, closed from its own header (the tab bar is underneath). */
+  .agent {
+    inset: 0; width: auto; height: auto;
+    border: 0; border-radius: 0;
+    padding: var(--safe-top) var(--safe-right) 0 var(--safe-left);
+    transform-origin: bottom center;
+  }
+  .agent__resize { display: none; }
+  .agent__header { padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
+  .agent__subject { max-width: 40%; }
+  .agent__form { padding: var(--space-2) var(--space-3) calc(var(--space-2) + var(--safe-bottom)); }
+  .bubble { max-width: 85%; }
+  .md { font-size: 14px; }
+  .build__part img, .build__part-fallback { width: 36px; height: 36px; }
+
+  /* Cleanup: the reason wraps under the name; the pill stays at the right. */
+  .cleanup__header { flex-direction: column; gap: var(--space-3); }
+  .cleanup__row { padding: var(--space-2); }
+
+  /* Rolls: one column of cards; the options rail becomes a bottom sheet opened from a toolbar. */
+  .rolls { grid-template-columns: minmax(0, 1fr); }
+  .rolls__head h2 { display: flex; align-items: baseline; gap: var(--space-2); }
+  .rolls__toolbar { display: flex; gap: var(--space-2); margin-top: var(--space-3); overflow-x: auto; scrollbar-width: none; }
+  .rolls__tool { position: relative; flex: none; min-height: 36px; gap: var(--space-1); font-size: 13px; }
+  .rolls__tool .icon { font-size: 18px; }
+  .rolls__tool--icon { padding-inline: var(--space-2); }
+  .rolls__tool .rolls__dot { position: static; }
+  .rolls__tool-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; line-height: 18px; text-align: center; }
+  .rolls__cards { grid-template-columns: minmax(0, 1fr); }
+  /* Group headings stay in view while their cards scroll under them. */
+  .rolls__group-head { position: sticky; top: 0; z-index: 1; background: var(--surface-page); min-height: var(--control-size); }
+  .roll-card__body { gap: var(--space-2) var(--space-1); }
+  .roll-perks { gap: var(--space-2) 6px; }
+  .roll-card__actions .button { flex: 1; justify-content: center; }
+
+  /* Bottom sheet, shared shape: rounded top, a grab handle, and the home indicator's inset. */
+  .sheet-scrim { position: fixed; inset: 0; z-index: 10; background: var(--overlay-scrim); animation: fade-in 160ms ease-out; }
+  .rolls__rail--sheet {
+    position: fixed; z-index: 11; inset: auto 0 0 0; top: auto;
+    max-height: var(--sheet-max-height);
+    display: grid; grid-template-rows: auto auto minmax(0, 1fr);
+    padding: var(--space-1) calc(var(--space-4) + var(--safe-right)) var(--safe-bottom) calc(var(--space-4) + var(--safe-left));
+    border: 0; border-top: 1px solid var(--border-subtle);
+    border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
+    background: var(--surface-sheet);
+    box-shadow: 0 -16px 48px rgb(0 0 0 / 0.5);
+    overflow: hidden;
+    animation: sheet-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+  .rolls__rail--sheet .rolls__rail-body { overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-4); }
+  .rolls__rail--sheet .rolls__panels { justify-content: flex-start; gap: var(--space-1); }
+  .sheet__handle { justify-self: center; width: 36px; height: 5px; margin: var(--space-1) 0 var(--space-2); border-radius: 3px; background: var(--sheet-handle); }
+  .rolls__done { color: var(--accent); font-weight: 600; }
+  /* The activity list has the sheet's full width, so its tiles can be full size. */
+  .rolls__rail--sheet .activity__row { --tile-scale: 0.85; }
+  @keyframes sheet-in { from { transform: translateY(100%); } }
+  @keyframes fade-in { from { opacity: 0; } }
+
+  /* Toast clears the tab bar. */
+  .toast { bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--space-3)); }
+}
+@media (max-width: 640px) and (prefers-reduced-motion: reduce) {
+  .rolls__rail--sheet, .sheet-scrim { animation: none; }
+  .tabbar__tab--chat.is-busy .tabbar__icon .icon { animation: none; }
+}

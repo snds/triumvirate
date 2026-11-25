@@ -12,10 +12,12 @@ interface Props {
   /** Minutes between quiet refreshes; 0 is off. */
   autoRefresh: number;
   onAutoRefresh: (minutes: number) => void;
+  /** Phone: the trigger is the avatar alone, so the name and sync time move into the menu. */
+  compact?: boolean;
 }
 
 /** Avatar, name, and sync time as one button; opens a menu with view settings and sign out. */
-export function ProfileMenu({ name, picture, synced, tileScale, onTileScale, onSignOut, autoRefresh, onAutoRefresh }: Props) {
+export function ProfileMenu({ name, picture, synced, tileScale, onTileScale, onSignOut, autoRefresh, onAutoRefresh, compact }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -42,17 +44,24 @@ export function ProfileMenu({ name, picture, synced, tileScale, onTileScale, onS
         className="profile__trigger"
         aria-haspopup="true"
         aria-expanded={open}
+        aria-label={compact ? `${name}, synced ${synced}` : undefined}
         onClick={() => setOpen((o) => !o)}
       >
         {picture ? <img className="profile__avatar" src={picture} alt="" /> : <span className="profile__avatar" />}
-        <span className="profile__text">
+        {!compact && <span className="profile__text">
           <span className="profile__name">{name}</span>
           <span className="profile__synced">synced {synced}{autoRefresh > 0 && <> · <Icon name="autorenew" className="profile__auto" /></>}</span>
-        </span>
-        <Icon name="chevronDown" />
+        </span>}
+        {!compact && <Icon name="chevronDown" />}
       </button>
       {open && (
         <div className="menu" role="menu">
+          {compact && (
+            <div className="menu__group menu__who">
+              <span className="profile__name">{name}</span>
+              <span className="profile__synced">synced {synced}{autoRefresh > 0 && <> · <Icon name="autorenew" className="profile__auto" /></>}</span>
+            </div>
+          )}
           <div className="menu__group">
             <span className="menu__label" id="tile-size-label">Item size</span>
             <div className="segmented" role="radiogroup" aria-labelledby="tile-size-label">
