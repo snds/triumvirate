@@ -181,6 +181,8 @@
   /* Optimizer: the tick marking a stat target on its bar. */
   --optimizer-goal: var(--text-primary);
   --sheet-width-optimizer: 1120px;
+  /* Digest: the dot on the Today button when there's one you haven't opened. */
+  --digest-new: var(--masterwork);
   --perk-enhanced: var(--gold-400);
   --perk-active-fill: var(--blue-500);
   --perk-active-border: var(--gray-100);

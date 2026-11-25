@@ -53,6 +53,7 @@ const GLYPHS = {
   more: 'more_horiz',
   import: 'download',
   warning: 'warning',
+  today: 'today',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

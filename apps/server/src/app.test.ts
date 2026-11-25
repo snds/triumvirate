@@ -102,3 +102,13 @@ test('saved loadouts: create, list, update, delete', async () => {
   assert.deepEqual(await (await app.request('/api/loadouts')).json(), []);
   assert.equal((await app.request('/api/loadouts/../x', { method: 'DELETE' })).status, 404);
 });
+
+test('digest: none yet, and building needs a sign-in', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  const res = await app.request('/api/digest');
+  assert.deepEqual(await res.json(), { digest: null, dates: [], building: false });
+  assert.equal((await app.request('/api/digest?date=../x')).status, 400);
+  const run = await app.request('/api/digest/run', { method: 'POST' });
+  assert.equal(run.status, 409);
+  assert.match((await run.json()).error, /Sign in/);
+});
