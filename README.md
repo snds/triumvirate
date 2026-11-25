@@ -89,3 +89,10 @@ Only legendary and exotic weapons are counted, and only item hashes are saved, n
 - Data for one weapon: `GET /api/community/items/<itemHash>`.
 
 Files live in `.data/community/`. A crawl makes at most 3,000 requests at 4 per second (about 15 minutes).
+
+## Daily digest
+
+Once a day the server syncs your inventory and writes a digest: new weapons and armor since yesterday (best first, with grades and stat totals), vendor weapons worth buying, and how full the vault is. With the assistant turned on, it opens with a few sentences on what to do first. Open it from the **Today** button in the top bar, or build one now from there.
+
+- Build it each morning: set `DIGEST_HOUR=7` in `.env` (after a 3 AM crawl, so grades are fresh).
+- Files live in `.data/digests/`, one per day; the last 30 are kept.

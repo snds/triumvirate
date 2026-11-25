@@ -10,7 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import {
   applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
-  type ManifestTables, type Tokens, type WishList,
+  type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, type Digest,
 } from '@triumvirate/core';
 import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
@@ -18,6 +18,7 @@ import { stream } from 'hono/streaming';
 import { createChatStore, validChatId } from './chats.ts';
 import { createCommunity } from './community.ts';
 import { createLoadoutStore, validLoadoutId } from './loadouts.ts';
+import { createDigestStore, localDate, validDigestDate } from './digests.ts';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
@@ -47,6 +48,8 @@ export interface AppDeps {
   anthropic?: Anthropic;
   /** Local hour (0-23) for the nightly community crawl; off when unset. */
   communityCrawlHour?: number;
+  /** Local hour (0-23) to build the daily digest; off when unset (it can still be built on demand). */
+  digestHour?: number;
 }
 
 export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
@@ -351,12 +354,11 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   // resets, so one pull is reused for 15 minutes (or until ?refresh).
   const vendorNames = new Map<number, string>();
   let vendorCache: { at: number; key: string; rows: (VendorRow & { appraisal?: AppraisedItem['appraisal'] })[] } | undefined;
-  app.get('/api/community/vendors', async (c) => {
-    const t = await validTokens();
-    if (!t) return c.json({ signedIn: false }, 401);
-    if (!current || !lastView || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+  /** Vendor weapons with grades. Needs a loaded inventory. */
+  async function vendorOffers(t: Tokens, refresh: boolean) {
+    if (!current || !lastView || !manifest) throw new Error('Load your inventory first.');
     const key = `${current.membershipId}.${manifest.version}`;
-    if (!vendorCache || vendorCache.key !== key || c.req.query('refresh') || Date.now() - vendorCache.at > 15 * 60_000) {
+    if (!vendorCache || vendorCache.key !== key || refresh || Date.now() - vendorCache.at > 15 * 60_000) {
       const http = createHttpClient(cfg.apiKey, t.accessToken);
       const responses = [];
       for (const ch of lastView.characters) {
@@ -385,7 +387,13 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const r = await community.rollup();
     const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
     for (const i of vendorCache.rows) if (i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest, r?.weapons[i.itemHash], i.itemHash, i.perks);
-    return c.json({ fetchedAt: new Date(vendorCache.at).toISOString(), items: vendorCache.rows, grades });
+    return { fetchedAt: new Date(vendorCache.at).toISOString(), items: vendorCache.rows, grades };
+  }
+  app.get('/api/community/vendors', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    if (!current || !lastView || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    return c.json(await vendorOffers(t, !!c.req.query('refresh')));
   });
   app.get('/api/community/items/:hash', async (c) => {
     const hash = Number(c.req.param('hash'));
@@ -671,6 +679,69 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const view = { characters, account, items, cleanup, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets };
     viewCache = { key, list, view };
     return view;
+  }
+
+  // ── Daily digest ───────────────────────────────────────────
+  const digests = createDigestStore(store.dataDir);
+  let digestRun: Promise<Digest> | undefined;
+  /** Syncs from Bungie, grades what's new since the last digest, checks vendors, and saves today's. */
+  function runDigest(): Promise<Digest> {
+    digestRun ??= (async () => {
+      const t = await validTokens();
+      if (!t) throw new Error('Sign in again to build the digest.');
+      const snap = await queued(() => sync(t));
+      setCurrent(snap);
+      const view = await buildView(snap);
+      const date = localDate();
+      const r = await community.rollup();
+      const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
+      for (const i of view.items) if (i.itemType === 3 && i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest!, r?.weapons[i.itemHash], i.itemHash, i.perks);
+      // Vendors are a bonus: a Bungie hiccup there shouldn't cost the whole digest.
+      const vendors = await vendorOffers(t, true).catch((e) => { console.error('Digest vendors failed:', e); return undefined; });
+      const digest = buildDigest({
+        date, items: view.items, prevSeen: (await digests.before(date))?.seen ?? (await digests.get(date))?.seen, grades, vendors,
+        cleanup: view.cleanup, vault: view.account.vault,
+        crawl: r ? { builtAt: r.builtAt, samples: r.samples } : undefined,
+      });
+      if (deps.anthropic) {
+        try {
+          const msg = await deps.anthropic.messages.create({
+            model: 'claude-haiku-5-5',
+            max_tokens: 400,
+            system: 'You write the opening of a Destiny 2 player\'s daily gear digest. Two to four short, plain sentences. Lead with the single most useful thing to do today. Only mention items and numbers from the facts. No greeting, no headings, no lists.',
+            messages: [{ role: 'user', content: digestFacts(digest) }],
+          });
+          const text = msg.content.flatMap((b) => (b.type === 'text' ? [b.text] : [])).join('').trim();
+          if (text) digest.lede = text;
+        } catch (e) { console.error('Digest lede failed:', e); }
+      }
+      await digests.save(digest);
+      return digest;
+    })().finally(() => { digestRun = undefined; });
+    return digestRun;
+  }
+  /** What the app needs: the digest without the long list of seen ids. */
+  const publicDigest = ({ seen: _seen, ...d }: Digest) => d;
+  app.get('/api/digest', async (c) => {
+    const date = c.req.query('date');
+    if (date && !validDigestDate(date)) return c.json({ error: 'Bad date.' }, 400);
+    const d = date ? await digests.get(date) : await digests.latest();
+    return c.json({ digest: d ? publicDigest(d) : null, dates: await digests.dates(), building: !!digestRun });
+  });
+  app.post('/api/digest/run', async (c) => {
+    try { return c.json({ digest: publicDigest(await runDigest()), dates: await digests.dates() }); }
+    catch (e) { return c.json({ error: e instanceof Error ? e.message : String(e) }, 409); }
+  });
+  if (deps.digestHour !== undefined) {
+    const hour = deps.digestHour;
+    const t = setInterval(() => {
+      const now = new Date();
+      if (now.getHours() !== hour || digestRun) return;
+      void digests.get(localDate(now)).then((done) => {
+        if (!done) runDigest().catch((e) => console.error('Daily digest failed:', e));
+      });
+    }, 5 * 60_000);
+    t.unref();
   }
 
   app.onError((err, c) => {

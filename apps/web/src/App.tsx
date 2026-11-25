@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { equipItem, fetchInventory, logout, moveItem, setLocked, type ActionResult, type Inventory } from './api.ts';
+import { equipItem, fetchDigest, fetchInventory, logout, moveItem, setLocked, type ActionResult, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
 import { checkEquip, checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
@@ -12,6 +12,7 @@ import { RollsView } from './components/RollsView.tsx';
 import { LoadoutsView } from './components/LoadoutsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
+import { DigestSheet } from './components/DigestSheet.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
 import { SLOT_ORDER } from './inventory.ts';
@@ -48,6 +49,15 @@ export function App() {
   // Always starts closed; the chat button shows when a conversation is going.
   const [agentOpen, setAgentOpen] = useState(false);
   const [chatStatus, setChatStatus] = useState<ChatStatus>({ active: false, busy: false, unread: 0 });
+  // Daily digest: the newest one's date, and the last one you opened (for the button's dot).
+  const [digestOpen, setDigestOpen] = useState(false);
+  const [latestDigest, setLatestDigest] = useState('');
+  const [seenDigest, setSeenDigest] = usePref('digestSeen', '');
+  const syncedAt = state.status === 'ready' ? state.inv.syncedAt : '';
+  useEffect(() => {
+    if (!syncedAt) return;
+    fetchDigest().then((r) => setLatestDigest(r.digest?.date ?? ''), () => {});
+  }, [syncedAt]);
   const [collapsed, setCollapsed] = usePref('charactersCollapsed', false);
   const [classOnly, setClassOnly] = usePref('vaultClassOnly', true);
   const [tileScale, setTileScale] = usePref('tileScale', 1);
@@ -381,6 +391,15 @@ export function App() {
         </div></>}
         <div className="topbar__end">
           <button
+            className="icon-button topbar__digest"
+            onClick={() => setDigestOpen(true)}
+            aria-label={latestDigest && latestDigest !== seenDigest ? 'Daily digest, new' : 'Daily digest'}
+            title="Daily digest"
+          >
+            <Icon name="today" />
+            {latestDigest && latestDigest !== seenDigest && <span className="topbar__dot" aria-hidden />}
+          </button>
+          <button
             className={`icon-button${syncing ? ' is-busy' : ''}`}
             onClick={() => void load(true)}
             disabled={syncing}
@@ -497,6 +516,15 @@ export function App() {
         {!agentOpen && chatStatus.unread > 0 && <span className="chat-fab__badge">{chatStatus.unread}</span>}
         {!agentOpen && chatStatus.unread === 0 && chatStatus.active && <span className="chat-fab__dot" />}
       </button>}
+      {digestOpen && (
+        <DigestSheet
+          items={inv.items}
+          // The item dialog sits under sheets, so step out of the digest to show it.
+          onSelect={(i) => { setDigestOpen(false); setSelected(i); }}
+          onClose={() => setDigestOpen(false)}
+          onSeen={(date) => { setSeenDigest(date); setLatestDigest((l) => (l < date ? date : l)); }}
+        />
+      )}
       {selected && (
         <ItemDetail
           item={selected}

@@ -30,6 +30,8 @@ const app = createApp(
     anthropic: process.env.ANTHROPIC_API_KEY ? new Anthropic() : undefined,
     // e.g. COMMUNITY_CRAWL_HOUR=3 crawls public matches at 3 AM while the server runs.
     communityCrawlHour: process.env.COMMUNITY_CRAWL_HOUR ? Number(process.env.COMMUNITY_CRAWL_HOUR) : undefined,
+    // e.g. DIGEST_HOUR=7 builds the daily digest at 7 AM (after the night's crawl).
+    digestHour: process.env.DIGEST_HOUR ? Number(process.env.DIGEST_HOUR) : undefined,
   },
 );
 const port = Number(process.env.API_PORT ?? 5444);
