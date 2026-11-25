@@ -78,3 +78,27 @@ test('perk swaps need a sign-in and a weapon', async () => {
   const res = await app.request('/api/perks', { method: 'POST', body: JSON.stringify({ instanceId: '1', plugs: [{ socketIndex: 1, plugHash: 2 }] }) });
   assert.equal(res.status, 401);
 });
+
+test('equip, lock, and loadout actions need a sign-in; equip errors say where to stand', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  const post = (path: string, body: unknown) => app.request(path, { method: 'POST', body: JSON.stringify(body) });
+  assert.equal((await post('/api/equip', { instanceId: '1', characterId: 'w' })).status, 401);
+  assert.equal((await post('/api/lock', { instanceId: '1', locked: true })).status, 401);
+  assert.equal((await post('/api/game-loadouts/equip', { characterId: 'w', index: 0 })).status, 401);
+  assert.match(friendlyMoveError(new Error('Bungie API error 1671: no')), /orbit/);
+  assert.match(friendlyMoveError(new Error('Bungie API error 1641: no')), /exotic/);
+});
+
+test('saved loadouts: create, list, update, delete', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  const items = [{ instanceId: '6917529', itemHash: 1, bucketHash: 1498876634 }];
+  assert.equal((await app.request('/api/loadouts', { method: 'POST', body: JSON.stringify({ name: '', classType: 2, items }) })).status, 400);
+  const created = await (await app.request('/api/loadouts', { method: 'POST', body: JSON.stringify({ name: 'Raid', classType: 2, items }) })).json();
+  assert.match(created.id, /^lo-/);
+  const put = await app.request(`/api/loadouts/${created.id}`, { method: 'PUT', body: JSON.stringify({ name: 'Raid DPS', classType: 2, items }) });
+  assert.equal((await put.json()).name, 'Raid DPS');
+  assert.equal((await (await app.request('/api/loadouts')).json()).length, 1);
+  await app.request(`/api/loadouts/${created.id}`, { method: 'DELETE' });
+  assert.deepEqual(await (await app.request('/api/loadouts')).json(), []);
+  assert.equal((await app.request('/api/loadouts/../x', { method: 'DELETE' })).status, 404);
+});

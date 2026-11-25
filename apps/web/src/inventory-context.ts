@@ -16,10 +16,15 @@ export interface InventoryApi {
   move: (item: AppraisedItem, to: string) => void;
   /** Instance id to when you last moved it, for sorting. */
   recentMoves: Record<string, number>;
+  /** Whether `item` can be equipped on `characterId`, and why not. */
+  checkEquip: (item: AppraisedItem, characterId: string) => MoveCheck;
+  equip: (item: AppraisedItem, characterId: string) => void;
+  setLocked: (item: AppraisedItem, locked: boolean) => void;
 }
 
 export const InventoryContext = createContext<InventoryApi>({
   byId: new Map(), select: () => {}, characters: [], moving: new Set(),
   check: () => ({ ok: false, reason: 'Not ready' }), move: () => {}, recentMoves: {},
+  checkEquip: () => ({ ok: false, reason: 'Not ready' }), equip: () => {}, setLocked: () => {},
 });
 export const useInventory = () => useContext(InventoryContext);

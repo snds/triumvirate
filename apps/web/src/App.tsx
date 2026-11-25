@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { fetchInventory, logout, moveItem, type Inventory } from './api.ts';
+import { equipItem, fetchInventory, logout, moveItem, setLocked, type ActionResult, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
-import { checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
+import { checkEquip, checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
 import { DragActionsContext, DragContext, useItemDrag } from './drag.ts';
 import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
 import { CleanupView } from './components/CleanupView.tsx';
 import { RollsView } from './components/RollsView.tsx';
+import { LoadoutsView } from './components/LoadoutsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { Icon } from './components/Icon.tsx';
@@ -169,6 +170,25 @@ export function App() {
     setSelected((sel) => (sel?.instanceId === instanceId ? next : sel));
   }, []);
 
+  /** Swaps several items at once (an equip moves one in and one out), keeping the item panel in step. */
+  const patchItems = useCallback((next: AppraisedItem[], account?: Inventory['account']) => {
+    if (next.length === 0 && !account) return;
+    const byId = new Map(next.map((i) => [i.instanceId, i]));
+    setState((s) => s.status !== 'ready' ? s : {
+      ...s,
+      inv: { ...s.inv, account: account ?? s.inv.account, items: s.inv.items.map((i) => (i.instanceId && byId.get(i.instanceId)) || i) },
+    });
+    setSelected((sel) => (sel?.instanceId && byId.get(sel.instanceId)) || sel);
+  }, []);
+
+  /** Shows what an equip or loadout did: patches the items and says what didn't go on. */
+  const settle = useCallback((res: ActionResult, what: string) => {
+    patchItems(res.items ?? [], res.account);
+    const skipped = res.skipped ?? [];
+    if (res.error) setToast({ id: Date.now(), text: `Couldn't ${what}: ${res.error}` });
+    else if (skipped.length) setToast({ id: Date.now(), text: `${skipped.length === 1 ? `${skipped[0]!.name ?? 'One item'} stayed put` : `${skipped.length} items stayed put`}: ${skipped[0]!.reason}` });
+  }, [patchItems]);
+
   /** Scrolls a moved item into view and makes it glow briefly, so it's easy to find in a long vault. */
   const spotlight = useCallback((id: string) => {
     requestAnimationFrame(() => {
@@ -205,6 +225,26 @@ export function App() {
     setMoving((m) => { const n = new Set(m); n.delete(id); return n; });
   }, [state, patchItem, spotlight, setRecentMoves]);
 
+  const equip = useCallback(async (item: AppraisedItem, characterId: string) => {
+    if (!item.instanceId) return;
+    const id = item.instanceId;
+    setMoving((m) => new Set(m).add(id));
+    const res = await equipItem(id, characterId);
+    settle(res, `equip ${item.name}`);
+    spotlight(id);
+    setMoving((m) => { const n = new Set(m); n.delete(id); return n; });
+  }, [settle, spotlight]);
+
+  const lock = useCallback(async (item: AppraisedItem, locked: boolean) => {
+    if (!item.instanceId) return;
+    const id = item.instanceId;
+    // Locks are instant in game, so show it right away and undo if Bungie says no.
+    patchItem(id, { ...item, locked });
+    const res = await setLocked(id, locked);
+    patchItem(id, res.item ?? (res.error ? item : { ...item, locked }));
+    if (res.error) setToast({ id: Date.now(), text: `Couldn't ${locked ? 'lock' : 'unlock'} ${item.name}: ${res.error}` });
+  }, [patchItem]);
+
   const inventoryApi = useMemo<InventoryApi>(() => {
     const inv = state.status === 'ready' ? state.inv : undefined;
     return {
@@ -215,8 +255,11 @@ export function App() {
       check: (item, to) => (inv ? checkMove(item, to, inv.characters, inv.items, inv.account) : { ok: false, reason: 'Not loaded' }),
       move: (item, to) => void move(item, to),
       recentMoves,
+      checkEquip: (item, characterId) => (inv ? checkEquip(item, characterId, inv.characters) : { ok: false, reason: 'Not loaded' }),
+      equip: (item, characterId) => void equip(item, characterId),
+      setLocked: (item, locked) => void lock(item, locked),
     };
-  }, [state, moving, move, recentMoves]);
+  }, [state, moving, move, recentMoves, equip, lock]);
   // Dropping re-checks the move, so a drop on a red column does nothing.
   const drag = useItemDrag((item, to) => {
     if (inventoryApi.check(item, to).ok) inventoryApi.move(item, to);
@@ -307,6 +350,13 @@ export function App() {
           >
             Rolls
           </button>
+          <button
+            className={`segmented__option${view === 'loadouts' ? ' is-selected' : ''}`}
+            aria-current={view === 'loadouts' ? 'page' : undefined}
+            onClick={() => setView('loadouts')}
+          >
+            Loadouts
+          </button>
         </nav>}
         {!compact && <><input
           className="search"
@@ -391,6 +441,16 @@ export function App() {
             />}
           </div>
           </>
+        ) : view === 'loadouts' ? (
+          <LoadoutsView
+            inv={inv}
+            characterId={inv.characters.some((c) => c.id === store) ? store : inv.characters[0]?.id ?? ''}
+            onCharacter={setStore}
+            onSelect={setSelected}
+            onSettle={settle}
+            onReload={() => load(false)}
+            onToast={(text) => setToast({ id: Date.now(), text })}
+          />
         ) : view === 'rolls' ? (
           <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} />
         ) : (

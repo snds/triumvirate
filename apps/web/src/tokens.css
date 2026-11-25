@@ -51,6 +51,9 @@
   --size-52: 52px;
   --size-56: 56px;
   --size-60: 60px;
+  --size-320: 320px;
+  --size-420: 420px;
+  --size-560: 560px;
   --white-a06: rgb(255 255 255 / 0.06);
   --gray-850-a70: rgb(24 28 34 / 0.7); /* gray-850 at 70% */
   --radius-pill: 999px;
@@ -218,6 +221,19 @@
   /* Count badge: one shape for every number on a tab or button (tab bar, rolls toolbar). */
   --count-badge-size: var(--size-18);
   --count-badge-font: var(--font-size-10);
+
+  /* Loadouts: cards in a grid that fits as many as the width allows, the in-game slot swatch,
+     and the small question sheets (centered with a mouse, a bottom sheet on a phone). */
+  --loadout-card-min: var(--size-320);
+  --loadout-swatch-size: var(--size-44);
+  --loadout-swatch-radius: var(--radius-sm);
+  --loadout-strip-scale: 0.8;
+  --loadout-worn: var(--verdict-good);
+  --loadout-missing: var(--warning);
+  --look-swatch-size: var(--control-size);
+  --sheet-width: var(--size-420);
+  --sheet-width-wide: var(--size-560);
+  --lock-on: var(--accent);
 }
 
 /*
@@ -227,6 +243,7 @@
  *   rolls        ≤560px one card per row, sticky group headings
  *   store        ≤440px vault currencies wrap under the title
  *   cleanup      ≤560px header stacks
+ *   loadouts     ≤560px header stacks, cards one per row, character picker scrolls
  *
  * Viewport breakpoints, for the page shell only (also in media.ts; custom properties can't be used inside @media):
  *   compact  max-width 640px   phones: one store at a time, floating tab bar, full-screen chat and item sheets

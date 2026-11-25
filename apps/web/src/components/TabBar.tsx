@@ -4,12 +4,13 @@ import type { ChatStatus } from './AgentPanel.tsx';
 import type { Kind } from '../inventory.ts';
 import { useKeyboardInset } from '../keyboard.ts';
 
-export type View = 'inventory' | 'cleanup' | 'rolls';
+export type View = 'inventory' | 'cleanup' | 'rolls' | 'loadouts';
 
 const VIEWS: { id: View; label: string; icon: IconName }[] = [
   { id: 'inventory', label: 'Inventory', icon: 'inventory' },
   { id: 'cleanup', label: 'Cleanup', icon: 'cleanup' },
   { id: 'rolls', label: 'Rolls', icon: 'rolls' },
+  { id: 'loadouts', label: 'Loadouts', icon: 'loadouts' },
 ];
 
 export const KIND_SCOPES: { value: Kind; label: string }[] = [
@@ -23,7 +24,7 @@ export const KIND_SCOPES: { value: Kind; label: string }[] = [
  * edges, with search as its own round button beside it. Tapping search turns the bar into a search
  * field: the tabs fold into one round button (the current tab, tap to go back), the field takes the
  * rest of the row, and the All / Weapons / Armor scopes float just above it.
- * The chat is the fourth tab, so nothing else floats over the tiles.
+ * The chat is the last tab, so nothing else floats over the tiles.
  */
 export function TabBar({ view, onView, cleanupCount, chatOpen, onChat, chatStatus, chatNote, query, onQuery, kind, onKind }: {
   view: View;

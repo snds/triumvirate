@@ -62,15 +62,19 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
         </ItemHeader>
 
         <div className="item-dialog__bar">
+          <div className="item-actions">
+            <EquipButtons item={item} />
+            <MoveButtons item={item} />
+          </div>
           <div className="drawer__actions">
+            <LockButton item={item} />
             <button className="button" onClick={() => onAsk(item)}>
               <Icon name="chat" /> Ask about this item
             </button>
             <a className="button button--quiet" href={`https://www.light.gg/db/items/${item.itemHash}/`} target="_blank" rel="noreferrer">
-              Open on light.gg <Icon name="openExternal" />
+              light.gg <Icon name="openExternal" />
             </a>
           </div>
-          <MoveButtons item={item} />
         </div>
 
         <div className="tabs" role="tablist" aria-label="Item information">
@@ -271,5 +275,59 @@ function MoveButtons({ item }: { item: AppraisedItem }) {
       ))}
       {busy && <span className="spinner" aria-label="Moving" />}
     </div>
+  );
+}
+
+/**
+ * Equip on a character: one button per character that can wear it. The likeliest one (the
+ * character holding it, else the one you played last) is the primary button.
+ */
+function EquipButtons({ item }: { item: AppraisedItem }) {
+  const inv = useInventory();
+  if (!item.instanceId) return null;
+  const busy = inv.moving.has(item.instanceId);
+  const options = inv.characters
+    .map((c) => ({ c, check: inv.checkEquip(item, c.id) }))
+    // Hide classes that can never wear it; keep reasons that might change (full slot, exotic clash).
+    .filter((o) => o.check.ok || (!o.check.quiet && !/^Not usable/.test(o.check.reason)));
+  const wornBy = item.equipped ? inv.characters.find((c) => c.id === item.owner) : undefined;
+  if (options.length === 0) {
+    return wornBy ? <p className="item-actions__state"><Icon name="equip" filled /> Equipped on {wornBy.className}</p> : null;
+  }
+  const likely = options.find((o) => o.check.ok && o.c.id === item.owner) ?? options.find((o) => o.check.ok);
+  return (
+    <div className="move-to" role="group" aria-label="Equip on">
+      <span className="move-to__label">{wornBy ? `On ${wornBy.className} · equip on` : 'Equip on'}</span>
+      {options.map(({ c, check }) => (
+        <button
+          key={c.id}
+          className={`button${c === likely?.c ? ' button--primary' : ''}`}
+          disabled={busy || !check.ok}
+          title={check.ok ? `Equip on ${c.className}` : check.reason}
+          onClick={() => inv.equip(item, c.id)}
+        >
+          {c === likely?.c && <Icon name="equip" />}{c.className}
+        </button>
+      ))}
+      {busy && <span className="spinner" aria-label="Working" />}
+    </div>
+  );
+}
+
+/** Lock toggle, as in game: a locked item can't be dismantled. */
+function LockButton({ item }: { item: AppraisedItem }) {
+  const inv = useInventory();
+  // Only weapons and armor (and ghosts) lock.
+  if (!item.instanceId || (item.itemType !== 2 && item.itemType !== 3 && item.bucket !== 'Ghost')) return null;
+  return (
+    <button
+      className={`button lock-toggle${item.locked ? ' is-locked' : ''}`}
+      aria-pressed={item.locked}
+      onClick={() => inv.setLocked(item, !item.locked)}
+      title={item.locked ? 'Locked: it can\'t be dismantled. Click to unlock.' : 'Lock it so it can\'t be dismantled'}
+    >
+      <Icon name={item.locked ? 'lock' : 'lockOpen'} filled={item.locked} />
+      {item.locked ? 'Locked' : 'Lock'}
+    </button>
   );
 }

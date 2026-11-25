@@ -41,7 +41,7 @@ export function StoreSwitcher({ characters, vaultCount, value, onChange }: {
         role="tab"
         aria-selected={value === 'vault'}
         aria-controls="store-panel"
-        className={`store-switcher__tab${value === 'vault' ? ' is-selected' : ''}`}
+        className={`store-switcher__tab store-switcher__tab--vault${value === 'vault' ? ' is-selected' : ''}`}
         onClick={() => onChange('vault')}
       >
         <span className="store-switcher__emblem store-switcher__emblem--vault" aria-hidden><Icon name="vault" /></span>

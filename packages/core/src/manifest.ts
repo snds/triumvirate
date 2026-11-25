@@ -14,6 +14,10 @@ import {
   type DestinyStatGroupDefinition,
   type DestinyBreakerTypeDefinition,
   type DestinyPlugSetDefinition,
+  type DestinyLoadoutNameDefinition,
+  type DestinyLoadoutColorDefinition,
+  type DestinyLoadoutIconDefinition,
+  type DestinyLoadoutConstantsDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 
@@ -34,6 +38,35 @@ export interface ManifestTables {
   breakerTypes?: Record<string, Pick<DestinyBreakerTypeDefinition, 'displayProperties'>>;
   /** Plug sets: the plugs each can roll (used for "every possible roll"). */
   plugSets?: Record<string, number[]>;
+  /** In-game loadout names, colors, and icons, in the game's picker order. */
+  loadoutStyles?: LoadoutStyles;
+}
+
+/** The choices the game offers for naming and decorating an in-game loadout. */
+export interface LoadoutStyles {
+  names: { hash: number; name: string }[];
+  colors: { hash: number; image: string }[];
+  icons: { hash: number; image: string }[];
+  /** Most slots a character can have (Guardian Rank unlocks them; the profile lists the ones you have). */
+  perCharacter: number;
+}
+
+/** Joins the four small loadout tables into one, in the order the constants list them. */
+export function slimLoadoutStyles(
+  constants: Record<string, DestinyLoadoutConstantsDefinition>,
+  names: Record<string, DestinyLoadoutNameDefinition>,
+  colors: Record<string, DestinyLoadoutColorDefinition>,
+  icons: Record<string, DestinyLoadoutIconDefinition>,
+): LoadoutStyles {
+  const c = Object.values(constants)[0];
+  const order = <T>(hashes: number[] | undefined, table: Record<string, T>) =>
+    (hashes?.length ? hashes : Object.keys(table).map(Number)).map((h) => [h, table[h]] as const).filter((x): x is readonly [number, T] => !!x[1]);
+  return {
+    names: order(c?.loadoutNameHashes, names).map(([hash, d]) => ({ hash, name: (d as DestinyLoadoutNameDefinition).name })),
+    colors: order(c?.loadoutColorHashes, colors).map(([hash, d]) => ({ hash, image: `https://www.bungie.net${(d as DestinyLoadoutColorDefinition).colorImagePath}` })),
+    icons: order(c?.loadoutIconHashes, icons).map(([hash, d]) => ({ hash, image: `https://www.bungie.net${(d as DestinyLoadoutIconDefinition).iconImagePath}` })),
+    perCharacter: c?.loadoutCountPerCharacter ?? 10,
+  };
 }
 
 /** The parts of the full item definition the app needs (the full table is hundreds of MB). */
@@ -103,6 +136,10 @@ const TABLES = {
   fullItems: 'DestinyInventoryItemDefinition',
   breakerTypes: 'DestinyBreakerTypeDefinition',
   plugSets: 'DestinyPlugSetDefinition',
+  loadoutConstants: 'DestinyLoadoutConstantsDefinition',
+  loadoutNames: 'DestinyLoadoutNameDefinition',
+  loadoutColors: 'DestinyLoadoutColorDefinition',
+  loadoutIcons: 'DestinyLoadoutIconDefinition',
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
@@ -165,7 +202,11 @@ export async function loadManifest(
     load(TABLES.plugSets, (full: Record<string, DestinyPlugSetDefinition>) =>
       Object.fromEntries(Object.entries(full).map(([h, ps]) => [h, ps.reusablePlugItems.filter((p) => p.currentlyCanRoll).map((p) => p.plugItemHash)]))),
   ]);
+  // Loadout names, colors, and icons: four tiny tables. Cosmetic, so a missing one never blocks the app.
+  const loadoutStyles = await Promise.all([
+    load(TABLES.loadoutConstants), load(TABLES.loadoutNames), load(TABLES.loadoutColors), load(TABLES.loadoutIcons),
+  ]).then(([c, n, col, i]) => slimLoadoutStyles(c as never, n as never, col as never, i as never)).catch(() => undefined);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles };
 }
