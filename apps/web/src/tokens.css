@@ -52,6 +52,8 @@
   --size-56: 56px;
   --size-60: 60px;
   --white-a06: rgb(255 255 255 / 0.06);
+  --gray-850-a70: rgb(24 28 34 / 0.7); /* gray-850 at 70% */
+  --radius-pill: 999px;
   --white-a12: rgb(255 255 255 / 0.12);
   --blur-lg: 24px;
   --saturate-lg: 180%;
@@ -131,7 +133,7 @@
   --shadow-sheet: var(--shadow-up-xl);
   /* Glass: the floating material for chrome over content (iOS 26 Liquid Glass, approximated with
      a translucent fill, background blur and saturation, a hairline edge, and a top highlight). */
-  --surface-glass: color-mix(in srgb, var(--surface-raised) 70%, transparent);
+  --surface-glass: var(--gray-850-a70);
   --border-glass: var(--white-a12);
   --highlight-glass: var(--white-a06);
   --fill-glass-selected: var(--white-a12);
@@ -206,7 +208,7 @@
   /* The floating bar's distance from the screen edges and from the home indicator. */
   --tabbar-inset: var(--space-4);
   --tabbar-lift: var(--space-2);
-  --tabbar-radius: calc(var(--tabbar-height) / 2);
+  --tabbar-radius: var(--radius-pill);
   --tabbar-icon-size: var(--size-24);
   --store-switcher-height: var(--size-52);
   --store-emblem-size: var(--size-36);

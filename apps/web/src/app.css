@@ -1232,7 +1232,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   }
   .tabbar__tab {
     display: grid; justify-items: center; align-content: center; gap: 1px;
-    min-width: 0; padding: 0; border: 0; border-radius: calc(var(--tabbar-radius) - var(--space-1));
+    min-width: 0; padding: 0; border: 0; border-radius: var(--tabbar-radius);
     background: none;
     /* Secondary, not muted: 10–11px labels need full text contrast. */
     color: var(--text-secondary); font: inherit; font-size: 10px; font-weight: 600;
@@ -1282,7 +1282,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   }
   .tabbar__scope {
     min-height: var(--control-size); padding: 0 var(--space-4);
-    border: 0; border-radius: calc(var(--tabbar-radius) - var(--space-1));
+    border: 0; border-radius: var(--tabbar-radius);
     background: none; color: var(--text-secondary); font: inherit; font-weight: 600; cursor: pointer;
   }
   .tabbar__scope.is-selected { background: var(--fill-glass-selected); color: var(--text-primary); }
