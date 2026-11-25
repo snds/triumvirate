@@ -308,7 +308,7 @@ export function App() {
             Rolls
           </button>
         </nav>}
-        <input
+        {!compact && <><input
           className="search"
           type="search"
           placeholder="Search name, type, element…"
@@ -328,7 +328,7 @@ export function App() {
               {k.label}
             </button>
           ))}
-        </div>
+        </div></>}
         <div className="topbar__end">
           <button
             className={`icon-button${syncing ? ' is-busy' : ''}`}
@@ -420,6 +420,10 @@ export function App() {
           onChat={() => setAgentOpen((o) => !o)}
           chatStatus={chatStatus}
           chatNote={fabNote(chatStatus)}
+          query={query}
+          onQuery={setQuery}
+          kind={kind}
+          onKind={setKind}
         />
       ) : <button
         className={`chat-fab${agentOpen ? ' is-open' : ''}${chatStatus.busy ? ' is-busy' : ''}`}

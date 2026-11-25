@@ -40,6 +40,8 @@ const GLYPHS = {
   rolls: 'casino',
   vault: 'shelves',
   options: 'tune',
+  search: 'search',
+  clear: 'cancel',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

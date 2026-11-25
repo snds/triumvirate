@@ -922,11 +922,6 @@ body.is-dragging-item .tile { pointer-events: none; }
 .item-dialog__roll { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(260px, 1fr); gap: var(--space-6); align-items: start; }
 .item-dialog__main, .item-dialog__side { display: grid; gap: var(--space-2); min-width: 0; }
 .item-dialog__main .verdict { margin-top: var(--space-2); }
-@media (max-width: 720px) {
-  .item-dialog__roll, .all-rolls { grid-template-columns: 1fr; }
-  .item-header--dialog { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .item-header--dialog .item-header__stats { grid-column: 2; justify-items: start; }
-}
 
 /* Tabs */
 .tabs { display: flex; gap: var(--space-1); padding: 0 var(--space-4); border-bottom: 1px solid var(--border-subtle); }
@@ -1123,60 +1118,175 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   .chat-list__item .icon-button { opacity: 1; }
 }
 
-/* ── Phone (compact, max-width 640px) ──────────────────────
-   One idea drives the layout: one thing at a time, full width, with navigation at the bottom
-   edge where a thumb rests. The tokens already shrank the gutter and grew the controls;
-   these rules rearrange the shell around them. */
-@media (max-width: 640px) {
-  /* Shell: top bar, scrolling content, tab bar. dvh follows Safari's toolbar as it shows and hides. */
-  .app { height: 100dvh; grid-template-rows: auto minmax(0, 1fr) auto; }
-  .main { padding-bottom: var(--space-4); }
+/* ── Component containers ─────────────────────────────────
+   Components lay themselves out by their own width, not the window's. The item dialog squeezed
+   beside the desktop chat, the chat at its narrowest drag width, and a roll card in a tight grid
+   all get the same treatment as on a phone. Sizes are listed in tokens.css. */
+.dialog { container: item-dialog / inline-size; }
+.agent { container: chat / inline-size; }
+.rolls__main { container: rolls / inline-size; }
+.column { container: store / inline-size; }
+.cleanup { container: cleanup / inline-size; }
 
-  /* Top bar, two rows: brand with refresh and profile, then search with the kind filter.
-     Padding clears the notch when the app runs full screen from the home screen. */
+@container item-dialog (max-width: 720px) {
+  .item-dialog__roll, .all-rolls { grid-template-columns: 1fr; }
+  .item-header--dialog { grid-template-columns: auto minmax(0, 1fr) auto; }
+  .item-header--dialog .item-header__stats { grid-column: 2; justify-items: start; }
+}
+@container item-dialog (max-width: 520px) {
+  .item-header--dialog {
+    --art: 72px;
+    gap: var(--space-3);
+    min-height: 0;
+    padding: var(--space-3) var(--space-2) var(--space-3) var(--space-4);
+  }
+  .item-header--dialog .item-header__name { font-size: 19px; }
+  .item-header--dialog .item-header__kind { font-size: 12px; }
+  .item-header--dialog .item-header__flavor { display: none; }
+  .item-header--dialog .item-header__stats { grid-row: 2; display: flex; align-items: center; gap: var(--space-2); }
+  .item-header--dialog .item-header__power { font-size: 26px; }
+  .item-header--dialog .item-header__icon { width: 20px; height: 20px; }
+  .item-header--dialog .item-header__art { grid-row: span 2; }
+  .item-header--dialog .item-header__close { grid-column: 3; grid-row: 1; }
+  .item-dialog__bar { padding: var(--space-2) var(--space-3); }
+  .move-to { width: 100%; }
+  .tabs { padding: 0 var(--space-3); overflow-x: auto; }
+  .tabs__tab { flex: none; }
+  .item-dialog__body { padding: var(--space-3); }
+  .stats__row { grid-template-columns: 104px minmax(0, 1fr); }
+  .stats__track { flex: 1 1 auto; width: auto; min-width: 0; }
+  .perks-block--named .perk-cell:first-child { min-width: 0; flex-basis: 100%; }
+  .details { grid-template-columns: 1fr 1fr; }
+}
+@container chat (max-width: 420px) {
+  .agent__subject { max-width: 40%; }
+  .bubble { max-width: 85%; }
+  .build__part img, .build__part-fallback { width: 36px; height: 36px; }
+}
+@container rolls (max-width: 560px) {
+  .rolls__cards { grid-template-columns: minmax(0, 1fr); }
+  .rolls__head h2 { display: flex; align-items: baseline; gap: var(--space-2); }
+  /* Group headings stay in view while their cards scroll under them. */
+  .rolls__group-head { position: sticky; top: 0; z-index: 1; background: var(--surface-page); min-height: var(--control-size); }
+  .roll-card__body { gap: var(--space-2) var(--space-1); }
+  .roll-card__actions .button { flex: 1; justify-content: center; }
+}
+@container store (max-width: 440px) {
+  .vault__header .currencies { margin-left: 0; flex-basis: 100%; }
+}
+@container cleanup (max-width: 560px) {
+  .cleanup__header { flex-direction: column; gap: var(--space-3); }
+  .cleanup__row { padding: var(--space-2); }
+}
+@media (pointer: coarse) {
+  .roll-perks { gap: var(--target-gap); }
+}
+
+/* Glass: the material for chrome that floats over content. */
+.glass {
+  background: var(--surface-glass);
+  -webkit-backdrop-filter: blur(var(--blur-glass)) saturate(var(--saturate-glass));
+  backdrop-filter: blur(var(--blur-glass)) saturate(var(--saturate-glass));
+  border: 1px solid var(--border-glass);
+  box-shadow: inset 0 1px 0 var(--highlight-glass), var(--shadow-float);
+}
+
+/* ── Phone shell (compact, max-width 640px) ────────────────
+   The page shell rearranges here; components inside it follow their containers above.
+   One thing at a time, full width, navigation floating at the bottom edge where a thumb rests. */
+@media (max-width: 640px) {
+  /* dvh follows Safari's toolbar as it shows and hides. Content scrolls under the floating bar,
+     so the scroll area ends with enough room to lift its last row clear of it. */
+  .app { height: 100dvh; }
+  .main { padding-bottom: calc(var(--tabbar-height) + var(--tabbar-lift) + var(--safe-bottom) + var(--space-6)); }
+
+  /* Top bar, one row: brand, refresh, profile. Search moved to the tab bar, as in iOS. */
   .topbar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    grid-template-areas: 'brand end' 'search kind';
-    align-items: center;
-    gap: var(--space-2);
+    flex-wrap: nowrap;
+    min-height: 0;
     padding: calc(var(--space-2) + var(--safe-top)) calc(var(--page-gutter) + var(--safe-right)) var(--space-2) calc(var(--page-gutter) + var(--safe-left));
   }
-  .topbar .brand { grid-area: brand; font-size: 15px; }
-  .topbar__end { grid-area: end; justify-self: end; margin-left: 0; }
-  .topbar .search { grid-area: search; min-width: 0; }
-  .topbar__kind { grid-area: kind; }
-  .topbar__kind .segmented__option { padding-inline: var(--space-3); }
+  .topbar .brand { font-size: 15px; }
   .profile__trigger { padding: var(--space-1); border-radius: 50%; }
   .menu { min-width: min(320px, calc(100vw - 2 * var(--page-gutter))); }
   .menu .segmented__option { flex: 1; white-space: nowrap; padding-inline: var(--space-2); }
   .menu__who { display: grid; gap: 2px; padding-top: 0; }
 
-  /* Bottom tab bar: views plus the chat. Labels stay visible; icons alone are guesswork. */
+  /* Floating tab bar: a glass capsule of tabs and a round search button, inset from the edges
+     and lifted off the home indicator. Labels stay visible; icons alone are guesswork. */
   .tabbar {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
-    background: var(--surface-panel);
-    border-top: 1px solid var(--border-subtle);
-    z-index: 2;
+    position: fixed; z-index: 4;
+    left: calc(var(--tabbar-inset) + var(--safe-left));
+    right: calc(var(--tabbar-inset) + var(--safe-right));
+    bottom: calc(var(--tabbar-lift) + max(var(--safe-bottom), var(--keyboard-inset, 0px)));
+    display: grid; gap: var(--target-gap);
+    pointer-events: none; /* only the glass pieces take taps; the gaps pass through to content */
+  }
+  .tabbar__row { display: flex; gap: var(--target-gap); }
+  .tabbar__row > *, .tabbar__scopes { pointer-events: auto; }
+  .tabbar__tabs {
+    flex: 1; min-width: 0;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    height: var(--tabbar-height); padding: var(--space-1);
+    border-radius: var(--tabbar-radius);
   }
   .tabbar__tab {
-    display: grid; justify-items: center; align-content: center; gap: 2px;
-    height: var(--tabbar-height);
-    padding: 0; border: 0; background: none;
-    /* Secondary, not muted: 11px labels need full text contrast (muted measures about 3:1 here). */
-    color: var(--text-secondary); font: inherit; font-size: 11px; font-weight: 600;
+    display: grid; justify-items: center; align-content: center; gap: 1px;
+    min-width: 0; padding: 0; border: 0; border-radius: calc(var(--tabbar-radius) - var(--space-1));
+    background: none;
+    /* Secondary, not muted: 10–11px labels need full text contrast. */
+    color: var(--text-secondary); font: inherit; font-size: 10px; font-weight: 600;
     cursor: pointer;
+    transition: background 160ms ease, color 160ms ease;
   }
-  .tabbar__tab.is-selected { color: var(--accent); }
+  /* The selected tab sits in a lighter pill inside the capsule, as on iOS. */
+  .tabbar__tab.is-selected { background: var(--fill-glass-selected); color: var(--accent); }
+  .tabbar__label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .tabbar__icon { position: relative; display: grid; place-items: center; }
   .tabbar__icon .icon { font-size: var(--tabbar-icon-size); }
   .tabbar__count { position: absolute; top: -4px; left: calc(100% - 8px); }
-  .tabbar__dot { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--text-primary); box-shadow: 0 0 0 2px var(--surface-panel); }
+  .tabbar__dot { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--text-primary); box-shadow: 0 0 0 2px var(--surface-raised); }
+  .tabbar__dot--accent { top: 14px; right: 14px; background: var(--accent); }
+  .tabbar__round {
+    position: relative; flex: none; display: grid; place-items: center;
+    width: var(--tabbar-height); height: var(--tabbar-height); padding: 0;
+    border-radius: 50%; color: var(--text-primary); cursor: pointer;
+  }
+  .tabbar__round .icon { font-size: var(--tabbar-icon-size); }
+  .tabbar__round.is-filtered { color: var(--accent); }
   /* While an answer is being written, the chat tab's icon pulses, like the button's ring on desktop. */
   .tabbar__tab--chat.is-busy .tabbar__icon .icon { color: var(--accent); animation: tab-pulse 1.2s ease-in-out infinite; }
   @keyframes tab-pulse { 50% { opacity: 0.45; } }
+
+  /* Search mode: the tabs fold into one round button, the field takes the row, scopes float above. */
+  .tabbar--searching .tabbar__row, .tabbar--searching .tabbar__scopes { animation: bar-morph 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .tabbar__round .icon--filled { color: var(--accent); }
+  .tabbar__field {
+    flex: 1; min-width: 0;
+    display: flex; align-items: center; gap: var(--space-2);
+    height: var(--tabbar-height); padding: 0 var(--space-2) 0 var(--space-4);
+    border-radius: var(--tabbar-radius); color: var(--text-secondary);
+  }
+  .tabbar__field input {
+    flex: 1; min-width: 0; height: 100%; padding: 0;
+    border: 0; background: none; outline: none;
+    color: var(--text-primary); font: inherit; font-size: var(--input-font-size);
+  }
+  .tabbar__field input::-webkit-search-cancel-button { display: none; }
+  .tabbar__field:focus-within { border-color: var(--accent); }
+  .tabbar__clear { display: grid; place-items: center; width: var(--control-size); height: var(--control-size); padding: 0; border: 0; background: none; color: var(--text-secondary); cursor: pointer; }
+  .tabbar__scopes {
+    justify-self: center;
+    display: flex; padding: var(--space-1); gap: var(--space-1);
+    border-radius: var(--tabbar-radius);
+  }
+  .tabbar__scope {
+    min-height: var(--control-size); padding: 0 var(--space-4);
+    border: 0; border-radius: calc(var(--tabbar-radius) - var(--space-1));
+    background: none; color: var(--text-secondary); font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .tabbar__scope.is-selected { background: var(--fill-glass-selected); color: var(--text-primary); }
+  @keyframes bar-morph { from { opacity: 0; transform: scale(0.96); } }
 
   /* Store switcher: sticks under the top bar as the store scrolls. */
   .store-switcher {
@@ -1217,37 +1327,14 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 
   /* Inventory: the chosen store fills the width. */
   .inventory { grid-template-columns: minmax(0, 1fr); padding-top: var(--space-3); }
-  .vault__header .currencies { margin-left: 0; flex-basis: 100%; }
 
-  /* Item dialog: a full-screen sheet. Header and body clear the notch and the home indicator. */
+  /* Item dialog: a full-screen sheet that clears the notch and the home indicator. */
   .dialog-scrim { padding: 0; place-items: stretch; }
   .dialog { width: 100%; height: 100dvh; max-height: none; border: 0; border-radius: 0; }
-  .item-header--dialog {
-    --art: 72px;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    gap: var(--space-3);
-    min-height: 0;
-    padding: calc(var(--space-3) + var(--safe-top)) var(--space-2) var(--space-3) var(--space-4);
-  }
-  .item-header--dialog .item-header__name { font-size: 19px; }
-  .item-header--dialog .item-header__kind { font-size: 12px; }
-  .item-header--dialog .item-header__flavor { display: none; }
-  .item-header--dialog .item-header__stats { grid-column: 2; grid-row: 2; justify-items: start; display: flex; align-items: center; gap: var(--space-2); }
-  .item-header--dialog .item-header__power { font-size: 26px; }
-  .item-header--dialog .item-header__icon { width: 20px; height: 20px; }
-  .item-header--dialog .item-header__art { grid-row: span 2; }
-  .item-header--dialog .item-header__close { grid-column: 3; grid-row: 1; }
-  .item-dialog__bar { padding: var(--space-2) var(--space-3); }
-  .move-to { width: 100%; }
-  .tabs { padding: 0 var(--space-3); overflow-x: auto; }
-  .tabs__tab { flex: none; }
-  .item-dialog__body { padding: var(--space-3) var(--space-3) calc(var(--space-6) + var(--safe-bottom)); }
-  .stats__row { grid-template-columns: 104px minmax(0, 1fr); }
-  .stats__track { flex: 1 1 auto; width: auto; min-width: 0; }
-  .perks-block--named .perk-cell:first-child { min-width: 0; flex-basis: 100%; }
-  .details { grid-template-columns: 1fr 1fr; }
+  .item-header--dialog { padding-top: calc(var(--space-3) + var(--safe-top)); }
+  .item-dialog__body { padding-bottom: calc(var(--space-6) + var(--safe-bottom)); }
 
-  /* Chat: full screen above everything, closed from its own header (the tab bar is underneath). */
+  /* Chat: full screen above everything, closed from its own header. */
   .agent {
     inset: 0; width: auto; height: auto;
     border: 0; border-radius: 0;
@@ -1256,30 +1343,16 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   }
   .agent__resize { display: none; }
   .agent__header { padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); }
-  .agent__subject { max-width: 40%; }
   .agent__form { padding: var(--space-2) var(--space-3) calc(var(--space-2) + var(--safe-bottom)); }
-  .bubble { max-width: 85%; }
   .md { font-size: 14px; }
-  .build__part img, .build__part-fallback { width: 36px; height: 36px; }
 
-  /* Cleanup: the reason wraps under the name; the pill stays at the right. */
-  .cleanup__header { flex-direction: column; gap: var(--space-3); }
-  .cleanup__row { padding: var(--space-2); }
-
-  /* Rolls: one column of cards; the options rail becomes a bottom sheet opened from a toolbar. */
+  /* Rolls: the options rail becomes a bottom sheet opened from a toolbar. */
   .rolls { grid-template-columns: minmax(0, 1fr); }
-  .rolls__head h2 { display: flex; align-items: baseline; gap: var(--space-2); }
   .rolls__toolbar { display: flex; gap: var(--space-2); margin-top: var(--space-3); overflow-x: auto; scrollbar-width: none; }
   .rolls__tool { position: relative; flex: none; min-height: 36px; gap: var(--space-1); font-size: 13px; }
   .rolls__tool .icon { font-size: 18px; }
   .rolls__tool--icon { padding-inline: var(--space-2); }
   .rolls__tool .rolls__dot { position: static; }
-  .rolls__cards { grid-template-columns: minmax(0, 1fr); }
-  /* Group headings stay in view while their cards scroll under them. */
-  .rolls__group-head { position: sticky; top: 0; z-index: 1; background: var(--surface-page); min-height: var(--control-size); }
-  .roll-card__body { gap: var(--space-2) var(--space-1); }
-  .roll-perks { gap: var(--target-gap); }
-  .roll-card__actions .button { flex: 1; justify-content: center; }
 
   /* Bottom sheet, shared shape: rounded top, a grab handle, and the home indicator's inset. */
   .sheet-scrim { position: fixed; inset: 0; z-index: 10; background: var(--overlay-scrim); animation: fade-in 160ms ease-out; }
@@ -1306,12 +1379,19 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   @keyframes sheet-in { from { transform: translateY(100%); } }
   @keyframes fade-in { from { opacity: 0; } }
 
-  /* Toast clears the tab bar. */
-  .toast { bottom: calc(var(--tabbar-height) + var(--safe-bottom) + var(--space-3)); }
+  /* Toast clears the floating bar. */
+  .toast { bottom: calc(var(--tabbar-height) + var(--tabbar-lift) + var(--safe-bottom) + var(--space-3)); }
 }
 @media (max-width: 640px) and (prefers-reduced-motion: reduce) {
-  .rolls__rail--sheet, .sheet-scrim { animation: none; }
+  .rolls__rail--sheet, .sheet-scrim, .tabbar--searching .tabbar__row, .tabbar--searching .tabbar__scopes { animation: none; }
   .tabbar__tab--chat.is-busy .tabbar__icon .icon { animation: none; }
+}
+/* Without backdrop blur (or with Reduce Transparency), glass turns solid so text stays readable. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass { background: var(--surface-raised); }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .glass { background: var(--surface-raised); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
 /* Count badge: the number on a tab or toolbar button. Neutral for a tally, danger for unread answers. */
