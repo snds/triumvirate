@@ -10,8 +10,8 @@ const stack: symbol[] = [];
  * makes it fill the screen for longer work. Escape or a tap on the scrim closes it; focus moves in
  * and goes back where it was when it closes. `footer` stays pinned under scrolling content.
  */
-export function Sheet({ title, onClose, wide, full, footer, children }: {
-  title: string; onClose: () => void; wide?: boolean; full?: boolean; footer?: ReactNode; children: ReactNode;
+export function Sheet({ title, onClose, wide, full, footer, className, children }: {
+  title: string; onClose: () => void; wide?: boolean; full?: boolean; footer?: ReactNode; className?: string; children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
@@ -38,7 +38,7 @@ export function Sheet({ title, onClose, wide, full, footer, children }: {
     <div className="sheet-layer" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div
         ref={ref}
-        className={`sheet${wide ? ' sheet--wide' : ''}${full ? ' sheet--full' : ''}`}
+        className={`sheet${wide ? ' sheet--wide' : ''}${full ? ' sheet--full' : ''}${className ? ` ${className}` : ''}`}
         role="dialog" aria-modal="true" aria-label={title} tabIndex={-1}
       >
         <span className="sheet__handle" aria-hidden />

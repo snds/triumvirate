@@ -3,12 +3,13 @@ import {
   LOADOUT_BUCKETS, loadoutStatus, setBonuses, type AppraisedItem, type CharacterRow, type GameLoadout, type LoadoutStyles, type SavedLoadout,
 } from '@triumvirate/core/browser';
 import {
-  applyLoadout, createLoadout, deleteLoadout, equipGameLoadout, listLoadouts, restyleGameLoadout, saveGameLoadout, updateLoadout,
+  applyLoadout, createLoadout, deleteLoadout, equipGameLoadout, equipItems, listLoadouts, restyleGameLoadout, saveGameLoadout, updateLoadout,
   type ActionResult, type GameSlotLook, type Inventory, type LoadoutDraft,
 } from '../api.ts';
 import { BuildSummary } from './BuildSummary.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { LoadoutEditor } from './LoadoutEditor.tsx';
+import { OptimizerSheet } from './OptimizerSheet.tsx';
 import { Icon } from './Icon.tsx';
 import { Sheet } from './Sheet.tsx';
 
@@ -46,6 +47,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
   const [ask, setAsk] = useState<Ask>();
   // The loadout builder: `true` for a new one, or the saved loadout being edited.
   const [editor, setEditor] = useState<SavedLoadout | true>();
+  const [optimizer, setOptimizer] = useState(false);
   useEffect(() => {
     listLoadouts().then(setSaved).catch((e) => setLoadError(e instanceof Error ? e.message : String(e)));
   }, []);
@@ -121,9 +123,14 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
             <h3 className="loadout-card__name">Wearing now</h3>
             <p className="loadout-card__meta">{character.subclass ? `${character.subclass.name} · ` : ''}{wearing.length} items</p>
           </div>
-          <button className="button button--primary" onClick={() => setEditor(true)} disabled={wearing.length === 0}>
-            <Icon name="save" /> Save as loadout
-          </button>
+          <div className="loadout-card__buttons">
+            <button className="button" onClick={() => setOptimizer(true)}>
+              <Icon name="options" /> Optimize armor
+            </button>
+            <button className="button button--primary" onClick={() => setEditor(true)} disabled={wearing.length === 0}>
+              <Icon name="save" /> Save as loadout
+            </button>
+          </div>
         </div>
         <ItemStrip items={wearing} onSelect={onSelect} />
         <BuildSummary subclass={character.subclass} sets={setBonuses(wearing, inv.itemSets)} artifact={character.artifact} compact />
@@ -275,6 +282,24 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
               const next = await updateLoadout(editor.id, draft);
               setSaved((s) => (s ?? []).map((x) => (x.id === editor.id ? next : x)));
             }
+          }}
+        />
+      )}
+      {optimizer && (
+        <OptimizerSheet
+          character={character}
+          items={inv.items}
+          itemSets={inv.itemSets}
+          onClose={() => setOptimizer(false)}
+          onEquip={async (ids) => {
+            const res = await equipItems(ids, character.id);
+            onSettle(res, 'equip the armor');
+            if (res.error) throw new Error(res.error);
+          }}
+          onSave={async (draft) => {
+            const l = await createLoadout(draft);
+            setSaved((s) => [l, ...(s ?? [])]);
+            onToast(`Saved ${l.name} to Triumvirate loadouts.`);
           }}
         />
       )}

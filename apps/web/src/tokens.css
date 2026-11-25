@@ -178,6 +178,9 @@
   --subclass-strand: var(--mint-400);
   --subclass-prismatic: #f08bd0;
   --stat-bonus: var(--mint-400);
+  /* Optimizer: the tick marking a stat target on its bar. */
+  --optimizer-goal: var(--text-primary);
+  --sheet-width-optimizer: 1120px;
   --perk-enhanced: var(--gold-400);
   --perk-active-fill: var(--blue-500);
   --perk-active-border: var(--gray-100);

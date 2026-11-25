@@ -1653,3 +1653,41 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   .loadouts__grid { grid-template-columns: minmax(0, 1fr); }
   .loadout-card__head .button--primary { flex: none; }
 }
+
+/* ── Build optimizer ──────────────────────────────────────── */
+.loadout-card__buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--target-gap); }
+.optimizer { display: grid; gap: var(--space-4); }
+.optimizer { grid-template-columns: 1fr; }
+/* Side by side when the sheet is wide: controls stay put while results scroll. */
+.optimizer-wrap { container-type: inline-size; }
+/* Room for controls beside results; on a phone the sheet rules make it full screen anyway. */
+@media (min-width: 641px) {
+  .sheet--optimizer { width: min(var(--sheet-width-optimizer), 100%); max-height: min(90vh, 1000px); }
+}
+@container (min-width: 720px) {
+  .optimizer { grid-template-columns: minmax(260px, 300px) 1fr; align-items: start; }
+  .optimizer__controls { position: sticky; top: 0; }
+}
+.optimizer__controls { display: grid; gap: var(--space-3); align-content: start; }
+.optimizer__targets { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.optimizer__target { display: grid; grid-template-columns: 96px 1fr 3ch; align-items: center; gap: var(--space-2); min-height: var(--control-size, 32px); }
+.optimizer__target input[type="range"] { width: 100%; accent-color: var(--stat-bar); }
+.optimizer__stat, .optimizer__row dt { display: inline-flex; align-items: center; gap: var(--space-1); font-size: 13px; color: var(--text-secondary); }
+.optimizer__stat img, .optimizer__row dt img { width: 16px; height: 16px; }
+.optimizer__value { font-variant-numeric: tabular-nums; text-align: right; font-size: 13px; }
+.optimizer__hint, .optimizer__summary { margin: 0; font-size: 12px; }
+.optimizer__choices { display: grid; gap: var(--space-3); }
+.optimizer__select {
+  width: 100%; min-height: var(--control-size, 32px); padding: 0 var(--space-2);
+  background: var(--surface-raised); color: var(--text-primary);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+}
+.optimizer__controls > .button { justify-self: start; }
+.optimizer__results { display: grid; gap: var(--space-3); min-width: 0; }
+.optimizer__list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.optimizer__stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--space-1) var(--space-4); margin: 0; }
+.optimizer__row { display: grid; grid-template-columns: 84px 1fr; align-items: center; }
+.optimizer__row dd { margin: 0; display: flex; align-items: center; gap: var(--space-2); }
+.optimizer__track { position: relative; display: flex; flex: 1; height: 8px; background: var(--surface-hover); }
+.optimizer__goal { position: absolute; top: -3px; bottom: -3px; width: 2px; margin-left: -1px; background: var(--optimizer-goal); }
+.optimizer__meta { margin: 0; font-size: 12px; color: var(--text-secondary); }
