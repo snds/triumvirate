@@ -6,6 +6,7 @@ import { Icon } from './Icon.tsx';
 import { ItemFacts, PerkCell, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { useInventory } from '../inventory-context.ts';
+import { TOUCH_QUERY, useMediaQuery } from '../media.ts';
 
 interface Props {
   item: AppraisedItem;
@@ -177,6 +178,7 @@ function AllRolls({ item }: { item: AppraisedItem }) {
   const [data, setData] = useState<RollOptions | null>(null);
   const [error, setError] = useState('');
   const [focus, setFocus] = useState<PerkOption | null>(null);
+  const touch = useMediaQuery(TOUCH_QUERY);
   useEffect(() => {
     let live = true;
     setData(null);
@@ -228,7 +230,7 @@ function AllRolls({ item }: { item: AppraisedItem }) {
               <strong>{focus.name}</strong>
               {focus.description && <p>{focus.description}</p>}
             </>
-          ) : <p className="muted">Point at a perk to read what it does.</p>}
+          ) : <p className="muted">{touch ? 'Tap' : 'Point at'} a perk to read what it does.</p>}
         </div>
       </div>
       <aside className="all-rolls__stats">

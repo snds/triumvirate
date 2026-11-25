@@ -41,6 +41,34 @@
   --space-6: 24px;
   --radius-sm: 4px;
   --radius-md: 8px;
+  --radius-lg: 16px;
+  /* Size ramp for controls, targets, and icons (literal: the name is the value). */
+  --size-18: 18px;
+  --size-24: 24px;
+  --size-36: 36px;
+  --size-40: 40px;
+  --size-44: 44px;
+  --size-52: 52px;
+  --size-56: 56px;
+  --size-60: 60px;
+  --white-a06: rgb(255 255 255 / 0.06);
+  --gray-850-a70: rgb(24 28 34 / 0.7); /* gray-850 at 70% */
+  --radius-pill: 999px;
+  --white-a12: rgb(255 255 255 / 0.12);
+  --blur-lg: 24px;
+  --saturate-lg: 180%;
+  --shadow-float-global: 0 10px 30px rgb(0 0 0 / 0.45);
+  --size-sheet-max: 82dvh;
+  --font-size-10: 10px;
+  --font-size-14: 14px;
+  --font-size-16: 16px;
+  --shadow-down-lg: 0 8px 24px rgb(0 0 0 / 0.55);
+  --shadow-up-xl: 0 -16px 48px rgb(0 0 0 / 0.55);
+  /* The device's notch and home-indicator insets; 0 unless the page uses viewport-fit=cover. */
+  --env-safe-top: env(safe-area-inset-top, 0px);
+  --env-safe-right: env(safe-area-inset-right, 0px);
+  --env-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --env-safe-left: env(safe-area-inset-left, 0px);
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* ── Semantic ───────────────────────────────────────── */
@@ -57,6 +85,8 @@
   --on-accent: var(--gray-950);
   --warning: var(--orange-500);
   --danger: #e5534b;
+  /* Text on a danger fill: dark, since light text on this red measures about 3:1. */
+  --on-danger: var(--gray-950);
 
   --tier-exotic: var(--gold-400);
   --tier-legendary: var(--purple-500);
@@ -85,6 +115,33 @@
   --scrollbar-thumb: var(--gray-700);
   --scrollbar-thumb-hover: var(--gray-500);
   --scrollbar-track: transparent;
+
+  /* Layout and touch. --page-gutter is the space between content and the screen edge;
+     --control-size is the smallest tappable control (36px with a mouse, 44px on touch, Apple's minimum).
+     --safe-* are the notch and home indicator insets; 0 everywhere except a phone with viewport-fit=cover. */
+  --page-gutter: var(--space-6);
+  --control-size: var(--size-36);
+  --input-font-size: var(--font-size-14);
+  --safe-top: var(--env-safe-top);
+  --safe-right: var(--env-safe-right);
+  --safe-bottom: var(--env-safe-bottom);
+  --safe-left: var(--env-safe-left);
+  /* Elevation. Dark UI: a higher layer is a lighter surface; shadow only separates it from what's under it.
+     Base (page, panels, full-screen sheets) → raised (cards, bottom sheets) → overlay (menus, toasts). */
+  --surface-sheet: var(--surface-raised);
+  --shadow-overlay: var(--shadow-down-lg);
+  --shadow-sheet: var(--shadow-up-xl);
+  /* Glass: the floating material for chrome over content (iOS 26 Liquid Glass, approximated with
+     a translucent fill, background blur and saturation, a hairline edge, and a top highlight). */
+  --surface-glass: var(--gray-850-a70);
+  --border-glass: var(--white-a12);
+  --highlight-glass: var(--white-a06);
+  --fill-glass-selected: var(--white-a12);
+  --blur-glass: var(--blur-lg);
+  --saturate-glass: var(--saturate-lg);
+  --shadow-float: var(--shadow-float-global);
+  /* Space between neighboring tap targets, so an overshoot doesn't hit the next one (8px floor). */
+  --target-gap: var(--space-2);
 
   /* ── Component ──────────────────────────────────────── */
   /* Item size: the user setting writes --tile-scale on :root. Equipped tiles keep their ratio. */
@@ -145,4 +202,49 @@
   --use-both: var(--gold-400);
   --roll-perk-size: 36px;
   --roll-rail-width: 240px;
+
+  /* Phone chrome: the bottom tab bar, the store switcher above the inventory, and bottom sheets. */
+  --tabbar-height: var(--size-60);
+  /* The floating bar's distance from the screen edges and from the home indicator. */
+  --tabbar-inset: var(--space-4);
+  --tabbar-lift: var(--space-2);
+  --tabbar-radius: var(--radius-pill);
+  --tabbar-icon-size: var(--size-24);
+  --store-switcher-height: var(--size-52);
+  --store-emblem-size: var(--size-36);
+  --sheet-radius: var(--radius-lg);
+  --sheet-max-height: var(--size-sheet-max);
+  --sheet-handle: var(--text-muted);
+  /* Count badge: one shape for every number on a tab or button (tab bar, rolls toolbar). */
+  --count-badge-size: var(--size-18);
+  --count-badge-font: var(--font-size-10);
+}
+
+/*
+ * Container sizes (components respond to their own width, wherever they're placed):
+ *   item-dialog  ≤720px stacks its columns · ≤520px compact header
+ *   chat         ≤420px narrow bubbles and build parts (the desktop chat can be this narrow too)
+ *   rolls        ≤560px one card per row, sticky group headings
+ *   store        ≤440px vault currencies wrap under the title
+ *   cleanup      ≤560px header stacks
+ *
+ * Viewport breakpoints, for the page shell only (also in media.ts; custom properties can't be used inside @media):
+ *   compact  max-width 640px   phones: one store at a time, floating tab bar, full-screen chat and item sheets
+ *   touch    pointer: coarse   any touch screen, phone or tablet: 44px controls
+ * Only semantic and component tokens change here; components pick the new values up untouched.
+ */
+@media (pointer: coarse) {
+  :root {
+    --control-size: var(--size-44);
+    /* 16px stops iOS Safari from zooming the page when a text field is focused. */
+    --input-font-size: var(--font-size-16);
+    --roll-perk-size: var(--size-40);
+  }
+}
+@media (max-width: 640px) {
+  :root {
+    --page-gutter: var(--space-3);
+    --topbar-height: auto;
+    --hovercard-width: min(360px, calc(100vw - 2 * var(--space-4)));
+  }
 }

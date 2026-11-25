@@ -35,6 +35,13 @@ const GLYPHS = {
   settings: 'settings',
   vendor: 'storefront',
   drop: 'new_releases',
+  inventory: 'inventory_2',
+  cleanup: 'delete_sweep',
+  rolls: 'casino',
+  vault: 'shelves',
+  options: 'tune',
+  search: 'search',
+  clear: 'cancel',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

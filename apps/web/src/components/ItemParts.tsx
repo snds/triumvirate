@@ -156,7 +156,7 @@ export function PerkCell({ perk, wished, showName, square, className, onPoint }:
   return (
     <li
       className={`perk-cell${perk.active ? ' is-active' : ''}${wished ? ' is-wished' : ''}${square ? ' is-square' : ''}${className ? ` ${className}` : ''}`}
-      {...(onPoint ? { tabIndex: 0, onMouseEnter: () => onPoint(perk), onFocus: () => onPoint(perk) } : {})}
+      {...(onPoint ? { tabIndex: 0, onMouseEnter: () => onPoint(perk), onFocus: () => onPoint(perk), onClick: () => onPoint(perk) } : {})}
       title={perk.description ? `${label}\n\n${perk.description}` : label}
     >
       <span className="perk-cell__icon">

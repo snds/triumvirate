@@ -47,9 +47,10 @@ export const ItemTile = memo(function ItemTile({
       data-movable={draggable || undefined}
       data-instance={item.instanceId}
       onPointerDown={draggable ? (e) => drag.press(e, item) : undefined}
-      onPointerMove={hover ? tilt : undefined}
+      onPointerMove={hover ? (e) => { if (e.pointerType === 'mouse') tilt(e); } : undefined}
       onClick={onSelect ? () => { hover?.leave(); onSelect(item); } : undefined}
-      onPointerEnter={hover ? (e) => hover.enter(item, e.currentTarget.getBoundingClientRect()) : undefined}
+      // Hovercards are for a mouse; a tap on a phone goes straight to the item dialog.
+      onPointerEnter={hover ? (e) => { if (e.pointerType === 'mouse') hover.enter(item, e.currentTarget.getBoundingClientRect()); } : undefined}
       onPointerLeave={(e) => { hover?.leave(); e.currentTarget.style.removeProperty('--mx'); e.currentTarget.style.removeProperty('--my'); }}
     >
       {item.icon && <img className="tile__icon" src={item.icon} alt="" decoding="async" draggable={false} />}

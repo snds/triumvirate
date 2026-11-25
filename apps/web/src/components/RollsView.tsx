@@ -14,6 +14,7 @@ import { usePref } from '../prefs.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { timeAgo } from '../inventory.ts';
+import { useCompact } from '../media.ts';
 
 const VERDICTS: { value: Verdict; label: string }[] = [
   { value: 'god', label: 'Wish list god roll' },
@@ -70,6 +71,17 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
   const [railOpen, setRailOpen] = usePref('rollRailOpen', true);
   const [panel, setPanel] = usePref<Panel>('rollPanel', 'filters');
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
+  // On a phone the rail becomes a bottom sheet, opened from a toolbar above the cards.
+  const compact = useCompact();
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const open = compact ? sheetOpen : railOpen;
+  const openSheet = (p: Panel) => { setPanel(p); setSheetOpen(true); };
+  useEffect(() => {
+    if (!compact || !sheetOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSheetOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [compact, sheetOpen]);
 
   useEffect(() => {
     let live = true;
@@ -139,14 +151,23 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
     });
 
   return (
-    <section className={`rolls${railOpen ? '' : ' rolls--rail-closed'}`}>
-      <aside className="rolls__rail" aria-label="Roll appraiser options">
+    <section className={`rolls${open || compact ? '' : ' rolls--rail-closed'}${compact ? ' rolls--compact' : ''}`}>
+      {compact && sheetOpen && <div className="sheet-scrim" onClick={() => setSheetOpen(false)} aria-hidden />}
+      {(!compact || sheetOpen) && (
+      <aside
+        className={`rolls__rail${compact ? ' rolls__rail--sheet' : ''}`}
+        aria-label="Roll appraiser options"
+        {...(compact ? { role: 'dialog', 'aria-modal': true } : {})}
+      >
+        {compact && <span className="sheet__handle" aria-hidden />}
         <header className="rolls__rail-head">
-          <button className="button button--quiet" onClick={() => setRailOpen((v) => !v)} aria-expanded={railOpen} title={railOpen ? 'Hide options' : 'Show options'}>
-            <Icon name={railOpen ? 'chevronsLeft' : 'chevronsRight'} />
-            {!railOpen && changed && <span className="rolls__dot" aria-label="Filters on" />}
-          </button>
-          {railOpen && (
+          {!compact && (
+            <button className="button button--quiet" onClick={() => setRailOpen((v) => !v)} aria-expanded={railOpen} title={railOpen ? 'Hide options' : 'Show options'}>
+              <Icon name={railOpen ? 'chevronsLeft' : 'chevronsRight'} />
+              {!railOpen && changed && <span className="rolls__dot" aria-label="Filters on" />}
+            </button>
+          )}
+          {open && (
             <div className="rolls__panels" role="tablist" aria-label="Options">
               {PANELS.map((p) => (
                 <button
@@ -165,8 +186,9 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
               ))}
             </div>
           )}
+          {compact && <button className="button button--quiet rolls__done" onClick={() => setSheetOpen(false)}>Done</button>}
         </header>
-        {railOpen && (
+        {open && (
           <div className="rolls__rail-body" role="tabpanel">
             <div className="rolls__panel-head">
               <h3>{PANELS.find((p) => p.id === panel)!.label}</h3>
@@ -289,10 +311,29 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
           </div>
         )}
       </aside>
+      )}
 
       <div className="rolls__main">
         <header className="rolls__head">
           <h2 className="vault__title">Roll appraiser <span className="vault__count">{shown.length} of {weapons.length}</span></h2>
+          {compact && (
+            <div className="rolls__toolbar" role="toolbar" aria-label="Roll appraiser options">
+              {PANELS.map((p) => (
+                <button
+                  key={p.id}
+                  className={`chip rolls__tool${p.id === 'settings' ? ' rolls__tool--icon' : ''}`}
+                  onClick={() => openSheet(p.id)}
+                  aria-haspopup="dialog"
+                  aria-label={p.id === 'settings' ? p.label : undefined}
+                >
+                  <Icon name={p.icon} />
+                  {p.id !== 'settings' && p.label}
+                  {p.id === 'filters' && changed && <span className="rolls__dot" aria-label="(on)" />}
+                  {p.id === 'activity' && activityCount > 0 && <span className="count-badge">{activityCount}</span>}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="muted">
             {error ? `Community data isn't available: ${error}`
               : !data ? 'Loading community data…'
