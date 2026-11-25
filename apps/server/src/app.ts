@@ -3,12 +3,12 @@
 import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, transferItem, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
+import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyStep, appraise, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
+  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList,
 } from '@triumvirate/core';
@@ -17,6 +17,7 @@ import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from '
 import { stream } from 'hono/streaming';
 import { createChatStore, validChatId } from './chats.ts';
 import { createCommunity } from './community.ts';
+import { createLoadoutStore, validLoadoutId } from './loadouts.ts';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
@@ -24,8 +25,10 @@ const COMPONENTS = [
   103, // ProfileCurrencies (glimmer, bright dust, silver)
   102, // ProfileInventories (vault)
   200, // Characters
+  202, // CharacterProgressions (trimmed to the seasonal artifact before saving)
   201, // CharacterInventories
   205, // CharacterEquipment
+  206, // CharacterLoadouts (in-game loadout slots)
   300, // ItemInstances (power, element, gear tier)
   304, // ItemStats (armor stats)
   305, // ItemSockets (slotted perks)
@@ -102,6 +105,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       loadManifestCached(http),
     ]);
     manifest = man;
+    trimProgressions(profile);
     const now = new Date().toISOString();
     // Bungie stamps each profile response; the same stamps mean the same data.
     if (prev && sameProfile(prev.profile, profile)) {
@@ -455,6 +459,186 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return c.json(out.body, out.status);
   });
 
+  // ── Equip, lock, and loadouts ──────────────────────────────
+
+  /** Loads the snapshot, item tables, and view once, for actions on a cold server. */
+  async function ready(t: Tokens) {
+    if (!current || !lastView || !manifest) {
+      setCurrent((await store.latestSnapshot()) ?? (await sync(t)));
+      if (!manifest) await sync(t);
+      await buildView(current!);
+    }
+    return { snap: current!, view: lastView!, http: createHttpClient(cfg.apiKey, t.accessToken) };
+  }
+
+  /** Runs `fn` after any action already in flight, so Bungie gets its pause and `current` one writer. */
+  function queued<T>(fn: () => Promise<T>): Promise<T> {
+    const run = moveQueue.then(fn);
+    moveQueue = run.catch(() => {});
+    return run;
+  }
+
+  const pause = (ms: number) => new Promise((f) => setTimeout(f, ms));
+  /** Where each item is and whether it's worn or locked, to report only what an action changed. */
+  const placeKey = (i: AppraisedItem) => `${i.owner}|${i.equipped}|${i.locked}|${i.location}`;
+
+  /**
+   * Carries out an equip plan step by step, recording each finished step in the snapshot, and stops
+   * at the first failure. Returns every item whose place changed, so the app can patch them in.
+   */
+  async function runPlan(t: Tokens, plan: (view: NonNullable<typeof lastView>, account: View['account']) => EquipPlan) {
+    return queued(async () => {
+      const { snap, view, http } = await ready(t);
+      const before = new Map(view.items.filter((i) => i.instanceId).map((i) => [i.instanceId!, placeKey(i)]));
+      const { steps, skipped } = plan(view, viewCache!.view.account);
+      snapVersion++; // the steps below edit it in place
+      let error: string | undefined;
+      const run = async (step: ActionStep) => {
+        if (step.kind === 'equip') {
+          if (step.instanceIds.length === 1) {
+            await equipItem(http, { itemId: step.instanceIds[0]!, characterId: step.characterId, membershipType: snap.membershipType });
+            applyEquip(snap.profile, step.characterId, step.instanceIds[0]!);
+            return;
+          }
+          // Several at once: Bungie reports each item's own result.
+          const { Response: r } = await equipItems(http, { itemIds: step.instanceIds, characterId: step.characterId, membershipType: snap.membershipType });
+          for (const res of r.equipResults) {
+            if (res.equipStatus === 1) applyEquip(snap.profile, step.characterId, res.itemInstanceId);
+            else error ??= friendlyMoveError(new Error(`Bungie API error ${res.equipStatus}`));
+          }
+          return;
+        }
+        const base = { itemReferenceHash: step.itemHash, stackSize: 1, itemId: step.instanceId, membershipType: snap.membershipType };
+        if (step.kind === 'pull') await pullFromPostmaster(http, { ...base, characterId: step.characterId });
+        else await transferItem(http, { ...base, characterId: step.characterId, transferToVault: step.kind === 'toVault' });
+        applyStep(snap.profile, step.instanceId, step, manifest!);
+      };
+      for (const step of steps) {
+        try { await run(step); } catch (err) { error = friendlyMoveError(err); break; }
+        if (error) break;
+        await pause(120);
+      }
+      await store.saveSnapshot(snap);
+      const next = await buildView(snap);
+      const changed = next.items.filter((i) => i.instanceId && before.get(i.instanceId) !== placeKey(i));
+      if (!error && steps.length === 0 && skipped.length) error = skipped[0]!.reason;
+      return { status: error ? 409 as const : 200 as const, body: { error, skipped, items: changed, account: next.account } };
+    });
+  }
+
+  // Equips one item on a character, bringing it over first when it's somewhere else.
+  app.post('/api/equip', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { instanceId, characterId } = (await c.req.json().catch(() => ({}))) as { instanceId?: string; characterId?: string };
+    if (!instanceId || !characterId) return c.json({ error: 'Say which item and which character.' }, 400);
+    const out = await runPlan(t, (view, account) => {
+      if (!view.characters.some((ch) => ch.id === characterId)) return { steps: [], skipped: [{ instanceId, reason: 'Unknown character.' }] };
+      return planEquip([instanceId], characterId, view.items, view.characters, account);
+    });
+    return c.json(out.body, out.status);
+  });
+
+  // Locks or unlocks an item in game.
+  app.post('/api/lock', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { instanceId, locked } = (await c.req.json().catch(() => ({}))) as { instanceId?: string; locked?: boolean };
+    if (!instanceId || typeof locked !== 'boolean') return c.json({ error: 'Say which item and whether to lock it.' }, 400);
+    const out = await queued(async () => {
+      const { snap, view, http } = await ready(t);
+      const item = view.items.find((i) => i.instanceId === instanceId);
+      if (!item) return { status: 404 as const, body: { error: 'That item isn\'t there anymore. Refresh and try again.' } };
+      // Bungie wants a character even for vault items; any of yours works.
+      const characterId = item.owner !== 'vault' ? item.owner : view.characters[0]?.id;
+      if (!characterId) return { status: 400 as const, body: { error: 'No character found to act through.' } };
+      try {
+        await setItemLockState(http, { state: locked, itemId: instanceId, characterId, membershipType: snap.membershipType });
+      } catch (err) {
+        return { status: 409 as const, body: { error: friendlyMoveError(err), item } };
+      }
+      snapVersion++;
+      applyLock(snap.profile, instanceId, locked);
+      await store.saveSnapshot(snap);
+      const next = await buildView(snap);
+      return { status: 200 as const, body: { item: next.items.find((i) => i.instanceId === instanceId) } };
+    });
+    return c.json(out.body, out.status);
+  });
+
+  // Triumvirate's own loadouts.
+  const loadouts = createLoadoutStore(store.dataDir);
+  app.get('/api/loadouts', async (c) => c.json(await loadouts.list()));
+  app.post('/api/loadouts', async (c) => {
+    const data = cleanLoadout(await c.req.json().catch(() => undefined));
+    if (!data) return c.json({ error: 'A loadout needs a name, a class, and at least one item.' }, 400);
+    return c.json(await loadouts.create(data), 201);
+  });
+  app.put('/api/loadouts/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!validLoadoutId(id)) return c.json({ error: 'Bad loadout id.' }, 400);
+    const data = cleanLoadout(await c.req.json().catch(() => undefined));
+    if (!data) return c.json({ error: 'A loadout needs a name, a class, and at least one item.' }, 400);
+    // PUT replaces: anything left out (notes, subclass, artifact) is cleared.
+    const saved = await loadouts.update(id, { notes: undefined, subclass: undefined, artifact: undefined, ...data });
+    return saved ? c.json(saved) : c.json({ error: 'Loadout not found.' }, 404);
+  });
+  app.delete('/api/loadouts/:id', async (c) => {
+    const id = c.req.param('id');
+    if (!validLoadoutId(id)) return c.json({ error: 'Bad loadout id.' }, 400);
+    await loadouts.remove(id);
+    return c.json({ ok: true });
+  });
+  // Puts a saved loadout on a character: moves what's elsewhere, then equips it all at once.
+  app.post('/api/loadouts/:id/apply', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const loadout = await loadouts.get(c.req.param('id'));
+    if (!loadout) return c.json({ error: 'Loadout not found.' }, 404);
+    const { characterId } = (await c.req.json().catch(() => ({}))) as { characterId?: string };
+    if (!characterId) return c.json({ error: 'Say which character.' }, 400);
+    const out = await runPlan(t, (view, account) => {
+      const ch = view.characters.find((x) => x.id === characterId);
+      if (!ch) return { steps: [], skipped: [{ instanceId: '', reason: 'Unknown character.' }] };
+      if (loadout.classType !== 3 && loadout.classType !== ch.classType) return { steps: [], skipped: [{ instanceId: '', reason: `This loadout is for another class, not a ${ch.className}.` }] };
+      return planEquip(loadout.items.map((i) => i.instanceId), characterId, view.items, view.characters, account);
+    });
+    return c.json(out.body, out.status);
+  });
+
+  // In-game loadout slots. Bungie does the work (it pulls from the vault too), and asks for a
+  // second between these calls; afterwards the real state is pulled back, since mods change too.
+  async function gameLoadoutAction(c: Context, act: (http: ReturnType<typeof createHttpClient>, body: { characterId: string; index: number; nameHash?: number; colorHash?: number; iconHash?: number }, membershipType: number) => Promise<unknown>) {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { characterId?: string; index?: number; nameHash?: number; colorHash?: number; iconHash?: number };
+    const index = Number(body.index);
+    if (!body.characterId || !Number.isInteger(index) || index < 0 || index > 49) return c.json({ error: 'Say which character and which slot.' }, 400);
+    const out = await queued(async () => {
+      const { snap, view, http } = await ready(t);
+      if (!view.characters.some((ch) => ch.id === body.characterId)) return { status: 400 as const, body: { error: 'Unknown character.' } };
+      let error: string | undefined;
+      try { await act(http, { ...body, characterId: body.characterId!, index }, snap.membershipType); } catch (err) { error = friendlyMoveError(err); }
+      await pause(1000);
+      // Pull the real state back from Bungie, so the app shows what actually happened.
+      await sync(t);
+      return { status: error ? 409 as const : 200 as const, body: { error } };
+    });
+    return c.json(out.body, out.status);
+  }
+  app.post('/api/game-loadouts/equip', (c) => gameLoadoutAction(c, (http, b, membershipType) =>
+    equipLoadout(http, { loadoutIndex: b.index, characterId: b.characterId, membershipType })));
+  // Saves what the character is wearing into a slot, with the chosen name, color, and icon.
+  app.post('/api/game-loadouts/save', (c) => gameLoadoutAction(c, async (http, b, membershipType) => {
+    const ids = { loadoutIndex: b.index, characterId: b.characterId, membershipType, colorHash: b.colorHash, iconHash: b.iconHash, nameHash: b.nameHash };
+    await snapshotLoadout(http, ids);
+    // Snapshot keeps the old look on some slots; set it explicitly when one was chosen.
+    if (b.nameHash || b.colorHash || b.iconHash) { await pause(1000); await updateLoadoutIdentifiers(http, ids); }
+  }));
+  // Renames or recolors a slot without touching its gear.
+  app.post('/api/game-loadouts/identify', (c) => gameLoadoutAction(c, (http, b, membershipType) =>
+    updateLoadoutIdentifiers(http, { loadoutIndex: b.index, characterId: b.characterId, membershipType, colorHash: b.colorHash, iconHash: b.iconHash, nameHash: b.nameHash })));
+
   // Turns a raw snapshot into what the web app and the agent see: items with roll verdicts, plus cleanup picks.
   async function buildView(snap: Snapshot): Promise<View> {
     const list = await deps.wishList();
@@ -468,13 +652,18 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const characters = summarizeCharacters(snap.profile, manifest!, snap.titles);
     const account = summarizeAccount(snap.profile, manifest!);
     const cleanup = cleanupCandidates(items);
+    const hashById = new Map(items.filter((i) => i.instanceId).map((i) => [i.instanceId!, i.itemHash]));
+    const gameLoadouts = summarizeGameLoadouts(snap.profile, manifest!, (id) => hashById.get(id));
+    // Only the armor sets this account owns pieces of; the full list is mostly other people's gear.
+    const owned = new Set(items.map((i) => i.setHash).filter(Boolean));
+    const itemSets = Object.fromEntries(Object.entries(manifest!.itemSets ?? {}).filter(([h]) => owned.has(Number(h))));
     // The subclass index only changes with the manifest, so build it once per version.
     if (subclassFor !== manifest!.version) {
       subclass = buildSubclassIndex(manifest!);
       subclassFor = manifest!.version;
     }
     lastView = { displayName: snap.displayName, characters, items, cleanup, subclass };
-    const view = { characters, account, items, cleanup };
+    const view = { characters, account, items, cleanup, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets };
     viewCache = { key, list, view };
     return view;
   }
@@ -496,6 +685,11 @@ export function friendlyMoveError(err: unknown): string {
   if (code === 1623) return 'Bungie can\'t find that item where we expected. Refresh and try again.';
   if (code === 1660 || code === 1673) return 'Bungie won\'t let this item move.';
   if (code === 1663) return 'Bungie won\'t allow that right now. Try again from orbit or a social space.';
+  if (code === 1634 || code === 1671 || code === 1655) return 'Equipping only works in orbit, in a social space, or while you\'re offline.';
+  if (code === 1641) return 'You already have an exotic of that kind equipped.';
+  if (code === 1640) return 'That item can\'t be equipped.';
+  if (code === 1638 || code === 1639) return 'That character can\'t use this item yet.';
+  if (code === 1656) return 'That item is equipped, so it can\'t do that right now.';
   if (code === 31 || code === 36) return 'Bungie asked us to slow down. Wait a moment and try again.';
   return msg;
 }
@@ -505,6 +699,19 @@ interface View {
   account: ReturnType<typeof summarizeAccount>;
   items: AppraisedItem[];
   cleanup: ReturnType<typeof cleanupCandidates>;
+  gameLoadouts: ReturnType<typeof summarizeGameLoadouts>;
+  loadoutStyles: ManifestTables['loadoutStyles'];
+  itemSets: NonNullable<ManifestTables['itemSets']>;
+}
+
+/**
+ * Character progressions hold every faction, milestone, and quest, but the app only reads the
+ * seasonal artifact, so the rest is dropped before a snapshot is saved (it would triple its size).
+ */
+export function trimProgressions(profile: DestinyProfileResponse) {
+  const data = profile.characterProgressions?.data as Record<string, { seasonalArtifact?: unknown }> | undefined;
+  if (!data) return;
+  for (const [id, p] of Object.entries(data)) data[id] = { seasonalArtifact: p.seasonalArtifact } as never;
 }
 
 /** Bungie stamps when it built each part of a profile; matching stamps mean nothing changed. */

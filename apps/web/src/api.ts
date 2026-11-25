@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, CharacterRow, CleanupCandidate, CommunityAppraisal, RollOptions } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, CommunityAppraisal, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -12,6 +12,11 @@ export interface Inventory {
   account?: AccountSummary;
   items: AppraisedItem[];
   cleanup: CleanupCandidate[];
+  /** In-game loadout slots by character id. Optional so an older server still renders. */
+  gameLoadouts?: Record<string, GameLoadout[]>;
+  loadoutStyles?: LoadoutStyles;
+  /** Armor sets you own pieces of, for set bonuses. */
+  itemSets?: Record<string, ArmorSet>;
 }
 
 export interface ChatTurn {
@@ -179,3 +184,51 @@ export interface VendorOffers {
 }
 export const fetchVendorOffers = async (refresh = false): Promise<VendorOffers> =>
   json(await fetch(`/api/community/vendors${refresh ? '?refresh=1' : ''}`), sameOriginImages);
+
+// ── Equip, lock, and loadouts ─────────────────────────────────
+
+export interface ActionResult {
+  /** Every item whose place changed (equipped, moved, or swapped out). */
+  items?: AppraisedItem[];
+  account?: AccountSummary;
+  /** Items a loadout couldn't put on, and why. */
+  skipped?: { instanceId: string; name?: string; reason: string }[];
+  error?: string;
+}
+
+/** POSTs an action. Never throws; a failure comes back as `error`. */
+async function act<T extends { error?: string }>(path: string, body: unknown, what: string): Promise<T> {
+  try {
+    const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const out = sameOriginJson<T>(await res.text());
+    if (!res.ok && !out.error) out.error = res.status === 401 ? `Sign in again to ${what}.` : `Couldn't ${what} (${res.status})`;
+    return out;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) } as T;
+  }
+}
+const sameOriginJson = <T>(text: string): T => { try { return JSON.parse(sameOriginImages(text)) as T; } catch { return {} as T; } };
+
+export const equipItem = (instanceId: string, characterId: string) => act<ActionResult>('/api/equip', { instanceId, characterId }, 'equip items');
+export const setLocked = (instanceId: string, locked: boolean) =>
+  act<{ item?: AppraisedItem; error?: string }>('/api/lock', { instanceId, locked }, 'lock items');
+
+export type LoadoutDraft = Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes' | 'subclass' | 'artifact'>;
+export const listLoadouts = async (): Promise<SavedLoadout[]> => json(await fetch('/api/loadouts'), sameOriginImages);
+export const createLoadout = async (l: LoadoutDraft): Promise<SavedLoadout> => json(await fetch('/api/loadouts', {
+  method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(l),
+}), sameOriginImages);
+export const updateLoadout = async (id: string, l: LoadoutDraft): Promise<SavedLoadout> => json(await fetch(`/api/loadouts/${encodeURIComponent(id)}`, {
+  method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(l),
+}), sameOriginImages);
+export const deleteLoadout = async (id: string): Promise<void> => { await fetch(`/api/loadouts/${encodeURIComponent(id)}`, { method: 'DELETE' }); };
+export const applyLoadout = (id: string, characterId: string) =>
+  act<ActionResult>(`/api/loadouts/${encodeURIComponent(id)}/apply`, { characterId }, 'apply the loadout');
+
+export interface GameSlotLook { nameHash?: number; colorHash?: number; iconHash?: number }
+export const equipGameLoadout = (characterId: string, index: number) =>
+  act<{ error?: string }>('/api/game-loadouts/equip', { characterId, index }, 'equip the loadout');
+export const saveGameLoadout = (characterId: string, index: number, look: GameSlotLook) =>
+  act<{ error?: string }>('/api/game-loadouts/save', { characterId, index, ...look }, 'save the loadout');
+export const restyleGameLoadout = (characterId: string, index: number, look: GameSlotLook) =>
+  act<{ error?: string }>('/api/game-loadouts/identify', { characterId, index, ...look }, 'rename the loadout');

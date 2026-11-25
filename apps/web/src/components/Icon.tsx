@@ -3,6 +3,7 @@
 const GLYPHS = {
   refresh: 'refresh',
   chevronDown: 'expand_more',
+  chevronRight: 'chevron_right',
   chevronsLeft: 'keyboard_double_arrow_left',
   chevronsRight: 'keyboard_double_arrow_right',
   signOut: 'logout',
@@ -42,6 +43,16 @@ const GLYPHS = {
   options: 'tune',
   search: 'search',
   clear: 'cancel',
+  lockOpen: 'lock_open',
+  equip: 'apparel',
+  loadouts: 'checkroom',
+  game: 'stadia_controller',
+  save: 'bookmark_add',
+  edit: 'edit',
+  add: 'add',
+  more: 'more_horiz',
+  import: 'download',
+  warning: 'warning',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

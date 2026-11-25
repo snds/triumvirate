@@ -14,7 +14,7 @@ The full product plan lives in the "Destiny Companion — Product Plan" doc in t
 | 2 | **Appraisal (current):** wish-list roll scoring, vault cleanup list, agent side panel |
 | 3 | Play-style profile (match history, loadouts, DIM) and build cards |
 | 4 | Vendor highlights, farming list, weekly digest |
-| 5 | Actions: move, equip, lock, apply loadout, DIM tag write-back |
+| 5 | Actions: move, equip, lock, loadouts (done); DIM tag write-back |
 | 6 | Armor optimizer, Claude chat tool (MCP server), phone install |
 | 7 | Destiny 1, read-only |
 
@@ -57,6 +57,14 @@ Cloudflare Tunnel, with Cloudflare Access letting only you in. Step-by-step setu
 - **Cleanup:** duplicates with a better copy, lone rolls no list wants ("Check"), and armor beaten in every
   stat by another piece for the same class and slot ("Safe"). Locked and equipped items are never listed.
   **Copy DIM search** gives you an `id:` search to select them all in DIM.
+- **Equip and lock:** the item panel has Equip on (one button per character) and a Lock toggle. Equipping
+  brings the item over from the vault or another character first, makes room in a full slot, and swaps out a
+  second exotic for your best legendary in that slot. Bungie only allows equipping in orbit, a social space, or offline.
+- **Loadouts:** the in-game slots for each character (equip, save what you're wearing, rename and recolor,
+  copy into Triumvirate), plus Triumvirate's own unlimited loadouts saved in `.data/loadouts.json`, which pull
+  gear from anywhere. The builder picks one item per slot from any character or the vault. Every card shows
+  the build at a glance: super, abilities, aspects, and fragments; armor set bonuses (on or locked); and
+  artifact perks (a reminder only, since apps can't change them). Armor mods stay out of the summary.
 - **Ask:** Claude (`claude-opus-5-5`) with read-only tools over your snapshot. Needs `ANTHROPIC_API_KEY` in `.env`.
 
 Tokens and the manifest cache live in `.data/` (git-ignored). Never commit `.env`.

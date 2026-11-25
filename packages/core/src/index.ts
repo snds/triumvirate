@@ -5,6 +5,7 @@ export * from './wishlist.ts';
 export * from './cleanup.ts';
 export * from './subclass.ts';
 export * from './transfer.ts';
+export * from './loadouts.ts';
 export * from './rolls.ts';
 export * from './community.ts';
 export * from './vendors.ts';
