@@ -37,7 +37,7 @@ export function TabBar({ view, onView, cleanupCount, chatOpen, onChat, chatStatu
           >
             <span className="tabbar__icon">
               <Icon name={v.icon} filled={current} />
-              {v.id === 'cleanup' && cleanupCount > 0 && <span className="tabbar__count">{cleanupCount > 99 ? '99+' : cleanupCount}</span>}
+              {v.id === 'cleanup' && cleanupCount > 0 && <span className="tabbar__count count-badge count-badge--neutral">{cleanupCount > 99 ? '99+' : cleanupCount}</span>}
             </span>
             <span className="tabbar__label">{v.label}</span>
           </button>
@@ -51,7 +51,7 @@ export function TabBar({ view, onView, cleanupCount, chatOpen, onChat, chatStatu
       >
         <span className="tabbar__icon">
           <Icon name="chat" filled={chatOpen} />
-          {!chatOpen && chatStatus.unread > 0 && <span className="tabbar__count tabbar__count--alert">{chatStatus.unread}</span>}
+          {!chatOpen && chatStatus.unread > 0 && <span className="tabbar__count count-badge count-badge--alert">{chatStatus.unread}</span>}
           {!chatOpen && chatStatus.unread === 0 && chatStatus.active && <span className="tabbar__dot" />}
         </span>
         <span className="tabbar__label">Ask</span>

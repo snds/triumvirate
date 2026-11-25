@@ -329,7 +329,7 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
                   <Icon name={p.icon} />
                   {p.id !== 'settings' && p.label}
                   {p.id === 'filters' && changed && <span className="rolls__dot" aria-label="(on)" />}
-                  {p.id === 'activity' && activityCount > 0 && <span className="rolls__tool-count">{activityCount}</span>}
+                  {p.id === 'activity' && activityCount > 0 && <span className="count-badge">{activityCount}</span>}
                 </button>
               ))}
             </div>

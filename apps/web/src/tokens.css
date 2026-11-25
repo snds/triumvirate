@@ -42,6 +42,25 @@
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 16px;
+  /* Size ramp for controls, targets, and icons (literal: the name is the value). */
+  --size-18: 18px;
+  --size-24: 24px;
+  --size-36: 36px;
+  --size-40: 40px;
+  --size-44: 44px;
+  --size-52: 52px;
+  --size-56: 56px;
+  --size-sheet-max: 82dvh;
+  --font-size-10: 10px;
+  --font-size-14: 14px;
+  --font-size-16: 16px;
+  --shadow-down-lg: 0 8px 24px rgb(0 0 0 / 0.55);
+  --shadow-up-xl: 0 -16px 48px rgb(0 0 0 / 0.55);
+  /* The device's notch and home-indicator insets; 0 unless the page uses viewport-fit=cover. */
+  --env-safe-top: env(safe-area-inset-top, 0px);
+  --env-safe-right: env(safe-area-inset-right, 0px);
+  --env-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --env-safe-left: env(safe-area-inset-left, 0px);
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
 
   /* ── Semantic ───────────────────────────────────────── */
@@ -58,6 +77,8 @@
   --on-accent: var(--gray-950);
   --warning: var(--orange-500);
   --danger: #e5534b;
+  /* Text on a danger fill: dark, since light text on this red measures about 3:1. */
+  --on-danger: var(--gray-950);
 
   --tier-exotic: var(--gold-400);
   --tier-legendary: var(--purple-500);
@@ -91,12 +112,19 @@
      --control-size is the smallest tappable control (36px with a mouse, 44px on touch, Apple's minimum).
      --safe-* are the notch and home indicator insets; 0 everywhere except a phone with viewport-fit=cover. */
   --page-gutter: var(--space-6);
-  --control-size: 36px;
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-right: env(safe-area-inset-right, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  --safe-left: env(safe-area-inset-left, 0px);
-  --surface-sheet: var(--surface-panel);
+  --control-size: var(--size-36);
+  --input-font-size: var(--font-size-14);
+  --safe-top: var(--env-safe-top);
+  --safe-right: var(--env-safe-right);
+  --safe-bottom: var(--env-safe-bottom);
+  --safe-left: var(--env-safe-left);
+  /* Elevation. Dark UI: a higher layer is a lighter surface; shadow only separates it from what's under it.
+     Base (page, panels, full-screen sheets) → raised (cards, bottom sheets) → overlay (menus, toasts). */
+  --surface-sheet: var(--surface-raised);
+  --shadow-overlay: var(--shadow-down-lg);
+  --shadow-sheet: var(--shadow-up-xl);
+  /* Space between neighboring tap targets, so an overshoot doesn't hit the next one (8px floor). */
+  --target-gap: var(--space-2);
 
   /* ── Component ──────────────────────────────────────── */
   /* Item size: the user setting writes --tile-scale on :root. Equipped tiles keep their ratio. */
@@ -159,13 +187,16 @@
   --roll-rail-width: 240px;
 
   /* Phone chrome: the bottom tab bar, the store switcher above the inventory, and bottom sheets. */
-  --tabbar-height: 56px;
-  --tabbar-icon-size: 24px;
-  --store-switcher-height: 52px;
+  --tabbar-height: var(--size-56);
+  --tabbar-icon-size: var(--size-24);
+  --store-switcher-height: var(--size-52);
+  --store-emblem-size: var(--size-36);
   --sheet-radius: var(--radius-lg);
-  --sheet-max-height: 82dvh;
-  --sheet-handle: var(--gray-500);
-  --input-font-size: 14px;
+  --sheet-max-height: var(--size-sheet-max);
+  --sheet-handle: var(--text-muted);
+  /* Count badge: one shape for every number on a tab or button (tab bar, rolls toolbar). */
+  --count-badge-size: var(--size-18);
+  --count-badge-font: var(--font-size-10);
 }
 
 /*
@@ -176,17 +207,16 @@
  */
 @media (pointer: coarse) {
   :root {
-    --control-size: 44px;
+    --control-size: var(--size-44);
     /* 16px stops iOS Safari from zooming the page when a text field is focused. */
-    --input-font-size: 16px;
-    --roll-perk-size: 40px;
+    --input-font-size: var(--font-size-16);
+    --roll-perk-size: var(--size-40);
   }
 }
 @media (max-width: 640px) {
   :root {
     --page-gutter: var(--space-3);
     --topbar-height: auto;
-    --tile-gap: 5px;
     --hovercard-width: min(360px, calc(100vw - 2 * var(--space-4)));
   }
 }

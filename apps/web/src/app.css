@@ -1165,19 +1165,14 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
     display: grid; justify-items: center; align-content: center; gap: 2px;
     height: var(--tabbar-height);
     padding: 0; border: 0; background: none;
-    color: var(--text-muted); font: inherit; font-size: 11px; font-weight: 600;
+    /* Secondary, not muted: 11px labels need full text contrast (muted measures about 3:1 here). */
+    color: var(--text-secondary); font: inherit; font-size: 11px; font-weight: 600;
     cursor: pointer;
   }
   .tabbar__tab.is-selected { color: var(--accent); }
   .tabbar__icon { position: relative; display: grid; place-items: center; }
   .tabbar__icon .icon { font-size: var(--tabbar-icon-size); }
-  .tabbar__count {
-    position: absolute; top: -4px; left: calc(100% - 8px);
-    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
-    background: var(--surface-hover); color: var(--text-secondary);
-    font-size: 10px; font-weight: 700; line-height: 18px; text-align: center;
-  }
-  .tabbar__count--alert { background: var(--danger); color: var(--text-primary); }
+  .tabbar__count { position: absolute; top: -4px; left: calc(100% - 8px); }
   .tabbar__dot { position: absolute; top: -1px; right: -3px; width: 9px; height: 9px; border-radius: 50%; background: var(--text-primary); box-shadow: 0 0 0 2px var(--surface-panel); }
   /* While an answer is being written, the chat tab's icon pulses, like the button's ring on desktop. */
   .tabbar__tab--chat.is-busy .tabbar__icon .icon { color: var(--accent); animation: tab-pulse 1.2s ease-in-out infinite; }
@@ -1186,7 +1181,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   /* Store switcher: sticks under the top bar as the store scrolls. */
   .store-switcher {
     position: sticky; top: 0; z-index: 3;
-    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--space-1);
+    display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--target-gap);
     padding: var(--space-2) var(--page-gutter);
     background: color-mix(in srgb, var(--surface-page) 92%, transparent);
     backdrop-filter: blur(8px);
@@ -1211,14 +1206,14 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   /* A scrim under the text, light enough that the emblem still reads. */
   .store-switcher__emblem::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, rgb(0 0 0 / 0.55), rgb(0 0 0 / 0.1)); }
   .store-switcher__tab.is-selected .store-switcher__emblem { opacity: 1; }
-  .store-switcher__emblem--vault { left: auto; width: 40px; display: grid; place-items: center; opacity: 0.5; color: var(--text-secondary); background: none; }
+  .store-switcher__emblem--vault { left: auto; width: var(--store-emblem-size); display: grid; place-items: center; opacity: 0.5; color: var(--text-secondary); background: none; }
   .store-switcher__emblem--vault::after { display: none; }
   .store-switcher__emblem--vault .icon { font-size: 28px; }
   .store-switcher__text { display: grid; min-width: 0; line-height: 1.2; }
   .store-switcher__name { font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .store-switcher__meta { display: flex; align-items: center; gap: 1px; font-size: 12px; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
   .store-switcher__meta .icon { font-size: 10px; }
-  .store-switcher__tab:last-child .store-switcher__meta { color: var(--text-muted); font-weight: 600; }
+  .store-switcher__tab:last-child .store-switcher__meta { color: var(--text-secondary); font-weight: 600; }
 
   /* Inventory: the chosen store fills the width. */
   .inventory { grid-template-columns: minmax(0, 1fr); padding-top: var(--space-3); }
@@ -1279,12 +1274,11 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   .rolls__tool .icon { font-size: 18px; }
   .rolls__tool--icon { padding-inline: var(--space-2); }
   .rolls__tool .rolls__dot { position: static; }
-  .rolls__tool-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; line-height: 18px; text-align: center; }
   .rolls__cards { grid-template-columns: minmax(0, 1fr); }
   /* Group headings stay in view while their cards scroll under them. */
   .rolls__group-head { position: sticky; top: 0; z-index: 1; background: var(--surface-page); min-height: var(--control-size); }
   .roll-card__body { gap: var(--space-2) var(--space-1); }
-  .roll-perks { gap: var(--space-2) 6px; }
+  .roll-perks { gap: var(--target-gap); }
   .roll-card__actions .button { flex: 1; justify-content: center; }
 
   /* Bottom sheet, shared shape: rounded top, a grab handle, and the home indicator's inset. */
@@ -1297,12 +1291,14 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
     border: 0; border-top: 1px solid var(--border-subtle);
     border-radius: var(--sheet-radius) var(--sheet-radius) 0 0;
     background: var(--surface-sheet);
-    box-shadow: 0 -16px 48px rgb(0 0 0 / 0.5);
+    box-shadow: var(--shadow-sheet);
     overflow: hidden;
     animation: sheet-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
   }
   .rolls__rail--sheet .rolls__rail-body { overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-4); }
-  .rolls__rail--sheet .rolls__panels { justify-content: flex-start; gap: var(--space-1); }
+  .rolls__rail--sheet .rolls__panels { justify-content: flex-start; gap: var(--target-gap); }
+  /* The sheet is one level up, so its rows and fields step up with it. */
+  .rolls__rail--sheet .activity__row, .rolls__rail--sheet .rolls__select { background: var(--surface-hover); }
   .sheet__handle { justify-self: center; width: 36px; height: 5px; margin: var(--space-1) 0 var(--space-2); border-radius: 3px; background: var(--sheet-handle); }
   .rolls__done { color: var(--accent); font-weight: 600; }
   /* The activity list has the sheet's full width, so its tiles can be full size. */
@@ -1317,3 +1313,14 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   .rolls__rail--sheet, .sheet-scrim { animation: none; }
   .tabbar__tab--chat.is-busy .tabbar__icon .icon { animation: none; }
 }
+
+/* Count badge: the number on a tab or toolbar button. Neutral for a tally, danger for unread answers. */
+.count-badge {
+  min-width: var(--count-badge-size); height: var(--count-badge-size); padding: 0 5px;
+  border-radius: calc(var(--count-badge-size) / 2);
+  background: var(--accent); color: var(--on-accent);
+  font-size: var(--count-badge-font); font-weight: 700; line-height: var(--count-badge-size); text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.count-badge--neutral { background: var(--surface-hover); color: var(--text-secondary); }
+.count-badge--alert { background: var(--danger); color: var(--on-danger); }
