@@ -18,6 +18,8 @@ import {
   type DestinyLoadoutColorDefinition,
   type DestinyLoadoutIconDefinition,
   type DestinyLoadoutConstantsDefinition,
+  type DestinyEquipableItemSetDefinition,
+  type DestinySandboxPerkDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 
@@ -40,6 +42,32 @@ export interface ManifestTables {
   plugSets?: Record<string, number[]>;
   /** In-game loadout names, colors, and icons, in the game's picker order. */
   loadoutStyles?: LoadoutStyles;
+  /** Armor sets and the perks that switch on at 2 and 4 pieces, by set hash. */
+  itemSets?: Record<string, ArmorSet>;
+}
+
+/** An armor set (Armor 3.0): its name and the bonus perks wearing enough of it turns on. */
+export interface ArmorSet {
+  name: string;
+  icon?: string;
+  perks: { count: number; name: string; description?: string; icon?: string }[];
+}
+
+/** Joins armor sets to their perk names, keeping only what the summary shows. */
+export function slimItemSets(
+  sets: Record<string, DestinyEquipableItemSetDefinition>, perks: Record<string, Pick<DestinySandboxPerkDefinition, 'displayProperties'>>,
+): Record<string, ArmorSet> {
+  const url = (p?: string) => (p ? `https://www.bungie.net${p}` : undefined);
+  const out: Record<string, ArmorSet> = {};
+  for (const [h, s] of Object.entries(sets)) {
+    const list = (s.setPerks ?? []).map((sp) => {
+      const d = perks[sp.sandboxPerkHash]?.displayProperties;
+      return { count: sp.requiredSetCount, name: d?.name || `${sp.requiredSetCount}-piece bonus`, description: d?.description || undefined, icon: url(d?.icon) };
+    }).sort((a, b) => a.count - b.count);
+    if (!s.displayProperties?.name || list.length === 0) continue;
+    out[h] = { name: s.displayProperties.name, icon: url(s.displayProperties.icon), perks: list };
+  }
+  return out;
 }
 
 /** The choices the game offers for naming and decorating an in-game loadout. */
@@ -87,6 +115,8 @@ export interface ItemExtra {
   baseStats?: [number, number][];
   /** Weapons: per socket, [plug set hash (0 if none), the plug it starts with]. */
   socketEntries?: [number, number][];
+  /** Armor: the set it belongs to, for set bonuses. */
+  itemSetHash?: number;
 }
 
 export interface ObjectiveExtra {
@@ -108,6 +138,7 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       if (cats?.length) x.socketCategories = cats.map((c) => [c.socketCategoryHash, c.socketIndexes]);
       if (d.flavorText) x.flavorText = d.flavorText;
       if (d.breakerTypeHash) x.breakerTypeHash = d.breakerTypeHash;
+      if (d.equippingBlock?.equipableItemSetHash) x.itemSetHash = d.equippingBlock.equipableItemSetHash;
       if (d.itemType === 3) {
         if (d.equippingBlock?.ammoType) x.ammoType = d.equippingBlock.ammoType;
         const base = Object.values(d.stats?.stats ?? {}).filter((st) => st.value !== 0);
@@ -140,10 +171,12 @@ const TABLES = {
   loadoutNames: 'DestinyLoadoutNameDefinition',
   loadoutColors: 'DestinyLoadoutColorDefinition',
   loadoutIcons: 'DestinyLoadoutIconDefinition',
+  itemSets: 'DestinyEquipableItemSetDefinition',
+  sandboxPerks: 'DestinySandboxPerkDefinition',
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 3;
+const SLIM_VERSION = 4;
 
 /**
  * Returns the manifest tables, or undefined when `currentVersion` is already the
@@ -206,7 +239,15 @@ export async function loadManifest(
   const loadoutStyles = await Promise.all([
     load(TABLES.loadoutConstants), load(TABLES.loadoutNames), load(TABLES.loadoutColors), load(TABLES.loadoutIcons),
   ]).then(([c, n, col, i]) => slimLoadoutStyles(c as never, n as never, col as never, i as never)).catch(() => undefined);
+  // Armor sets name their perks by sandbox perk; that table is big, so keep only what sets use.
+  const itemSets = await load(TABLES.itemSets, (full: Record<string, DestinyEquipableItemSetDefinition>) => full)
+    .then(async (sets) => {
+      const used = new Set(Object.values(sets).flatMap((x) => x.setPerks?.map((p) => String(p.sandboxPerkHash)) ?? []));
+      const perks = await load(TABLES.sandboxPerks, (full: Record<string, DestinySandboxPerkDefinition>) =>
+        Object.fromEntries(Object.entries(full).filter(([h]) => used.has(h)).map(([h, p]) => [h, { displayProperties: p.displayProperties }])));
+      return slimItemSets(sets, perks);
+    }).catch(() => undefined);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets };
 }

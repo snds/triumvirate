@@ -1,9 +1,9 @@
 // Equipping, locking, and loadouts. Pure logic: the web app checks an action instantly, and the
 // server plans the same Bungie calls and records each finished step in its snapshot.
 import type { DestinyItemComponent, DestinyProfileResponse } from 'bungie-api-ts/destiny2';
-import type { ManifestTables } from './manifest.ts';
-import type { AccountSummary, CharacterRow, ItemRow } from './vault.ts';
-import { POSTMASTER_BUCKET, SUBCLASS_BUCKET } from './vault.ts';
+import type { ArmorSet, ManifestTables } from './manifest.ts';
+import type { AccountSummary, ArtifactPerk, CharacterRow, EquippedSubclass, ItemRow } from './vault.ts';
+import { POSTMASTER_BUCKET, SUBCLASS_BUCKET, subclassFromPlugs } from './vault.ts';
 import { CHARACTER_BUCKET_CARRIED, planMove, type MoveStep } from './transfer.ts';
 
 /** Equippable slots, in game order: three weapons, five armor pieces, then ghost and subclass. */
@@ -223,17 +223,32 @@ export interface GameLoadout {
   plugs: Record<string, number[]>;
   /** A slot nothing has been saved to. */
   empty: boolean;
+  /** The subclass setup saved in the slot: super, abilities, aspects, fragments. */
+  subclass?: EquippedSubclass;
 }
 
 /** Each character's in-game loadout slots, read from the CharacterLoadouts component (206). */
 export function summarizeGameLoadouts(
-  profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'loadoutStyles'>,
+  profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'loadoutStyles'> & Partial<Pick<ManifestTables, 'items' | 'extras'>>,
+  /** Instance id to item hash, to find which loadout item is the subclass. */
+  itemHashOf: (instanceId: string) => number | undefined = () => undefined,
 ): Record<string, GameLoadout[]> {
   const styles = manifest.loadoutStyles;
   const name = new Map(styles?.names.map((n) => [n.hash, n.name]));
   const color = new Map(styles?.colors.map((c) => [c.hash, c.image]));
   const icon = new Map(styles?.icons.map((c) => [c.hash, c.image]));
   const out: Record<string, GameLoadout[]> = {};
+  // The subclass is the loadout item whose definition sits in the subclass bucket.
+  const subclassOf = (real: { itemInstanceId: string; plugItemHashes: number[] }[]) => {
+    if (!manifest.items) return {};
+    for (const i of real) {
+      const hash = itemHashOf(i.itemInstanceId);
+      if (hash && manifest.items[hash]?.inventory?.bucketTypeHash === SUBCLASS_BUCKET) {
+        return { subclass: subclassFromPlugs(hash, i.plugItemHashes, { items: manifest.items, extras: manifest.extras }) };
+      }
+    }
+    return {};
+  };
   const data = (profile as DestinyProfileResponse & { characterLoadouts?: { data?: Record<string, { loadouts: { colorHash: number; iconHash: number; nameHash: number; items: { itemInstanceId: string; plugItemHashes: number[] }[] }[] }> } }).characterLoadouts?.data ?? {};
   for (const [characterId, c] of Object.entries(data)) {
     out[characterId] = c.loadouts.map((l, index) => {
@@ -252,6 +267,7 @@ export function summarizeGameLoadouts(
         items: real.map((i) => i.itemInstanceId),
         plugs,
         empty: real.length === 0,
+        ...subclassOf(real),
       };
     });
   }
@@ -269,8 +285,35 @@ export interface SavedLoadout {
   /** One per slot; item hash kept so a missing copy can still be named. */
   items: { instanceId: string; itemHash: number; bucketHash?: number }[];
   notes?: string;
+  /** Subclass setup when saved (Triumvirate shows it; applying it is up to you in game). */
+  subclass?: EquippedSubclass;
+  /** Artifact perks that were on when saved. Bungie can't change artifact perks, so this is a note. */
+  artifact?: ArtifactPerk[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SetBonus {
+  hash: number;
+  name: string;
+  icon?: string;
+  /** Pieces of the set in the list. */
+  count: number;
+  perks: (ArmorSet['perks'][number] & { active: boolean })[];
+}
+
+/** Armor set bonuses for a set of items: each set worn, how many pieces, and which perks that turns on. */
+export function setBonuses(items: Pick<ItemRow, 'setHash' | 'instanceId'>[], sets: Record<string, ArmorSet> | undefined): SetBonus[] {
+  if (!sets) return [];
+  const counts = new Map<number, number>();
+  for (const i of items) if (i.setHash) counts.set(i.setHash, (counts.get(i.setHash) ?? 0) + 1);
+  return [...counts]
+    .flatMap(([hash, count]): SetBonus[] => {
+      const set = sets[hash];
+      return set ? [{ hash, name: set.name, icon: set.icon, count, perks: set.perks.map((p) => ({ ...p, active: count >= p.count })) }] : [];
+    })
+    // Sets doing something first, then the most pieces.
+    .sort((a, b) => Number(b.perks.some((p) => p.active)) - Number(a.perks.some((p) => p.active)) || b.count - a.count);
 }
 
 /** The gear a character is wearing, as loadout items (subclass included). */
@@ -295,7 +338,51 @@ export function loadoutStatus(loadout: Pick<SavedLoadout, 'items'>, characterId:
 }
 
 /** Accepts a loadout from a request body, trimmed to known fields. Undefined when it doesn't hold up. */
-export function cleanLoadout(body: unknown): Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes'> | undefined {
+const str = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined);
+// The web app shows Bungie images through its own /api/bungie-img/ route, so a loadout sent back may
+// use either form. Both are stored as the bungie.net link; anything else is dropped.
+const bungieImage = (v: unknown) => {
+  if (typeof v !== 'string') return undefined;
+  const m = /^(?:https:\/\/www\.bungie\.net|\/api\/bungie-img)?\/((?:common|img)\/[\w./-]+)$/.exec(v);
+  return m && !m[1]!.includes('..') ? `https://www.bungie.net/${m[1]}` : undefined;
+};
+type Part = { name: string; icon?: string; description?: string };
+const cleanPart = (p: unknown): Part | undefined => {
+  if (!p || typeof p !== 'object') return undefined;
+  const o = p as Record<string, unknown>;
+  const name = str(o.name, 80);
+  if (!name) return undefined;
+  const icon = bungieImage(o.icon);
+  const description = str(o.description, 400);
+  return { name, ...(icon ? { icon } : {}), ...(description ? { description } : {}) };
+};
+const SUBCLASS_SLOTS = ['supers', 'grenades', 'melee', 'class_abilities', 'movement', 'aspects', 'fragments'];
+/** A subclass snapshot from a request, kept to known slots and a sane size. */
+function cleanSubclass(v: unknown): EquippedSubclass | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const o = v as Record<string, unknown>;
+  const name = str(o.name, 60);
+  if (!name) return undefined;
+  const parts: EquippedSubclass['parts'] = {};
+  const raw = (o.parts && typeof o.parts === 'object' ? o.parts : {}) as Record<string, unknown>;
+  for (const slot of SUBCLASS_SLOTS) {
+    const list = Array.isArray(raw[slot]) ? (raw[slot] as unknown[]).slice(0, 8).map(cleanPart).filter((x): x is Part => !!x) : [];
+    if (list.length) parts[slot] = list;
+  }
+  const icon = bungieImage(o.icon);
+  return { name, element: str(o.element, 20) ?? '', ...(icon ? { icon } : {}), parts };
+}
+function cleanArtifact(v: unknown): ArtifactPerk[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const list = v.slice(0, 40).map((p) => {
+    const part = cleanPart(p);
+    const hash = Number((p as { hash?: unknown })?.hash);
+    return part && Number.isInteger(hash) ? { hash, ...part } : undefined;
+  }).filter((x): x is ArtifactPerk => !!x);
+  return list.length ? list : undefined;
+}
+
+export function cleanLoadout(body: unknown): Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes' | 'subclass' | 'artifact'> | undefined {
   if (!body || typeof body !== 'object') return undefined;
   const b = body as Record<string, unknown>;
   const name = typeof b.name === 'string' ? b.name.trim().slice(0, 60) : '';
@@ -308,6 +395,8 @@ export function cleanLoadout(body: unknown): Pick<SavedLoadout, 'name' | 'classT
     .slice(0, LOADOUT_BUCKETS.length)
     .map((i) => ({ instanceId: i.instanceId, itemHash: i.itemHash, ...(Number.isInteger(i.bucketHash) ? { bucketHash: i.bucketHash } : {}) }));
   if (items.length === 0) return undefined;
-  const notes = typeof b.notes === 'string' && b.notes.trim() ? b.notes.trim().slice(0, 500) : undefined;
-  return { name, classType, items, ...(notes ? { notes } : {}) };
+  const notes = str(b.notes, 500);
+  const subclass = cleanSubclass(b.subclass);
+  const artifact = cleanArtifact(b.artifact);
+  return { name, classType, items, ...(notes ? { notes } : {}), ...(subclass ? { subclass } : {}), ...(artifact ? { artifact } : {}) };
 }

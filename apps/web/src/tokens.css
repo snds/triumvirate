@@ -45,15 +45,18 @@
   /* Size ramp for controls, targets, and icons (literal: the name is the value). */
   --size-18: 18px;
   --size-24: 24px;
+  --size-28: 28px;
   --size-36: 36px;
   --size-40: 40px;
   --size-44: 44px;
   --size-52: 52px;
   --size-56: 56px;
   --size-60: 60px;
+  --size-72: 72px;
   --size-320: 320px;
   --size-420: 420px;
   --size-560: 560px;
+  --size-720: 720px;
   --white-a06: rgb(255 255 255 / 0.06);
   --gray-850-a70: rgb(24 28 34 / 0.7); /* gray-850 at 70% */
   --radius-pill: 999px;
@@ -234,6 +237,25 @@
   --sheet-width: var(--size-420);
   --sheet-width-wide: var(--size-560);
   --lock-on: var(--accent);
+  --sheet-width-full: var(--size-720);
+
+  /* At a glance: subclass setup, set bonuses, and artifact perks under each loadout. Abilities and
+     aspects read first, fragments a step smaller; the super is the one big glyph, as in game. */
+  --glance-label-width: var(--size-72);
+  --glance-super-size: var(--size-36);
+  --glance-icon-size: var(--size-28);
+  --glance-fragment-size: var(--size-24);
+  --glance-icon-radius: var(--radius-sm);
+  --glance-icon-bg: var(--surface-hover);
+  --glance-perk-on: var(--accent);
+  --glance-perk-off: var(--text-muted);
+  --glance-divider: var(--border-subtle);
+
+  /* Loadout builder: one row per slot, and the item picker that opens over it. */
+  --editor-row-bg: var(--surface-panel);
+  --editor-row-hover: var(--surface-hover);
+  --editor-empty-border: var(--border-subtle);
+  --picker-selected: var(--accent);
 }
 
 /*

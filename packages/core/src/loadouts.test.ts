@@ -122,3 +122,27 @@ test('saved loadouts: from equipped gear, status, and request cleaning', () => {
   assert.equal(cleanLoadout({ name: 'Raid', classType: 2, items: [{ instanceId: 'x; drop', itemHash: 1 }] }), undefined);
   assert.equal(cleanLoadout({ name: 'Raid', classType: 2, items: l })?.items.length, 2);
 });
+
+test('setBonuses counts pieces and switches perks on at 2 and 4', async () => {
+  const { setBonuses } = await import('./loadouts.ts');
+  const sets = { 7: { name: 'Great Hunt', perks: [{ count: 2, name: 'Two' }, { count: 4, name: 'Four' }] }, 8: { name: 'Techsec', perks: [{ count: 2, name: 'T2' }] } };
+  const out = setBonuses([{ setHash: 7 }, { setHash: 7 }, { setHash: 7 }, { setHash: 8 }, {}], sets);
+  assert.equal(out[0]!.name, 'Great Hunt');
+  assert.deepEqual(out[0]!.perks.map((p) => p.active), [true, false]);
+  assert.equal(out[1]!.count, 1);
+  assert.equal(setBonuses([{ setHash: 9 }], sets).length, 0);
+});
+
+test('cleanLoadout keeps a sane subclass and artifact snapshot', () => {
+  const items = [{ instanceId: '1', itemHash: 1 }];
+  const out = cleanLoadout({
+    name: 'Raid', classType: 2, items,
+    subclass: { name: 'Voidwalker', element: 'Void', icon: '/common/x.png', parts: { aspects: [{ name: 'Chaos Accelerant', icon: 'javascript:alert(1)' }], bogus: [{ name: 'x' }] } },
+    artifact: [{ hash: 5, name: 'Overload SMG' }, { name: 'no hash' }],
+  });
+  assert.deepEqual(out?.subclass?.parts, { aspects: [{ name: 'Chaos Accelerant' }] });
+  assert.equal(out?.artifact?.length, 1);
+  // The web app's same-origin image links come back as bungie.net links.
+  const viaApp = cleanLoadout({ name: 'Raid', classType: 2, items, subclass: { name: 'Voidwalker', icon: '/api/bungie-img/common/x.png', parts: {} } });
+  assert.equal(viaApp?.subclass?.icon, 'https://www.bungie.net/common/x.png');
+});

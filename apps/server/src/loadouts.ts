@@ -28,19 +28,19 @@ export function createLoadoutStore(dataDir: string) {
   return {
     list: read,
     async get(id: string) { return (await read()).find((l) => l.id === id); },
-    create: (data: Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes'>) => locked(async () => {
+    create: (data: Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes' | 'subclass' | 'artifact'>) => locked(async () => {
       const now = new Date().toISOString();
       const loadout: SavedLoadout = { id: `lo-${Date.now().toString(36)}${randomBytes(3).toString('hex')}`, ...data, createdAt: now, updatedAt: now };
       await write([loadout, ...(await read())]);
       return loadout;
     }),
-    update: (id: string, data: Partial<Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes'>>) => locked(async () => {
+    update: (id: string, data: Partial<Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes' | 'subclass' | 'artifact'>>) => locked(async () => {
       const list = await read();
       const n = list.findIndex((l) => l.id === id);
       if (n < 0) return undefined;
       const next: SavedLoadout = { ...list[n]!, ...data, updatedAt: new Date().toISOString() };
-      // An update that clears the notes sends notes: undefined.
-      if ('notes' in data && data.notes === undefined) delete next.notes;
+      // A field sent as undefined is cleared.
+      for (const [k, v] of Object.entries(data)) if (v === undefined) delete (next as unknown as Record<string, unknown>)[k];
       list[n] = next;
       await write(list);
       return next;

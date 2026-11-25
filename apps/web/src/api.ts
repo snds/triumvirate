@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, CharacterRow, CleanupCandidate, CommunityAppraisal, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, CommunityAppraisal, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -15,6 +15,8 @@ export interface Inventory {
   /** In-game loadout slots by character id. Optional so an older server still renders. */
   gameLoadouts?: Record<string, GameLoadout[]>;
   loadoutStyles?: LoadoutStyles;
+  /** Armor sets you own pieces of, for set bonuses. */
+  itemSets?: Record<string, ArmorSet>;
 }
 
 export interface ChatTurn {
@@ -211,14 +213,14 @@ export const equipItem = (instanceId: string, characterId: string) => act<Action
 export const setLocked = (instanceId: string, locked: boolean) =>
   act<{ item?: AppraisedItem; error?: string }>('/api/lock', { instanceId, locked }, 'lock items');
 
-export type LoadoutDraft = Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes'>;
-export const listLoadouts = async (): Promise<SavedLoadout[]> => json(await fetch('/api/loadouts'));
+export type LoadoutDraft = Pick<SavedLoadout, 'name' | 'classType' | 'items' | 'notes' | 'subclass' | 'artifact'>;
+export const listLoadouts = async (): Promise<SavedLoadout[]> => json(await fetch('/api/loadouts'), sameOriginImages);
 export const createLoadout = async (l: LoadoutDraft): Promise<SavedLoadout> => json(await fetch('/api/loadouts', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(l),
-}));
+}), sameOriginImages);
 export const updateLoadout = async (id: string, l: LoadoutDraft): Promise<SavedLoadout> => json(await fetch(`/api/loadouts/${encodeURIComponent(id)}`, {
   method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(l),
-}));
+}), sameOriginImages);
 export const deleteLoadout = async (id: string): Promise<void> => { await fetch(`/api/loadouts/${encodeURIComponent(id)}`, { method: 'DELETE' }); };
 export const applyLoadout = (id: string, characterId: string) =>
   act<ActionResult>(`/api/loadouts/${encodeURIComponent(id)}/apply`, { characterId }, 'apply the loadout');

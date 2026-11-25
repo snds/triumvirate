@@ -3,6 +3,7 @@
 const GLYPHS = {
   refresh: 'refresh',
   chevronDown: 'expand_more',
+  chevronRight: 'chevron_right',
   chevronsLeft: 'keyboard_double_arrow_left',
   chevronsRight: 'keyboard_double_arrow_right',
   signOut: 'logout',

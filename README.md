@@ -62,7 +62,9 @@ Cloudflare Tunnel, with Cloudflare Access letting only you in. Step-by-step setu
   second exotic for your best legendary in that slot. Bungie only allows equipping in orbit, a social space, or offline.
 - **Loadouts:** the in-game slots for each character (equip, save what you're wearing, rename and recolor,
   copy into Triumvirate), plus Triumvirate's own unlimited loadouts saved in `.data/loadouts.json`, which pull
-  gear from anywhere.
+  gear from anywhere. The builder picks one item per slot from any character or the vault. Every card shows
+  the build at a glance: super, abilities, aspects, and fragments; armor set bonuses (on or locked); and
+  artifact perks (a reminder only, since apps can't change them). Armor mods stay out of the summary.
 - **Ask:** Claude (`claude-opus-5-5`) with read-only tools over your snapshot. Needs `ANTHROPIC_API_KEY` in `.env`.
 
 Tokens and the manifest cache live in `.data/` (git-ignored). Never commit `.env`.

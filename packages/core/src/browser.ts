@@ -9,3 +9,4 @@ export * from './rolls.ts';
 export * from './community.ts'; // pure logic; manifest import is type-only
 export type * from './vendors.ts';
 export type { LoadoutStyles } from './manifest.ts';
+export type { ArmorSet } from './manifest.ts';

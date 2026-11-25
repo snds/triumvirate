@@ -25,6 +25,7 @@ const COMPONENTS = [
   103, // ProfileCurrencies (glimmer, bright dust, silver)
   102, // ProfileInventories (vault)
   200, // Characters
+  202, // CharacterProgressions (trimmed to the seasonal artifact before saving)
   201, // CharacterInventories
   205, // CharacterEquipment
   206, // CharacterLoadouts (in-game loadout slots)
@@ -104,6 +105,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       loadManifestCached(http),
     ]);
     manifest = man;
+    trimProgressions(profile);
     const now = new Date().toISOString();
     // Bungie stamps each profile response; the same stamps mean the same data.
     if (prev && sameProfile(prev.profile, profile)) {
@@ -577,7 +579,8 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     if (!validLoadoutId(id)) return c.json({ error: 'Bad loadout id.' }, 400);
     const data = cleanLoadout(await c.req.json().catch(() => undefined));
     if (!data) return c.json({ error: 'A loadout needs a name, a class, and at least one item.' }, 400);
-    const saved = await loadouts.update(id, { ...data, notes: data.notes });
+    // PUT replaces: anything left out (notes, subclass, artifact) is cleared.
+    const saved = await loadouts.update(id, { notes: undefined, subclass: undefined, artifact: undefined, ...data });
     return saved ? c.json(saved) : c.json({ error: 'Loadout not found.' }, 404);
   });
   app.delete('/api/loadouts/:id', async (c) => {
@@ -649,14 +652,18 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const characters = summarizeCharacters(snap.profile, manifest!, snap.titles);
     const account = summarizeAccount(snap.profile, manifest!);
     const cleanup = cleanupCandidates(items);
-    const gameLoadouts = summarizeGameLoadouts(snap.profile, manifest!);
+    const hashById = new Map(items.filter((i) => i.instanceId).map((i) => [i.instanceId!, i.itemHash]));
+    const gameLoadouts = summarizeGameLoadouts(snap.profile, manifest!, (id) => hashById.get(id));
+    // Only the armor sets this account owns pieces of; the full list is mostly other people's gear.
+    const owned = new Set(items.map((i) => i.setHash).filter(Boolean));
+    const itemSets = Object.fromEntries(Object.entries(manifest!.itemSets ?? {}).filter(([h]) => owned.has(Number(h))));
     // The subclass index only changes with the manifest, so build it once per version.
     if (subclassFor !== manifest!.version) {
       subclass = buildSubclassIndex(manifest!);
       subclassFor = manifest!.version;
     }
     lastView = { displayName: snap.displayName, characters, items, cleanup, subclass };
-    const view = { characters, account, items, cleanup, gameLoadouts, loadoutStyles: manifest!.loadoutStyles };
+    const view = { characters, account, items, cleanup, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets };
     viewCache = { key, list, view };
     return view;
   }
@@ -694,6 +701,17 @@ interface View {
   cleanup: ReturnType<typeof cleanupCandidates>;
   gameLoadouts: ReturnType<typeof summarizeGameLoadouts>;
   loadoutStyles: ManifestTables['loadoutStyles'];
+  itemSets: NonNullable<ManifestTables['itemSets']>;
+}
+
+/**
+ * Character progressions hold every faction, milestone, and quest, but the app only reads the
+ * seasonal artifact, so the rest is dropped before a snapshot is saved (it would triple its size).
+ */
+export function trimProgressions(profile: DestinyProfileResponse) {
+  const data = profile.characterProgressions?.data as Record<string, { seasonalArtifact?: unknown }> | undefined;
+  if (!data) return;
+  for (const [id, p] of Object.entries(data)) data[id] = { seasonalArtifact: p.seasonalArtifact } as never;
 }
 
 /** Bungie stamps when it built each part of a profile; matching stamps mean nothing changed. */

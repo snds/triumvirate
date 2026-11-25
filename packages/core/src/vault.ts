@@ -83,6 +83,8 @@ export interface ItemRow {
   movable?: boolean;
   /** A postmaster item Bungie won't transfer: it can only be pulled to its own character. */
   pullOnly?: boolean;
+  /** Armor: the set it belongs to (see ManifestTables.itemSets), for set bonuses. */
+  setHash?: number;
 }
 
 export type AmmoType = 'Primary' | 'Special' | 'Heavy';
@@ -131,6 +133,15 @@ export interface CharacterRow {
   stats?: CharacterStat[];
   /** The equipped subclass and what's slotted in it. */
   subclass?: EquippedSubclass;
+  /** Seasonal artifact perks switched on for this character. */
+  artifact?: ArtifactPerk[];
+}
+
+export interface ArtifactPerk {
+  hash: number;
+  name: string;
+  icon?: string;
+  description?: string;
 }
 
 export interface EquippedSubclass {
@@ -174,20 +185,17 @@ const ORNAMENT_PLUG = /skins/i;
 const TRANSFER_NOT_TRANSFERRABLE = 2;
 const SUBCLASS_PLUG = /^(?:titan|hunter|warlock|shared)\.(\w+)\.(supers|grenades|melee|class_abilities|movement|aspects|fragments)$/;
 
-/** Reads the subclass a character has equipped and every plug slotted into it. */
-export function equippedSubclass(
-  profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items' | 'extras'>, characterId: string,
-): EquippedSubclass | undefined {
-  const item = profile.characterEquipment?.data?.[characterId]?.items.find((i) => i.bucketHash === SUBCLASS_BUCKET);
-  if (!item) return undefined;
-  const def = manifest.items[item.itemHash];
+/** A subclass and the plugs slotted in it (super, abilities, aspects, fragments), named and grouped by slot. */
+export function subclassFromPlugs(
+  itemHash: number, plugHashes: number[], manifest: Pick<ManifestTables, 'items' | 'extras'>,
+): EquippedSubclass {
+  const def = manifest.items[itemHash];
   const parts: EquippedSubclass['parts'] = {};
   let element = '';
-  const socketList = item.itemInstanceId ? profile.itemComponents?.sockets?.data?.[item.itemInstanceId]?.sockets ?? [] : [];
-  for (const socket of socketList) {
-    if (!socket.plugHash) continue;
-    const m = SUBCLASS_PLUG.exec(manifest.extras?.[socket.plugHash]?.plugCategory ?? '');
-    const d = manifest.items[socket.plugHash];
+  for (const plugHash of plugHashes) {
+    if (!plugHash) continue;
+    const m = SUBCLASS_PLUG.exec(manifest.extras?.[plugHash]?.plugCategory ?? '');
+    const d = manifest.items[plugHash];
     const name = d?.displayProperties.name;
     // Empty aspect/fragment sockets have plugs named "Empty ... Socket".
     if (!m || !name || /^empty/i.test(name)) continue;
@@ -196,6 +204,28 @@ export function equippedSubclass(
     (parts[slot] ??= []).push({ name, icon: bungieUrl(d.displayProperties.icon), description: d.displayProperties.description || undefined });
   }
   return { name: def?.displayProperties.name ?? 'Subclass', element, icon: bungieUrl(def?.displayProperties.icon), parts };
+}
+
+/** Reads the subclass a character has equipped and every plug slotted into it. */
+export function equippedSubclass(
+  profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items' | 'extras'>, characterId: string,
+): EquippedSubclass | undefined {
+  const item = profile.characterEquipment?.data?.[characterId]?.items.find((i) => i.bucketHash === SUBCLASS_BUCKET);
+  if (!item) return undefined;
+  const socketList = item.itemInstanceId ? profile.itemComponents?.sockets?.data?.[item.itemInstanceId]?.sockets ?? [] : [];
+  return subclassFromPlugs(item.itemHash, socketList.map((s) => s.plugHash ?? 0), manifest);
+}
+
+/** The artifact perks a character has switched on (CharacterProgressions, component 202). */
+export function activeArtifactPerks(
+  profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items'>, characterId: string,
+): ArtifactPerk[] | undefined {
+  const art = profile.characterProgressions?.data?.[characterId]?.seasonalArtifact;
+  if (!art?.tiers) return undefined;
+  return art.tiers.flatMap((t) => t.items.filter((i) => i.isActive)).map((i) => {
+    const d = manifest.items[i.itemHash]?.displayProperties;
+    return { hash: i.itemHash, name: d?.name ?? 'Artifact perk', icon: bungieUrl(d?.icon), ...(d?.description ? { description: d.description } : {}) };
+  });
 }
 
 export function summarizeCharacters(
@@ -214,6 +244,7 @@ export function summarizeCharacters(
       subclass: manifest?.items && manifest.extras
         ? equippedSubclass(profile, { items: manifest.items, extras: manifest.extras }, id)
         : undefined,
+      artifact: manifest?.items ? activeArtifactPerks(profile, { items: manifest.items }, id) : undefined,
       stats: manifest
         ? CHARACTER_STAT_ORDER.filter((h) => ch.stats?.[h] !== undefined).map((h) => ({
           name: manifest.stats[h]?.displayProperties.name ?? '',
@@ -430,6 +461,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       ...(breakerDef ? { breaker: { name: breakerDef.displayProperties.name, icon: bungieUrl(breakerDef.displayProperties.icon) } } : {}),
       ...(movable ? { movable } : {}),
       ...(movable && inPostmaster && notTransferrable ? { pullOnly: true } : {}),
+      ...(manifest.extras?.[item.itemHash]?.itemSetHash ? { setHash: manifest.extras[item.itemHash]!.itemSetHash } : {}),
     };
   };
 

@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  LOADOUT_BUCKETS, loadoutStatus, type AppraisedItem, type CharacterRow, type GameLoadout, type LoadoutStyles, type SavedLoadout,
+  LOADOUT_BUCKETS, loadoutStatus, setBonuses, type AppraisedItem, type CharacterRow, type GameLoadout, type LoadoutStyles, type SavedLoadout,
 } from '@triumvirate/core/browser';
 import {
   applyLoadout, createLoadout, deleteLoadout, equipGameLoadout, listLoadouts, restyleGameLoadout, saveGameLoadout, updateLoadout,
   type ActionResult, type GameSlotLook, type Inventory, type LoadoutDraft,
 } from '../api.ts';
+import { BuildSummary } from './BuildSummary.tsx';
 import { ItemTile } from './ItemTile.tsx';
+import { LoadoutEditor } from './LoadoutEditor.tsx';
 import { Icon } from './Icon.tsx';
 import { Sheet } from './Sheet.tsx';
 
@@ -28,7 +30,6 @@ const ORDER = [LOADOUT_BUCKETS.at(-1)!, ...LOADOUT_BUCKETS.slice(0, -1)];
 const bySlot = (a?: number, b?: number) => ORDER.indexOf(a ?? 0) - ORDER.indexOf(b ?? 0);
 
 type Ask =
-  | { kind: 'name'; title: string; initial: string; action: string; onDone: (name: string) => Promise<void> }
   | { kind: 'look'; slot: GameLoadout; saveGear: boolean }
   | { kind: 'confirm'; title: string; body: string; action: string; danger?: boolean; onDone: () => Promise<void> };
 
@@ -43,6 +44,8 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
   const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState<string>(); // which card is working
   const [ask, setAsk] = useState<Ask>();
+  // The loadout builder: `true` for a new one, or the saved loadout being edited.
+  const [editor, setEditor] = useState<SavedLoadout | true>();
   useEffect(() => {
     listLoadouts().then(setSaved).catch((e) => setLoadError(e instanceof Error ? e.message : String(e)));
   }, []);
@@ -58,6 +61,9 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
     // Weapons-only loadouts work on any class; anything with armor or a subclass is this class's.
     classType: wearing.some((i) => i.classType !== 3 || i.bucket === 'Subclass') ? character.classType : 3,
     items: wearing.map((i) => ({ instanceId: i.instanceId!, itemHash: i.itemHash, bucketHash: i.bucketHash })),
+    // Snapshot the setup too, so the card can show it after the character changes.
+    ...(character.subclass && Object.keys(character.subclass.parts).length ? { subclass: character.subclass } : {}),
+    ...(character.artifact?.length ? { artifact: character.artifact } : {}),
   });
   const slots = inv.gameLoadouts?.[character.id] ?? [];
   const mine = (saved ?? []).filter((l) => l.classType === 3 || l.classType === character.classType);
@@ -73,18 +79,10 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
     if (res.error) onToast(`Couldn't ${what}: ${res.error}`);
   });
 
-  const newFromWearing = () => setAsk({
-    kind: 'name', title: 'Save what you\'re wearing', action: 'Save loadout',
-    // "Voidwalker Warlock", but not "Prismatic Warlock Warlock".
-    initial: character.subclass?.name
-      ? (character.subclass.name.includes(character.className) ? character.subclass.name : `${character.subclass.name} ${character.className}`)
-      : `${character.className} loadout`,
-    onDone: async (name) => { const l = await createLoadout(wearingDraft(name)); setSaved((s) => [l, ...(s ?? [])]); },
-  });
   const copyFromGame = (slot: GameLoadout) => run(`game-${slot.index}`, async () => {
     const items = slot.items.map((id) => byId.get(id)).filter((i): i is AppraisedItem => !!i)
       .map((i) => ({ instanceId: i.instanceId!, itemHash: i.itemHash, bucketHash: i.bucketHash }));
-    const l = await createLoadout({ name: slot.name ?? `In-game ${slot.index + 1}`, classType: character.classType, items });
+    const l = await createLoadout({ name: slot.name ?? `In-game ${slot.index + 1}`, classType: character.classType, items, ...(slot.subclass && Object.keys(slot.subclass.parts).length ? { subclass: slot.subclass } : {}) });
     setSaved((s) => [l, ...(s ?? [])]);
     onToast(`Copied ${l.name} to Triumvirate loadouts.`);
   });
@@ -123,11 +121,12 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
             <h3 className="loadout-card__name">Wearing now</h3>
             <p className="loadout-card__meta">{character.subclass ? `${character.subclass.name} · ` : ''}{wearing.length} items</p>
           </div>
-          <button className="button button--primary" onClick={newFromWearing} disabled={wearing.length === 0}>
+          <button className="button button--primary" onClick={() => setEditor(true)} disabled={wearing.length === 0}>
             <Icon name="save" /> Save as loadout
           </button>
         </div>
         <ItemStrip items={wearing} onSelect={onSelect} />
+        <BuildSummary subclass={character.subclass} sets={setBonuses(wearing, inv.itemSets)} artifact={character.artifact} compact />
       </article>
 
       <h3 className="drawer__section loadouts__section">
@@ -160,6 +159,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
                   )}
                 </div>
                 {!slot.empty && <ItemStrip items={items} missing={status.missing.length} onSelect={onSelect} />}
+                {!slot.empty && <BuildSummary subclass={slot.subclass} sets={setBonuses(items, inv.itemSets)} artifactNote="Not kept by in-game loadouts" compact />}
                 {!slot.empty && <div className="loadout-card__actions">
                   {!slot.empty && (
                     <button
@@ -190,9 +190,12 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
         </ul>
       )}
 
-      <h3 className="drawer__section loadouts__section">
-        <Icon name="loadouts" /> Triumvirate <span className="vault__count">{mine.length}</span>
-      </h3>
+      <div className="loadouts__section-bar">
+        <h3 className="drawer__section loadouts__section">
+          <Icon name="loadouts" /> Triumvirate <span className="vault__count">{mine.length}</span>
+        </h3>
+        <button className="button" onClick={() => setEditor(true)}><Icon name="add" /> New loadout</button>
+      </div>
       {loadError && <p className="error">{loadError}</p>}
       {saved && mine.length === 0 && (
         <p className="empty">No saved loadouts for {character.className} yet. Unlike in-game slots, these have no limit and can pull gear from the vault and your other characters.</p>
@@ -212,6 +215,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
                 {busy === key && <span className="spinner" aria-label="Working" />}
               </div>
               <ItemStrip items={items} missing={status.missing.length} onSelect={onSelect} />
+              <BuildSummary subclass={l.subclass} sets={setBonuses(items, inv.itemSets)} artifact={l.artifact} compact />
               <div className="loadout-card__actions">
                 <button
                   className="button button--primary"
@@ -234,19 +238,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
                 >
                   <Icon name="save" /> Update
                 </button>
-                <button
-                  className="icon-button"
-                  disabled={!!busy}
-                  aria-label={`Rename ${l.name}`}
-                  title="Rename"
-                  onClick={() => setAsk({
-                    kind: 'name', title: 'Rename loadout', initial: l.name, action: 'Rename',
-                    onDone: async (name) => {
-                      const next = await updateLoadout(l.id, { name, classType: l.classType, items: l.items, notes: l.notes });
-                      setSaved((s) => (s ?? []).map((x) => (x.id === l.id ? next : x)));
-                    },
-                  })}
-                >
+                <button className="icon-button" disabled={!!busy} aria-label={`Edit ${l.name}`} title="Edit" onClick={() => setEditor(l)}>
                   <Icon name="edit" />
                 </button>
                 <button
@@ -268,7 +260,24 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
         })}
       </ul>
 
-      {ask?.kind === 'name' && <NameSheet ask={ask} onClose={() => setAsk(undefined)} onToast={onToast} />}
+      {editor && (
+        <LoadoutEditor
+          character={character}
+          items={inv.items}
+          itemSets={inv.itemSets}
+          editing={editor === true ? undefined : editor}
+          onClose={() => setEditor(undefined)}
+          onSave={async (draft) => {
+            if (editor === true) {
+              const l = await createLoadout(draft);
+              setSaved((s) => [l, ...(s ?? [])]);
+            } else {
+              const next = await updateLoadout(editor.id, draft);
+              setSaved((s) => (s ?? []).map((x) => (x.id === editor.id ? next : x)));
+            }
+          }}
+        />
+      )}
       {ask?.kind === 'confirm' && <ConfirmSheet ask={ask} onClose={() => setAsk(undefined)} onToast={onToast} />}
       {ask?.kind === 'look' && (
         <LookSheet
@@ -330,32 +339,6 @@ function GameSwatch({ slot }: { slot: Pick<GameLoadout, 'colorImage' | 'iconImag
     <span className={`game-swatch${slot.empty ? ' is-empty' : ''}`} style={slot.colorImage ? { backgroundImage: `url(${slot.colorImage})` } : undefined} aria-hidden>
       {slot.iconImage ? <img src={slot.iconImage} alt="" /> : <span className="game-swatch__number">{slot.index + 1}</span>}
     </span>
-  );
-}
-
-function NameSheet({ ask, onClose, onToast }: { ask: Extract<Ask, { kind: 'name' }>; onClose: () => void; onToast: (t: string) => void }) {
-  const [name, setName] = useState(ask.initial);
-  const [working, setWorking] = useState(false);
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { input.current?.select(); }, []);
-  const submit = async () => {
-    if (!name.trim()) return;
-    setWorking(true);
-    try { await ask.onDone(name.trim()); onClose(); } catch (e) { onToast(e instanceof Error ? e.message : String(e)); setWorking(false); }
-  };
-  return (
-    <Sheet title={ask.title} onClose={onClose}>
-      <form className="sheet__form" onSubmit={(e) => { e.preventDefault(); void submit(); }}>
-        <label className="field">
-          <span className="field__label">Name</span>
-          <input ref={input} className="search field__input" value={name} maxLength={60} onChange={(e) => setName(e.target.value)} enterKeyHint="done" />
-        </label>
-        <div className="sheet__actions">
-          <button type="button" className="button button--quiet" onClick={onClose}>Cancel</button>
-          <button type="submit" className="button button--primary" disabled={working || !name.trim()}>{ask.action}</button>
-        </div>
-      </form>
-    </Sheet>
   );
 }
 
