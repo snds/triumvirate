@@ -55,7 +55,12 @@ root.route('/', app);
 const webDist = process.env.WEB_DIST ? resolve(process.env.WEB_DIST) : undefined;
 if (webDist && existsSync(webDist)) {
   root.use('/assets/*', serveStatic({ root: webDist, onFound: (_p, c) => c.header('Cache-Control', 'public, max-age=31536000, immutable') }));
-  root.use('*', serveStatic({ root: webDist }));
+  // The service worker and manifest must be rechecked on every visit, or app updates get stuck behind an old copy.
+  const fresh = serveStatic({ root: webDist, onFound: (_p, c) => c.header('Cache-Control', 'no-cache') });
+  root.get('/sw.js', fresh);
+  root.get('/manifest.webmanifest', fresh);
+  // "/" is answered here with index.html, which must not be cached either, so new builds show up.
+  root.use('*', serveStatic({ root: webDist, onFound: (p, c) => { if (p.endsWith('index.html')) c.header('Cache-Control', 'no-cache'); } }));
   // Single-page app: anything else gets index.html (never cached, so new builds show up).
   const page = serveStatic({ root: webDist, path: 'index.html', onFound: (_p, c) => c.header('Cache-Control', 'no-cache') });
   // API paths that don't exist should stay 404s, not turn into the page.

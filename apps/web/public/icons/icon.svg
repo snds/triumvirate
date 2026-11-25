@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Placeholder mark: three tier diamonds, one over two. Full-bleed background so it also works as a maskable icon; the mark stays inside the central safe circle. -->
+  <rect width="512" height="512" fill="#12151a"/>
+  <g fill="#c1af29">
+    <path d="M256 145 L326 215 L256 285 L186 215 Z"/>
+    <path d="M174 227 L244 297 L174 367 L104 297 Z"/>
+    <path d="M338 227 L408 297 L338 367 L268 297 Z"/>
+  </g>
+</svg>
