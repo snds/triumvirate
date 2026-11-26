@@ -79,6 +79,9 @@ export interface ItemRow {
   ornament?: { name: string; icon?: string };
   /** The item's own art, kept when an ornament replaces `icon`. */
   baseIcon?: string;
+  /** Weapons: Bungie's large studio render, of the applied ornament when there is one. Missing for a
+   * few old weapons, and for ornaments without a render (the dialog then shows the icon header). */
+  screenshot?: string;
   /** Can be dragged somewhere: instanced, not equipped, and Bungie allows moving it. */
   movable?: boolean;
   /** A postmaster item Bungie won't transfer: it can only be pulled to its own character. */
@@ -457,6 +460,9 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
         ornament: { name: ornament.displayProperties.name, icon: bungieUrl(ornament.displayProperties.icon) },
         baseIcon: bungieUrl(def?.displayProperties.icon),
       } : {}),
+      ...(isWeapon && (ornament ? manifest.extras?.[styleHash!]?.screenshot : manifest.extras?.[item.itemHash]?.screenshot)
+        ? { screenshot: bungieUrl(ornament ? manifest.extras![styleHash!]!.screenshot : manifest.extras![item.itemHash]!.screenshot) }
+        : {}),
       ...(manifest.extras?.[item.itemHash]?.ammoType ? { ammo: AMMO_NAMES[manifest.extras[item.itemHash]!.ammoType!] } : {}),
       ...(breakerDef ? { breaker: { name: breakerDef.displayProperties.name, icon: bungieUrl(breakerDef.displayProperties.icon) } } : {}),
       ...(movable ? { movable } : {}),

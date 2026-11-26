@@ -281,6 +281,15 @@
   --editor-row-hover: var(--surface-hover);
   --editor-empty-border: var(--border-subtle);
   --picker-selected: var(--accent);
+
+  /* Item dialog art header: Bungie's weapon render behind the name. The tier color fades in from the
+     left so text always sits on a known ground; masterworked weapons add a warm light behind the gun. */
+  --item-art-height: clamp(260px, 34cqi, 360px);
+  --item-art-stage: 62cqi;        /* compact dialog: the render's height above the name band (16:10) */
+  --item-art-ground: var(--surface-raised);
+  --item-art-fade-in: 240ms;
+  --item-art-tag-bg: rgb(0 0 0 / 0.45);
+  --masterwork-glow: rgb(224 197 90 / 0.28); /* --gold-300 at 28% */
 }
 
 /*

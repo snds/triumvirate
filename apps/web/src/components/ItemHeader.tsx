@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
 import { AmmoIcon } from './AmmoIcon.tsx';
 import { ElementIcon } from './ElementIcon.tsx';
@@ -15,11 +16,32 @@ export function ItemHeader({ item, size, children }: {
   children?: React.ReactNode;
 }) {
   const tier = item.tier.toLowerCase() || 'common';
+  // The dialog shows Bungie's large render behind the header. It fades in over the tier color once
+  // loaded; if it fails (a few old weapons 404), the header falls back to the icon layout.
+  const [art, setArt] = useState<{ src: string; state: 'loading' | 'loaded' | 'failed' }>();
+  // (api.ts already points bungie.net URLs at the app's image proxy.)
+  const shot = size === 'dialog' ? item.screenshot : undefined;
+  const artState = shot && art?.src === shot ? art.state : 'loading';
+  const hasArt = !!shot && artState !== 'failed';
   return (
-    <header className={`item-header item-header--${size} tier-${tier}${item.masterworked ? ' is-masterworked' : ''}`}>
+    <header className={`item-header item-header--${size} tier-${tier}${item.masterworked ? ' is-masterworked' : ''}${hasArt ? ' has-art' : ''}${hasArt && artState === 'loaded' ? ' is-art-loaded' : ''}`}>
+      {hasArt && (
+        <>
+          <img
+            key={shot}
+            className="item-header__backdrop"
+            src={shot}
+            alt=""
+            onLoad={() => setArt({ src: shot, state: 'loaded' })}
+            onError={() => setArt({ src: shot, state: 'failed' })}
+          />
+          <span className="item-header__scrim" aria-hidden />
+          {item.ornament && <span className="item-header__tag">{item.ornament.name}</span>}
+        </>
+      )}
       {/* The art, dressed like the inventory tile: watermark, masterwork shimmer, and the
           tier diamonds standing in a column under the release icon. */}
-      {item.icon && (
+      {item.icon && !hasArt && (
         <span className="item-header__art">
           <img src={item.icon} alt="" />
           {item.watermark && <img src={item.watermark} alt="" />}
