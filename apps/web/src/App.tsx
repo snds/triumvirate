@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { collectPostmaster, equipItem, fetchDigest, fetchInventory, logout, moveItem, setLocked, type ActionResult, type Inventory } from './api.ts';
+import { collectPostmaster, equipItem, failKind, fetchDigest, fetchInventory, logout, moveItem, setLocked, type ActionResult, type FailKind, type Inventory } from './api.ts';
+import { SignInScreen, StatusScreen, type SignInReason } from './components/StatusScreen.tsx';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
 import { checkEquip, checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
@@ -31,12 +32,12 @@ import { StoreSwitcher } from './components/StoreSwitcher.tsx';
 import { TabBar, type View } from './components/TabBar.tsx';
 import { useCompact } from './media.ts';
 import { bootShowing, dismissBoot } from './boot.ts';
-import { Mark } from './components/Mark.tsx';
+import { StatusBanner } from './components/StatusBanner.tsx';
 
 type State =
   | { status: 'loading' }
-  | { status: 'signed-out' }
-  | { status: 'error'; message: string }
+  | { status: 'signed-out'; reason?: SignInReason }
+  | { status: 'error'; kind: FailKind; message: string }
   | { status: 'ready'; inv: Inventory };
 
 const KINDS: { value: Kind; label: string }[] = [
@@ -125,19 +126,43 @@ export function App() {
     },
   }), []);
 
+  // Bungie sends a failed or cancelled sign-in back as /?signin=retry; read it once and tidy the URL.
+  const [signInNote] = useState<SignInReason>(() => {
+    const url = new URL(location.href);
+    if (url.searchParams.get('signin') !== 'retry') return undefined;
+    url.searchParams.delete('signin');
+    history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    return 'retry';
+  });
+
+  /** Set when a load fails while gear is already on screen; the gear stays and this says why. */
+  const [loadFail, setLoadFail] = useState<{ kind: FailKind; message: string }>();
   const load = useCallback(async (refresh: boolean) => {
     setSyncing(true);
     try {
       const inv = await fetchInventory(refresh);
-      setState(inv ? { status: 'ready', inv } : { status: 'signed-out' });
+      setState(inv.signedIn ? { status: 'ready', inv } : { status: 'signed-out', reason: inv.reason ?? signInNote });
+      setLoadFail(undefined);
     } catch (err) {
-      setState({ status: 'error', message: err instanceof Error ? err.message : String(err) });
+      const fail = { kind: failKind(err), message: err instanceof Error ? err.message : String(err) };
+      // Never take your gear off the screen because a refresh failed: keep it and say why.
+      setState((s) => (s.status === 'ready' && fail.kind !== 'access' ? s : { status: 'error', ...fail }));
+      setLoadFail(fail);
     } finally {
       setSyncing(false);
     }
-  }, []);
+  }, [signInNote]);
+  const retry = useCallback(() => void load(false), [load]);
 
   useEffect(() => { void load(false); }, [load]);
+  // Back online after showing the saved copy (or an offline failure): load a live one once.
+  const offlineNow = (state.status === 'ready' && !!state.inv.offline) || loadFail?.kind === 'offline';
+  useEffect(() => {
+    if (!offlineNow) return;
+    window.addEventListener('online', retry);
+    return () => window.removeEventListener('online', retry);
+  }, [offlineNow, retry]);
+  const retryRefresh = useCallback(() => void load(true), [load]);
   // First load settled: the index.html loader exits and the app rises in behind it (once per launch).
   const [entering, setEntering] = useState(false);
   const booted = useRef(false);
@@ -167,12 +192,16 @@ export function App() {
       setSyncing(true);
       try {
         const inv = await fetchInventory(true);
-        if (inv && autoRef.current.moving === 0 && !autoRef.current.dragging) {
+        if (inv.signedIn && autoRef.current.moving === 0 && !autoRef.current.dragging) {
           setState({ status: 'ready', inv });
+          setLoadFail(undefined);
           // Keep an open item panel pointed at the fresh copy of the same item.
           setSelected((sel) => (sel?.instanceId ? inv.items.find((i) => i.instanceId === sel.instanceId) ?? sel : sel));
         }
-      } catch { /* try again next time */ } finally {
+      } catch (err) {
+        // Most quiet failures just wait for the next tick; maintenance is worth saying, since moves pause.
+        if (failKind(err) === 'bungie-down') setLoadFail({ kind: 'bungie-down', message: '' });
+      } finally {
         quietBusy.current = false;
         setSyncing(false);
       }
@@ -321,6 +350,9 @@ export function App() {
     }
   }, [load]);
 
+  // Moves can't work from the saved copy or while Bungie is down; say so on the tile instead of failing.
+  const paused = state.status === 'ready' && state.inv.offline ? 'You\'re offline'
+    : loadFail?.kind === 'bungie-down' ? 'Bungie is down for maintenance' : '';
   const inventoryApi = useMemo<InventoryApi>(() => {
     const inv = state.status === 'ready' ? state.inv : undefined;
     return {
@@ -328,10 +360,10 @@ export function App() {
       select: setSelected,
       characters: inv?.characters ?? [],
       moving,
-      check: (item, to) => (inv ? checkMove(item, to, inv.characters, inv.items, inv.account) : { ok: false, reason: 'Not loaded' }),
+      check: (item, to) => (paused ? { ok: false, reason: paused } : inv ? checkMove(item, to, inv.characters, inv.items, inv.account) : { ok: false, reason: 'Not loaded' }),
       move: (item, to) => void move(item, to),
       recentMoves,
-      checkEquip: (item, characterId) => (inv ? checkEquip(item, characterId, inv.characters) : { ok: false, reason: 'Not loaded' }),
+      checkEquip: (item, characterId) => (paused ? { ok: false, reason: paused } : inv ? checkEquip(item, characterId, inv.characters) : { ok: false, reason: 'Not loaded' }),
       equip: (item, characterId) => void equip(item, characterId),
       setLocked: (item, locked) => void lock(item, locked),
       quick: (item) => { if (item.instanceId) setQuickId(item.instanceId); },
@@ -346,7 +378,7 @@ export function App() {
       itemSets: inv?.itemSets,
       allItems: inv?.items ?? [],
     };
-  }, [state, moving, move, recentMoves, equip, lock, selecting, picked, collect]);
+  }, [state, moving, move, recentMoves, equip, lock, selecting, picked, collect, paused]);
 
   // Bulk moves go one at a time through the latest `move`, so each sees where the last one landed.
   const moveRef = useRef(move);
@@ -385,23 +417,8 @@ export function App() {
 
   // The index.html loader covers the screen until the first load settles.
   if (state.status === 'loading') return null;
-  if (state.status === 'signed-out') {
-    return (
-      <main className="center">
-        <Mark className="center__mark" />
-        <h1 className="brand">Triumvirate</h1>
-        <a className="button button--primary" href="/auth/login">Sign in with Bungie</a>
-      </main>
-    );
-  }
-  if (state.status === 'error') {
-    return (
-      <main className="center">
-        <p className="error">Something went wrong: {state.message}</p>
-        <button className="button" onClick={() => void load(true)}>Try again</button>
-      </main>
-    );
-  }
+  if (state.status === 'signed-out') return <SignInScreen reason={state.reason} />;
+  if (state.status === 'error') return <StatusScreen kind={state.kind} message={state.message} onRetry={retry} />;
 
   const { inv } = state;
   // Characters arrive most recently played first; that one stays when the others collapse.
@@ -427,7 +444,12 @@ export function App() {
       .filter((x) => x.n > 0)
       .map((x) => `${x.c.className} ${x.n}`)
     : [];
-  const signOut = async () => { await logout(); setState({ status: 'signed-out' }); };
+  const signOut = async () => {
+    await logout();
+    // The device's saved copy of your gear goes with the sign-in.
+    await globalThis.caches?.delete('data-v1').catch(() => false);
+    setState({ status: 'signed-out' });
+  };
 
   return (
     <HoverContext.Provider value={hoverApi}>
@@ -533,7 +555,7 @@ export function App() {
           <button
             className={`icon-button${syncing ? ' is-busy' : ''}`}
             onClick={() => void load(true)}
-            disabled={syncing}
+            disabled={syncing || !!inv.offline}
             aria-label={syncing ? 'Syncing' : 'Refresh from Bungie'}
             title={syncing ? 'Syncing…' : 'Refresh from Bungie'}
           >
@@ -550,6 +572,9 @@ export function App() {
           />
         </div>
       </header>
+      {inv.offline
+        ? <StatusBanner kind="offline-copy" syncedAt={inv.syncedAt} />
+        : loadFail && <StatusBanner kind={loadFail.kind} message={loadFail.message} syncedAt={inv.syncedAt} onRetry={retryRefresh} />}
 
       <main className={`main${selecting && compact ? ' main--selecting' : ''}`} onScroll={hovered ? hoverApi.leave : undefined}>
         {view === 'inventory' ? (

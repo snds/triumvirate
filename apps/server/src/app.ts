@@ -15,6 +15,7 @@ import {
   type SavedLoadout, type CleanupState, type WatchEntry,
   vendorScreen, balancesFrom, bestInSlot,
 } from '@triumvirate/core';
+import { bungieIsDown, TokenRejected } from '@triumvirate/core';
 import type { WishListCache } from './wishlist-cache.ts';
 import { createDefsCache } from './defs-cache.ts';
 import { createTrackedStore } from './tracked-store.ts';
@@ -73,6 +74,8 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   const app = new Hono();
   let lastView: AgentContext | undefined;
   let pendingState = '';
+  /** Why you're signed out, for the sign-in screen: your Bungie sign-in ran out or was refused. */
+  let signOutReason: 'expired' | undefined;
   let manifest: ManifestTables | undefined;
   let subclass: ReturnType<typeof buildSubclassIndex> | undefined;
   let subclassFor = '';
@@ -88,9 +91,23 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
 
   async function validTokens(): Promise<Tokens | undefined> {
     let t = await store.readTokens();
-    if (!t || Date.now() > t.refreshExpiresAt) return undefined;
+    if (!t) return undefined;
+    if (Date.now() > t.refreshExpiresAt) {
+      signOutReason = 'expired';
+      return undefined;
+    }
     if (needsRefresh(t)) {
-      t = await refreshTokens(cfg, t.refreshToken);
+      try {
+        t = await refreshTokens(cfg, t.refreshToken);
+      } catch (err) {
+        // Bungie said no to the refresh token itself: you need to sign in again. Anything else
+        // (maintenance, a network blip) is passed on, and the tokens stay for the next try.
+        if (!(err instanceof TokenRejected)) throw err;
+        console.error(err);
+        await store.clearTokens();
+        signOutReason = 'expired';
+        return undefined;
+      }
       await store.writeTokens(t);
     }
     return t;
@@ -175,11 +192,16 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   });
 
   app.get('/auth/callback', async (c) => {
-    if (!pendingState || c.req.query('state') !== pendingState) {
-      return c.text('Sign-in state did not match. Go back and sign in again.', 400);
-    }
+    // Every way back from Bungie lands on the app; the sign-in screen explains a failed one.
+    if (c.req.query('error') || !pendingState || c.req.query('state') !== pendingState) return c.redirect('/?signin=retry');
     pendingState = '';
-    await store.writeTokens(await exchangeCode(cfg, c.req.query('code') ?? ''));
+    try {
+      await store.writeTokens(await exchangeCode(cfg, c.req.query('code') ?? ''));
+    } catch (err) {
+      console.error(err);
+      return c.redirect('/?signin=retry');
+    }
+    signOutReason = undefined;
     return c.redirect('/');
   });
 
@@ -221,7 +243,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
 
   app.get('/api/inventory', async (c) => {
     const t = await validTokens();
-    if (!t) return c.json({ signedIn: false }, 401);
+    if (!t) return c.json({ signedIn: false, reason: signOutReason }, 401);
     // Page loads read the snapshot in memory; only Refresh (or a cold server) asks Bungie.
     let snap = c.req.query('refresh') ? undefined : current ?? (await store.latestSnapshot());
     // The item table is needed to name items, so a cold server always syncs once.
@@ -1365,9 +1387,11 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return c.json({ restored });
   });
 
+  // `kind` tells the app which screen to show: Bungie's maintenance page, or a plain error.
   app.onError((err, c) => {
     console.error(err);
-    return c.json({ error: err.message }, 500);
+    if (bungieIsDown(err)) return c.json({ error: 'Bungie is down for maintenance.', kind: 'bungie-down' }, 503);
+    return c.json({ error: err.message, kind: 'server' }, 500);
   });
 
   return app;
