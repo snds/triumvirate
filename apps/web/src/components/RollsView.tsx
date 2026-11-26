@@ -91,7 +91,7 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
     let live = true;
     fetchCommunityAppraisals().then((d) => { if (live) { setData(d); setError(undefined); } }, (e: Error) => live && setError(e.message));
     return () => { live = false; };
-  }, [syncedAt]);
+  }, [syncedAt, items]); // items too: a perk swap reorders a copy's options without a new sync
 
   // Character follow. The last class we saw is saved too, so a swap made while the app was
   // closed is caught on the next load, not only one made while it's open.
@@ -421,28 +421,40 @@ function RollCard({ item, c, onSelect, onChanged }: {
   item: AppraisedItem; c?: CommunityAppraisal; onSelect: (i: AppraisedItem) => void; onChanged: () => void;
 }) {
   const columns = item.perks ?? [];
-  const slotted = useMemo(() => columns.map((col) => Math.max(0, col.findIndex((p) => p.active))), [columns]);
+  // Keyed on the slotted perk hashes, not the array: a quiet auto refresh hands over new objects for the
+  // same roll, and that must not throw away a preview the player is about to apply.
+  const slottedKey = columns.map((col) => col.find((p) => p.active)?.hash ?? '').join(',');
+  const slotted = useMemo(() => columns.map((col) => Math.max(0, col.findIndex((p) => p.active))), [slottedKey]);
   // The roll being previewed: an option index per column. Starts as what's slotted.
   const [picks, setPicks] = useState<number[]>(slotted);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string>();
-  useEffect(() => { setPicks(slotted); setError(undefined); }, [slotted]);
+  // The result of the last Apply, shown until the next pick: success or Bungie's reason.
+  const [notice, setNotice] = useState<{ ok: boolean; text: string }>();
+  useEffect(() => { setPicks(slotted); }, [slotted]);
+  useEffect(() => {
+    if (!notice?.ok) return;
+    const id = setTimeout(() => setNotice(undefined), 6000);
+    return () => clearTimeout(id);
+  }, [notice]);
   const previewing = picks.some((p, i) => p !== slotted[i]);
   const previewGrade = c?.grade && previewing ? toGrade(scoreRoll(c.perks, c.traitColumns, picks)) : undefined;
   const grade = previewGrade ?? c?.grade;
   const canSwap = !!item.instanceId && columns.some((col) => col.length > 1);
 
-  const pick = (ci: number, k: number) => { setError(undefined); setPicks((p) => p.map((v, i) => (i === ci ? k : v))); };
+  const pick = (ci: number, k: number) => { setNotice(undefined); setPicks((p) => p.map((v, i) => (i === ci ? k : v))); };
   const apply = async () => {
-    const plugs = picks.flatMap((k, ci) => {
+    const chosen = picks.flatMap((k, ci) => {
       const p = columns[ci]?.[k];
-      return k !== slotted[ci] && p?.hash !== undefined && p.socketIndex !== undefined ? [{ socketIndex: p.socketIndex, plugHash: p.hash }] : [];
+      return k !== slotted[ci] && p?.hash !== undefined && p.socketIndex !== undefined ? [{ socketIndex: p.socketIndex, plugHash: p.hash, name: p.name }] : [];
     });
     setBusy(true);
-    const r = await applyPerks(item.instanceId!, plugs);
+    setNotice(undefined);
+    const r = await applyPerks(item.instanceId!, chosen.map(({ socketIndex, plugHash }) => ({ socketIndex, plugHash })));
     setBusy(false);
-    if (r.error) setError(r.error);
-    else onChanged();
+    if (r.error) setNotice({ ok: false, text: r.error });
+    else setNotice({ ok: true, text: `Swapped in game: ${chosen.map((p) => p.name).join(', ')}.` });
+    // Reload even after a partial failure, so the card shows whichever perks did change.
+    if (!r.error || r.applied) onChanged();
   };
 
   const gradeTitle = grade
@@ -497,10 +509,10 @@ function RollCard({ item, c, onSelect, onChanged }: {
           )}
         </div>
       </div>
-      {canSwap && (c?.betterPossible || previewing || error) && (
+      {canSwap && (c?.betterPossible || previewing || notice) && (
         <footer className="roll-card__actions">
           {c?.betterPossible && !previewing && (
-            <button className="button button--primary" onClick={() => setPicks(c.bestPicks)}>
+            <button className="button button--primary" onClick={() => { setNotice(undefined); setPicks(c.bestPicks); }}>
               <Icon name="arrowUp" /> Higher rank
             </button>
           )}
@@ -509,10 +521,15 @@ function RollCard({ item, c, onSelect, onChanged }: {
               <button className="button button--primary" onClick={() => void apply()} disabled={busy}>
                 {busy ? 'Applying…' : 'Apply in game'}
               </button>
-              <button className="button" onClick={() => { setPicks(slotted); setError(undefined); }} disabled={busy}>Revert</button>
+              <button className="button" onClick={() => { setPicks(slotted); setNotice(undefined); }} disabled={busy}>Revert</button>
+              {!busy && !notice && <p className="roll-card__hint">Previewing{previewGrade ? ` the ${previewGrade} roll` : ''}. Apply in game to swap the perks.</p>}
             </>
           )}
-          {error && <p className="roll-card__error" role="alert">{error}</p>}
+          {notice && (
+            <p className={notice.ok ? 'roll-card__success' : 'roll-card__error'} role={notice.ok ? 'status' : 'alert'}>
+              <Icon name={notice.ok ? 'check' : 'warning'} /> {notice.text}
+            </p>
+          )}
         </footer>
       )}
     </article>
