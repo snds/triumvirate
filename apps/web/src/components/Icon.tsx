@@ -55,6 +55,8 @@ const GLYPHS = {
   warning: 'warning',
   today: 'today',
   alertsOff: 'notifications_off',
+  autopilot: 'auto_delete',
+  pull: 'unarchive',
   info: 'info',
   select: 'checklist',
   checkCircle: 'check_circle',

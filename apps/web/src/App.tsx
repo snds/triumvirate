@@ -542,8 +542,14 @@ export function App() {
           <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} />
         ) : (
           <CleanupView
-            cleanup={inv.cleanup.filter((c) => matches(c.item, query, kind))}
+            characters={inv.characters}
+            characterId={inv.characters.some((c) => c.id === store) ? store : inv.characters[0]?.id ?? ''}
+            onCharacter={setStore}
+            filter={(i) => matches(i, query, kind)}
             onSelect={setSelected}
+            onPatch={(items) => patchItems(items)}
+            onChanged={() => void load(false)}
+            onToast={(text) => setToast({ id: Date.now(), text })}
           />
         )}
       </main>
