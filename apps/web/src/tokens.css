@@ -232,6 +232,13 @@
   --store-switcher-height: var(--size-52);
   --store-emblem-size: var(--size-36);
   --sheet-radius: var(--radius-lg);
+  /* Select mode: picked tiles and the toolbar that replaces the tab bar. */
+  --tile-picked-ring: var(--accent);
+  --tile-picked-badge: var(--accent);
+  --tile-unpickable-opacity: 0.35;
+  --select-bar-radius: var(--radius-lg);
+  --select-bar-clearance: 160px;
+  --toast-ok-border: var(--border-subtle);
   --sheet-max-height: var(--size-sheet-max);
   --sheet-handle: var(--text-muted);
   /* Count badge: one shape for every number on a tab or button (tab bar, rolls toolbar). */

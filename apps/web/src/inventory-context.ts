@@ -22,11 +22,16 @@ export interface InventoryApi {
   setLocked: (item: AppraisedItem, locked: boolean) => void;
   /** Opens the quick-move sheet: the touch way to move, from a long-press or right-click. */
   quick: (item: AppraisedItem) => void;
+  /** Phone select mode: while active, a tap picks or unpicks a tile instead of opening it. */
+  selection: { active: boolean; ids: Set<string> };
+  /** Picks or unpicks an item, starting select mode if it's off. */
+  pick: (item: AppraisedItem) => void;
 }
 
 export const InventoryContext = createContext<InventoryApi>({
   byId: new Map(), select: () => {}, characters: [], moving: new Set(),
   check: () => ({ ok: false, reason: 'Not ready' }), move: () => {}, recentMoves: {},
   checkEquip: () => ({ ok: false, reason: 'Not ready' }), equip: () => {}, setLocked: () => {}, quick: () => {},
+  selection: { active: false, ids: new Set() }, pick: () => {},
 });
 export const useInventory = () => useContext(InventoryContext);

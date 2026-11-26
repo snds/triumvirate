@@ -56,6 +56,8 @@ const GLYPHS = {
   today: 'today',
   alertsOff: 'notifications_off',
   info: 'info',
+  select: 'checklist',
+  checkCircle: 'check_circle',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

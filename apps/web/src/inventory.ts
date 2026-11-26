@@ -78,3 +78,31 @@ export function timeAgo(iso: string, now = Date.now()): string {
 
 /** Items waiting at a character's postmaster. */
 export const isPostmaster = (i: { bucketHash?: number }) => i.bucketHash === POSTMASTER_BUCKET;
+
+type MoveCheckFn<T> = (item: T, to: string, items: T[], account?: AccountLike) => { ok: true } | { ok: false; reason: string; quiet?: boolean };
+interface AccountLike { vault: { used: number; capacity: number } }
+
+/**
+ * Plans moving several items to one place, checking each against the inventory as it will be after
+ * the ones before it land: five helmets for a character with room for three sends three. Items
+ * already there are left out quietly; the rest that can't go come back with the reason.
+ */
+export function planBulkMove<T extends { owner: string; instanceId?: string }>(
+  picked: T[], to: string, items: T[], account: AccountLike | undefined, check: MoveCheckFn<T>,
+): { go: T[]; skip: { item: T; reason: string }[] } {
+  let working = items;
+  let used = account?.vault.used ?? 0;
+  const go: T[] = [];
+  const skip: { item: T; reason: string }[] = [];
+  for (const item of picked) {
+    const res = check(item, to, working, account && { vault: { ...account.vault, used } });
+    if (!res.ok) {
+      if (!res.quiet) skip.push({ item, reason: res.reason });
+      continue;
+    }
+    go.push(item);
+    used += (to === 'vault' ? 1 : 0) - (item.owner === 'vault' ? 1 : 0);
+    working = working.map((i) => (i === item ? { ...i, owner: to } : i));
+  }
+  return { go, skip };
+}
