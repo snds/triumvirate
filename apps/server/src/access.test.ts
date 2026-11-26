@@ -57,3 +57,12 @@ test('config needs both team domain and audience', () => {
   assert.deepEqual(accessConfigFromEnv({ CF_ACCESS_TEAM_DOMAIN: team, CF_ACCESS_AUD: aud, ALLOWED_EMAILS: 'A@b.com, c@d.com' }),
     { teamDomain: team, audience: aud, allowedEmails: ['a@b.com', 'c@d.com'] });
 });
+
+test('home screen icons load without signing in; everything else stays gated', async () => {
+  const { app } = await setup();
+  app.get('*', (c) => c.text('ok'));
+  for (const p of ['/icons/apple-touch-icon.png', '/icons/icon-512.png', '/icons/icon.svg', '/apple-touch-icon.png', '/apple-touch-icon-precomposed.png', '/apple-touch-icon-180x180.png', '/favicon.ico'])
+    assert.equal((await app.request(p)).status, 200, p);
+  for (const p of ['/', '/index.html', '/manifest.webmanifest', '/api/x', '/icons/x.json', '/icons/a/b.png', '/icons/..png'])
+    assert.equal((await app.request(p)).status, 403, p);
+});

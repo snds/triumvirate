@@ -52,6 +52,17 @@ stack on Unraid.
    Basic information tab).
 6. Find your **team domain** under **Settings > Custom Pages** (or **Settings > General**). It looks like
    `yourteam.cloudflareaccess.com`.
+7. **Let the home screen icon through.** iPhone fetches the icon for *Add to Home Screen* without your
+   sign-in, so Access must not block it (it's only the app's artwork). Add a second **Self-hosted**
+   application named **Triumvirate icons** with these **Destinations** (subdomain `triumvirate`, domain
+   `snds-server.com`), one per row:
+   - path `icons/*`
+   - path `apple-touch-icon*`
+   - path `favicon.ico`
+
+   Give it one policy: **Action:** Bypass · **Include > Everyone**. A more specific path wins over the
+   main app, so everything else still asks for your email. The app itself only lets these icon files
+   through without the sign-in.
 
 ## 4. Let Unraid download the app
 
