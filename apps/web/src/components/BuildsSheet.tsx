@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ACTIVITY_LABEL, ARMOR_STATS, BUILD_ACTIVITIES, type AppraisedItem, type ArmorSet, type ArmorStat, type BuildActivity, type PopularBuild } from '@triumvirate/core/browser';
 import { fetchBuilds, saveBuilds, type BuildsResponse } from '../api.ts';
+import { BUILD_MODE, ModeIcon } from './ModeIcon.tsx';
 import { Icon, type IconName } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards } from './Skeleton.tsx';
@@ -144,7 +145,7 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
                     // A build needs at least one activity.
                     onClick={() => (on ? b.activities.length > 1 : true) && edit(b.id, { activities: on ? b.activities.filter((x) => x !== a) : BUILD_ACTIVITIES.filter((x) => x === a || b.activities.includes(x)) })}
                   >
-                    <Icon name={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}
+                    <ModeIcon mode={BUILD_MODE[a]} fallback={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}
                   </button>
                 );
               })}
@@ -209,7 +210,7 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
                           <span className="suggestion__name">{s.build.name}</span>
                           <span className="suggestion__why">{s.why}</span>
                           <span className="suggestion__meta">
-                            {s.build.activities.map((a) => <span key={a} className={`chip activity-chip activity-chip--${a} is-static`}><Icon name={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}</span>)}
+                            {s.build.activities.map((a) => <span key={a} className={`chip activity-chip activity-chip--${a} is-static`}><ModeIcon mode={BUILD_MODE[a]} fallback={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}</span>)}
                             <span className="suggestion__stats">{s.build.stats.join(' › ')}</span>
                             {s.build.set && <span className="suggestion__stats">{s.build.set} set</span>}
                           </span>

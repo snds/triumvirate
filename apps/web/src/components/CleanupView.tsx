@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ACTIVITY_LABEL, dimSearch, type AppraisedItem, type ArmorKeep, type ArmorSet, type CharacterRow, type CleanupCandidate } from '@triumvirate/core/browser';
 import { decideCleanup, fetchCleanup, pullCleanup, type CleanupStatus } from '../api.ts';
+import { BUILD_MODE, ModeIcon } from './ModeIcon.tsx';
 import { Icon } from './Icon.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { ACTIVITY_HINT, ACTIVITY_ICON, BuildsSheet } from './BuildsSheet.tsx';
@@ -232,7 +233,7 @@ function ActivityTags({ activities }: { activities: ArmorKeep['activities'] }) {
     <>
       {activities.map((a) => (
         <span key={a} className={`pill activity-pill activity-pill--${a}`} title={`Best in slot for a ${ACTIVITY_LABEL[a]} build: ${ACTIVITY_HINT[a].toLowerCase()}`}>
-          <Icon name={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}
+          <ModeIcon mode={BUILD_MODE[a]} fallback={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}
         </span>
       ))}
     </>

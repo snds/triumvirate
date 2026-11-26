@@ -20,6 +20,7 @@ import { DigestSheet } from './components/DigestSheet.tsx';
 import { SettingsSheet, type Section as SettingsSection } from './components/SettingsSheet.tsx';
 import { SeasonSheet } from './components/SeasonSheet.tsx';
 import { WatchListSheet } from './components/WatchSheet.tsx';
+import { ModesContext } from './components/ModeIcon.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
 import { INVENTORY_ROWS, planBulkMove, SLOT_ORDER } from './inventory.ts';
@@ -48,6 +49,8 @@ const KINDS: { value: Kind; label: string }[] = [
   { value: 'weapons', label: 'Weapons' },
   { value: 'armor', label: 'Armor' },
 ];
+
+const NO_MODES = {};
 
 export function App() {
   const [state, setState] = useState<State>({ status: 'loading' });
@@ -470,6 +473,7 @@ export function App() {
   };
 
   return (
+    <ModesContext.Provider value={(state.status === 'ready' && state.inv.modes) || NO_MODES}>
     <HoverContext.Provider value={hoverApi}>
     <InventoryContext.Provider value={inventoryApi}>
     <DragActionsContext.Provider value={drag.actions}>
@@ -767,6 +771,7 @@ export function App() {
     </DragActionsContext.Provider>
     </InventoryContext.Provider>
     </HoverContext.Provider>
+    </ModesContext.Provider>
   );
 }
 

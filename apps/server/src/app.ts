@@ -1174,7 +1174,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       subclassFor = manifest!.version;
     }
     lastView = { displayName: snap.displayName, characters, items, cleanup, subclass, itemSets };
-    const view = { characters, account, items, cleanup, keeps, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets };
+    const view = { characters, account, items, cleanup, keeps, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets, modes: manifest!.modes };
     viewCache = { key, list, view };
     return view;
   }

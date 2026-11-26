@@ -469,6 +469,9 @@
   --loadout-mark-size: var(--size-36);
   --loadout-title-min: 9rem;
   --week-card-ratio: 16 / 9;
+  --mode-head-height: var(--size-44);
+  --mode-head-glyph: 22px;
+  --mode-banner-opacity: 0.45;
   --week-row-card: 72%;
   --week-mod-size: 22px;
   --week-mod-sheet-size: var(--size-36);

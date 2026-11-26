@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments, BuildSuggestion, ThisWeek } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments, BuildSuggestion, ThisWeek, ActivityMode } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -20,6 +20,8 @@ export interface Inventory {
   loadoutStyles?: LoadoutStyles;
   /** Armor sets you own pieces of, for set bonuses. */
   itemSets?: Record<string, ArmorSet>;
+  /** Activity mode glyphs and banners, by modeType. */
+  modes?: Record<string, ActivityMode>;
   /** Set on the device's saved copy, served by the service worker when there's no connection. */
   offline?: boolean;
 }

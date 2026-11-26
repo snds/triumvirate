@@ -12,6 +12,7 @@ import {
 } from '../rolls-view.ts';
 import { usePref } from '../prefs.ts';
 import { ItemTile } from './ItemTile.tsx';
+import { ModeIcon, ROLE_MODE, USE_MODE, useMode } from './ModeIcon.tsx';
 import { Icon } from './Icon.tsx';
 import { timeAgo } from '../inventory.ts';
 import { useCompact } from '../media.ts';
@@ -205,7 +206,7 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
                 </FilterGroup>
                 <FilterGroup title="Most used for">
                   {ROLES.map((r) => (
-                    <Check key={r} checked={filters.usedFor.has(r)} onChange={() => toggle('usedFor', r)}>{ROLE_LABEL[r]}</Check>
+                    <Check key={r} checked={filters.usedFor.has(r)} onChange={() => toggle('usedFor', r)}><ModeIcon mode={ROLE_MODE[r]} fallback="activity" className="rolls__check-mode" /> {ROLE_LABEL[r]}</Check>
                   ))}
                 </FilterGroup>
                 <FilterGroup title="Popularity grade">
@@ -357,11 +358,13 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
           return (
             <section key={g.type} className="rolls__group">
               <button
-                className="rolls__group-head"
+                className={`rolls__group-head${g.role ? ' rolls__group-head--mode' : ''}`}
                 aria-expanded={open}
                 onClick={() => setClosedGroups((s) => { const n = new Set(s); if (open) n.add(g.type); else n.delete(g.type); return n; })}
               >
+                {g.role && <ModeBanner role={g.role} />}
                 <Icon name="chevronDown" className={open ? '' : 'is-rotated'} />
+                {g.role && <ModeIcon mode={ROLE_MODE[g.role]} fallback="activity" />}
                 {g.type} <span className="vault__count">{g.items.length}</span>
               </button>
               {open && (
@@ -467,7 +470,7 @@ function RollCard({ item, c, onSelect, onChanged }: {
             {c?.rollType && (
               <span className={`use-pill use-pill--${c.rollType}`}><UseIcon use={c.rollType} /> {ROLL_TYPE_LABEL[c.rollType].replace('Community ', '')}</span>
             )}
-            {c?.usedFor && <span className="pill pill--neutral" title="Where this exact roll scores best">{ROLE_LABEL[c.usedFor]}</span>}
+            {c?.usedFor && <span className="pill pill--neutral pill--mode" title="Where this exact roll scores best"><ModeIcon mode={ROLE_MODE[c.usedFor]} fallback="activity" /> {ROLE_LABEL[c.usedFor]}</span>}
             {c?.betterPossible && !previewing && (
               <span className="pill pill--better"><Icon name="arrowUp" /> {c.bestGrade} possible</span>
             )}
@@ -554,8 +557,15 @@ function RollPerk({ perk, mark, picked, onPick }: { perk: PerkOption; mark?: Per
   );
 }
 
+/** PvE and PvP use the game's own mode glyphs; "both" has none, so it keeps the star. */
 function UseIcon({ use }: { use: 'pve' | 'pvp' | 'both' }) {
-  return <Icon name={use} filled />;
+  return use === 'both' ? <Icon name="both" filled /> : <ModeIcon mode={USE_MODE[use]} fallback={use} />;
+}
+
+/** A group head when grouped by best activity: the mode's glyph, with its banner faded in behind. */
+function ModeBanner({ role }: { role: Role }) {
+  const m = useMode(ROLE_MODE[role]);
+  return m?.banner ? <img className="rolls__group-banner" src={m.banner} alt="" /> : null;
 }
 
 function FilterGroup({ title, closed, children }: { title: string; closed?: boolean; children: React.ReactNode }) {

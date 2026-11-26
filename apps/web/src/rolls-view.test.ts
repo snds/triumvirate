@@ -99,3 +99,10 @@ test('the activity stream takes stock first, then lists only new drops', () => {
   assert.equal(meetsGrade('C', 'B'), false);
   assert.equal(meetsGrade(undefined, 'F'), false);
 });
+
+test('groups by best activity in the game-mode order, with the role on each group', () => {
+  const items = [gun({ name: 'A', instanceId: '1' }), gun({ name: 'B', instanceId: '2' }), gun({ name: 'C', instanceId: '3' })];
+  const grades = { 1: graded({ usedFor: 'pvp' }), 2: graded({ usedFor: 'pve-endgame' }) };
+  const g = groupItems(items, grades, 'use');
+  assert.deepEqual(g.map((x) => [x.type, x.role]), [['PvE endgame', 'pve-endgame'], ['PvP', 'pvp'], ['No clear pick', undefined]]);
+});
