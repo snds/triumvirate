@@ -1,21 +1,63 @@
 // Per-device view preferences, kept in localStorage. Storage can be blocked
 // (private windows), so every read and write falls back silently.
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+/** Every pref lives under this prefix, so a backup can gather them all. */
+export const PREF_PREFIX = 'triumvirate.';
+/** Fired when a pref changes, so other components reading the same pref (Settings and the view it tunes) stay in step. */
+const PREF_EVENT = 'triumvirate:pref';
 
 export function usePref<T>(key: string, initial: T): [T, (v: T | ((prev: T) => T)) => void] {
-  const storageKey = `triumvirate.${key}`;
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      return raw === null ? initial : (JSON.parse(raw) as T);
-    } catch {
-      return initial;
-    }
-  });
+  const storageKey = `${PREF_PREFIX}${key}`;
+  const [value, setValue] = useState<T>(() => readPref(storageKey, initial));
+  const first = useRef(true);
   useEffect(() => {
+    // The first run only echoes what was just read; writing it back would announce a change that isn't one.
+    if (first.current) { first.current = false; return; }
     try { localStorage.setItem(storageKey, JSON.stringify(value)); } catch { /* not saved; fine */ }
+    window.dispatchEvent(new CustomEvent(PREF_EVENT, { detail: { key: storageKey, value } }));
   }, [storageKey, value]);
+  useEffect(() => {
+    const onPref = (e: Event) => {
+      const d = (e as CustomEvent<{ key: string; value: T }>).detail;
+      if (d.key === storageKey) setValue((v) => (Object.is(v, d.value) ? v : d.value));
+    };
+    window.addEventListener(PREF_EVENT, onPref);
+    return () => window.removeEventListener(PREF_EVENT, onPref);
+  }, [storageKey]);
   return [value, setValue];
+}
+
+function readPref<T>(storageKey: string, initial: T): T {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    return raw === null ? initial : (JSON.parse(raw) as T);
+  } catch {
+    return initial;
+  }
+}
+
+/** Every saved pref, for a backup file. */
+export function allPrefs(): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k?.startsWith(PREF_PREFIX)) continue;
+      try { out[k.slice(PREF_PREFIX.length)] = JSON.parse(localStorage.getItem(k)!); } catch { /* skip unreadable */ }
+    }
+  } catch { /* storage blocked */ }
+  return out;
+}
+
+/** Writes prefs from a backup; the page reloads after, so every view reads them fresh. */
+export function restorePrefs(prefs: Record<string, unknown>): number {
+  let n = 0;
+  for (const [k, v] of Object.entries(prefs)) {
+    if (!/^[\w.-]{1,64}$/.test(k)) continue;
+    try { localStorage.setItem(`${PREF_PREFIX}${k}`, JSON.stringify(v)); n++; } catch { /* storage blocked */ }
+  }
+  return n;
 }
 
 /** Item size steps, as multipliers on the tile size tokens. */

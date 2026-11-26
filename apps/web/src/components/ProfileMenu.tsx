@@ -1,23 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { Icon } from './Icon.tsx';
-import { AUTO_REFRESH, TILE_SCALES } from '../prefs.ts';
 
 interface Props {
   name: string;
   picture?: string;
   synced: string;
-  tileScale: number;
-  onTileScale: (v: number) => void;
+  onSettings: () => void;
   onSignOut: () => void;
-  /** Minutes between quiet refreshes; 0 is off. */
+  /** Minutes between quiet refreshes; 0 is off (shown as an icon by the sync time). */
   autoRefresh: number;
-  onAutoRefresh: (minutes: number) => void;
   /** Phone: the trigger is the avatar alone, so the name and sync time move into the menu. */
   compact?: boolean;
 }
 
-/** Avatar, name, and sync time as one button; opens a menu with view settings and sign out. */
-export function ProfileMenu({ name, picture, synced, tileScale, onTileScale, onSignOut, autoRefresh, onAutoRefresh, compact }: Props) {
+/** Avatar, name, and sync time as one button; opens a menu with Settings and sign out. */
+export function ProfileMenu({ name, picture, synced, onSettings, onSignOut, autoRefresh, compact }: Props) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -62,39 +59,9 @@ export function ProfileMenu({ name, picture, synced, tileScale, onTileScale, onS
               <span className="profile__synced">synced {synced}{autoRefresh > 0 && <> · <Icon name="autorenew" className="profile__auto" /></>}</span>
             </div>
           )}
-          <div className="menu__group">
-            <span className="menu__label" id="tile-size-label">Item size</span>
-            <div className="segmented" role="radiogroup" aria-labelledby="tile-size-label">
-              {TILE_SCALES.map((s) => (
-                <button
-                  key={s.label}
-                  role="radio"
-                  aria-checked={tileScale === s.value}
-                  className={`segmented__option${tileScale === s.value ? ' is-selected' : ''}`}
-                  onClick={() => onTileScale(s.value)}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="menu__group">
-            <span className="menu__label" id="auto-refresh-label">Auto refresh</span>
-            <div className="segmented" role="radiogroup" aria-labelledby="auto-refresh-label">
-              {AUTO_REFRESH.map((r) => (
-                <button
-                  key={r.label}
-                  role="radio"
-                  aria-checked={autoRefresh === r.value}
-                  className={`segmented__option${autoRefresh === r.value ? ' is-selected' : ''}`}
-                  onClick={() => onAutoRefresh(r.value)}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-            <span className="menu__hint">Only while this tab is open and visible.</span>
-          </div>
+          <button className="menu__item" role="menuitem" onClick={() => { setOpen(false); onSettings(); }}>
+            <Icon name="settings" /> Settings
+          </button>
           <button className="menu__item" role="menuitem" onClick={() => { setOpen(false); onSignOut(); }}>
             <Icon name="signOut" /> Sign out
           </button>

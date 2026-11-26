@@ -38,7 +38,7 @@ const PANELS: { id: Panel; label: string; icon: 'filter' | 'sort' | 'activity' |
   { id: 'settings', label: 'Settings', icon: 'settings' },
 ];
 
-interface RollSettings {
+export interface RollSettings {
   groupBy: GroupBy;
   sortBy: SortBy;
   /** Swap the location filter to whichever character you're playing. */
@@ -48,7 +48,7 @@ interface RollSettings {
   soundDrops: boolean;
   soundVendors: boolean;
 }
-const DEFAULT_SETTINGS: RollSettings = { groupBy: 'type', sortBy: 'grade', followCharacter: true, streamMin: 'A', soundDrops: false, soundVendors: false };
+export const DEFAULT_ROLL_SETTINGS: RollSettings = { groupBy: 'type', sortBy: 'grade', followCharacter: true, streamMin: 'A', soundDrops: false, soundVendors: false };
 
 export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, onWatchList }: {
   items: AppraisedItem[];
@@ -69,9 +69,9 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
   const filters = useMemo(() => decodeFilters(saved), [saved]);
   const setFilters = (next: RollFilters | ((f: RollFilters) => RollFilters)) =>
     setSaved((s) => encodeFilters(typeof next === 'function' ? next(decodeFilters(s)) : next));
-  const [storedSettings, setSettings] = usePref<RollSettings>('rollSettings', DEFAULT_SETTINGS);
-  const settings = { ...DEFAULT_SETTINGS, ...storedSettings };
-  const set = <K extends keyof RollSettings>(k: K, v: RollSettings[K]) => setSettings((s) => ({ ...DEFAULT_SETTINGS, ...s, [k]: v }));
+  const [storedSettings, setSettings] = usePref<RollSettings>('rollSettings', DEFAULT_ROLL_SETTINGS);
+  const settings = { ...DEFAULT_ROLL_SETTINGS, ...storedSettings };
+  const set = <K extends keyof RollSettings>(k: K, v: RollSettings[K]) => setSettings((s) => ({ ...DEFAULT_ROLL_SETTINGS, ...s, [k]: v }));
   const [railOpen, setRailOpen] = usePref('rollRailOpen', true);
   const [panel, setPanel] = usePref<Panel>('rollPanel', 'filters');
   const [closedGroups, setClosedGroups] = useState<Set<string>>(new Set());
@@ -400,7 +400,7 @@ function ActivityRow({ item, c, meta, onSelect }: { item: AppraisedItem; c?: Com
 
 /** A short two-note chime, made on the spot (no audio file). Browsers may block it until the page is clicked once. */
 const audio = { ctx: undefined as AudioContext | undefined };
-function chime() {
+export function chime() {
   try {
     const ctx = (audio.ctx ??= new AudioContext());
     [880, 1320].forEach((f, k) => {

@@ -75,6 +75,9 @@ const GLYPHS = {
   endgame: 'skull',
   casual: 'explore',
   set: 'join',
+  upload: 'upload',
+  server: 'dns',
+  wishlist: 'playlist_add_check',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

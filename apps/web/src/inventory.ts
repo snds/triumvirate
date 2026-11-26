@@ -73,7 +73,9 @@ export function timeAgo(iso: string, now = Date.now()): string {
   const m = Math.round(s / 60);
   if (m < 60) return `${m} min ago`;
   const h = Math.round(m / 60);
-  return h < 24 ? `${h} hr ago` : `${Math.round(h / 24)} days ago`;
+  if (h < 24) return `${h} hr ago`;
+  const d = Math.round(h / 24);
+  return d === 1 ? '1 day ago' : `${d} days ago`;
 }
 
 /** Items waiting at a character's postmaster. */

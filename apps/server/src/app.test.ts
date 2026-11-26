@@ -123,3 +123,37 @@ test('watch list: empty to start, adding needs item data, checking needs a sign-
   assert.match((await check.json()).error, /Sign in/);
   assert.deepEqual((await (await app.request('/api/watch/nope', { method: 'DELETE' })).json()).entries, []);
 });
+
+test('status reports schedules without a sign-in', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), { ...deps, communityCrawlHour: 3, digestHour: 7 });
+  const s = await (await app.request('/api/status')).json();
+  assert.equal(s.crawl.hour, 3);
+  assert.equal(s.crawl.running, false);
+  assert.equal(s.digest.hour, 7);
+  assert.equal(s.digest.latest, null);
+  assert.equal(s.wishLists, null);
+});
+
+test('backup round trip: loadouts, builds, cleanup, and watch list come back; junk is refused', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'tri-'));
+  const app = createApp(cfg, createStore(dir), deps);
+  const created = await (await app.request('/api/loadouts', { method: 'POST', body: JSON.stringify({ name: 'Raid', classType: 2, items: [{ instanceId: '6917529', itemHash: 1, bucketHash: 1498876634 }] }) })).json();
+  const backup = await (await app.request('/api/backup')).json();
+  assert.equal(backup.kind, 'backup');
+  assert.equal(backup.data.loadouts[0].name, 'Raid');
+  assert.equal(JSON.stringify(backup).includes('token'), false);
+
+  // Restore into an empty server.
+  const fresh = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  backup.data.watch.entries = [{ id: 'w1', itemHash: 42, name: 'Fatebringer', perks: [['Firefly']], createdAt: '2026-11-01T00:00:00Z' }];
+  backup.data.cleanup = { decisions: { '9': { action: 'keep', at: '2026-11-01T00:00:00Z' } }, cleared: [] };
+  const r = await (await fresh.request('/api/backup', { method: 'POST', body: JSON.stringify(backup) })).json();
+  assert.deepEqual(r.restored, ['1 loadout', 'cleanup decisions', '1 watched weapon']);
+  const list = await (await fresh.request('/api/loadouts')).json();
+  assert.equal(list[0].id, created.id);
+  const watched = await (await fresh.request('/api/watch')).json();
+  assert.equal(watched.entries[0].name, 'Fatebringer');
+
+  const bad = await fresh.request('/api/backup', { method: 'POST', body: JSON.stringify({ hello: 1 }) });
+  assert.equal(bad.status, 400);
+});
