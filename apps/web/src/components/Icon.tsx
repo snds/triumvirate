@@ -85,6 +85,8 @@ const GLYPHS = {
   gilded: 'auto_awesome',
   maintenance: 'build',
   cloudOff: 'cloud_off',
+  week: 'calendar_view_week',
+  modifier: 'tune',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

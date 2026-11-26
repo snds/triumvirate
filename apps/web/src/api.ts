@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments, BuildSuggestion } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments, BuildSuggestion, ThisWeek } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -225,6 +225,8 @@ export async function applyPerks(instanceId: string, plugs: { socketIndex: numbe
 export const fetchOrnaments = async (instanceId: string): Promise<WeaponOrnaments> =>
   json(await fetch(`/api/items/${encodeURIComponent(instanceId)}/ornaments`), sameOriginImages);
 
+/** The weekly rotation and the event running now, for Today's "This week". */
+export const fetchWeek = async (): Promise<ThisWeek> => json(await fetch('/api/week'), sameOriginImages);
 export interface Lore { name: string; subtitle?: string; text: string }
 /** One lore entry, for the item dialog's Lore tab. */
 export const fetchLore = async (hash: number): Promise<Lore> => json(await fetch(`/api/lore/${hash}`));

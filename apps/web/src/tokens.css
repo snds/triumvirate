@@ -468,6 +468,13 @@
   --loadout-edge: 3px;
   --loadout-mark-size: var(--size-36);
   --loadout-title-min: 9rem;
+  --week-card-ratio: 16 / 9;
+  --week-row-card: 72%;
+  --week-mod-size: 22px;
+  --week-mod-sheet-size: var(--size-36);
+  /* Key-art scrim: heavier than --art-scrim, so titles on busy activity art stay at 4.5:1. */
+  --key-art-scrim: linear-gradient(to top, rgb(0 0 0 / 0.88) 0%, rgb(0 0 0 / 0.55) 45%, rgb(0 0 0 / 0) 75%);
+  --event-scrim: linear-gradient(to right, rgb(0 0 0 / 0.85) 0%, rgb(0 0 0 / 0.55) 55%, rgb(0 0 0 / 0.15) 100%);
 
   /* Loadout builder: one row per slot, and the item picker that opens over it. */
   --editor-row-bg: var(--surface-panel);

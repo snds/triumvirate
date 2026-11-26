@@ -6,7 +6,8 @@ import { join } from 'node:path';
 import { getDestinyEntityDefinition } from 'bungie-api-ts/destiny2';
 import type { HttpClient } from 'bungie-api-ts/http';
 
-export type DefType = 'DestinyVendorDefinition' | 'DestinyVendorGroupDefinition' | 'DestinyDestinationDefinition' | 'DestinyProgressionDefinition' | 'DestinyInventoryItemDefinition' | 'DestinyLoreDefinition';
+export type DefType = 'DestinyVendorDefinition' | 'DestinyVendorGroupDefinition' | 'DestinyDestinationDefinition' | 'DestinyProgressionDefinition' | 'DestinyInventoryItemDefinition' | 'DestinyLoreDefinition'
+  | 'DestinyMilestoneDefinition' | 'DestinyActivityDefinition' | 'DestinyActivityModifierDefinition' | 'DestinyEventCardDefinition';
 
 export function createDefsCache(dataDir: string) {
   const mem = new Map<string, unknown>();
