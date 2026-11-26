@@ -32,13 +32,15 @@ export function accessGate(cfg: AccessConfig, keys?: JWTVerifyGetKey): Middlewar
     // Access sends the token as a header to the origin, and as a cookie to the browser.
     const token = c.req.header('cf-access-jwt-assertion')
       ?? c.req.header('cookie')?.match(/(?:^|;\s*)CF_Authorization=([^;]+)/)?.[1];
-    if (!token) return c.text('Sign in through Cloudflare Access to use this app.', 403);
+    // The app's own calls get JSON with a kind, so it can show "sign in to your server again".
+    const deny = (text: string) => (c.req.path.startsWith('/api/') ? c.json({ error: text, kind: 'access' }, 403) : c.text(text, 403));
+    if (!token) return deny('Sign in through Cloudflare Access to use this app.');
     try {
       const { payload } = await jwtVerify(token, keys, { issuer, audience: cfg.audience });
       const email = String(payload.email ?? '').toLowerCase();
-      if (cfg.allowedEmails?.length && !cfg.allowedEmails.includes(email)) return c.text('This account is not allowed.', 403);
+      if (cfg.allowedEmails?.length && !cfg.allowedEmails.includes(email)) return deny('This account is not allowed.');
     } catch {
-      return c.text('Your Cloudflare Access sign-in is missing or expired. Reload to sign in again.', 403);
+      return deny('Your Cloudflare Access sign-in is missing or expired. Reload to sign in again.');
     }
     await next();
   };

@@ -5,7 +5,7 @@ import type { RankRow } from '@triumvirate/core/browser';
 import { fetchSeason, type SeasonResponse } from '../api.ts';
 import { timeAgo } from '../inventory.ts';
 import { Icon } from './Icon.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards } from './Skeleton.tsx';
 
 const num = (n: number) => n.toLocaleString();

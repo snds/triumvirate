@@ -4,7 +4,7 @@ import type { AppraisedItem, DigestItem } from '@triumvirate/core/browser';
 import { fetchDigest, runDigest, type DigestResponse } from '../api.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkText } from './Skeleton.tsx';
 import { alertState, clearDigestAlerts, disableAlerts, enableAlerts, sendTestAlert, type AlertState } from '../push.ts';
 

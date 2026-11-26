@@ -26,7 +26,10 @@ async function setup(allowedEmails?: string[]) {
 
 test('no token is refused', async () => {
   const { app } = await setup();
-  assert.equal((await app.request('/api/x')).status, 403);
+  const res = await app.request('/api/x');
+  assert.equal(res.status, 403);
+  // The app's own calls get a kind, so it can show "sign in to your server again".
+  assert.equal(((await res.json()) as { kind: string }).kind, 'access');
 });
 
 test('a valid Access token gets through, by header or cookie', async () => {

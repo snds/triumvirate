@@ -4,6 +4,7 @@ import { deleteChat, getChat, listChats, newChatId, type ChatSummary } from '../
 import { useAgentChat, type Pending } from '../chat-session.ts';
 import { usePref } from '../prefs.ts';
 import { timeAgo } from '../inventory.ts';
+import { Mark } from './Mark.tsx';
 import { Icon } from './Icon.tsx';
 import { ChatMarkdown } from './ChatMarkdown.tsx';
 import { ResizeHandle } from './ResizeHandle.tsx';
@@ -204,7 +205,13 @@ export function AgentPanel({ enabled, open, about, onClose, onStatus, width, onW
         </div>
       )}
       <div className="agent__log" ref={logRef} onScroll={onLogScroll} hidden={!!history}>
-        {!enabled && <p className="muted">Add ANTHROPIC_API_KEY to your .env file and restart to turn this on.</p>}
+        {!enabled && (
+          <div className="agent__off">
+            <Mark className="agent__off-mark" />
+            <strong>Chat is off on this server</strong>
+            <p className="muted">Ask about rolls, builds, and what to clean up. To turn it on, add <code>ANTHROPIC_API_KEY</code> to the server's environment and restart the app.</p>
+          </div>
+        )}
         {enabled && turns.length === 0 && !busy && (
           <div className="agent__starters">
             <p className="muted">{subject ? `Ask anything about your ${subject.name}.` : 'Ask about your gear. Answers only use items you own.'}</p>
@@ -221,7 +228,7 @@ export function AgentPanel({ enabled, open, about, onClose, onStatus, width, onW
         {pending && <Working pending={pending} />}
         {error && <p className="error">{error}</p>}
       </div>
-      <form
+      {enabled && <form
         className="agent__form"
         onSubmit={(e) => { e.preventDefault(); void send(draft); }}
       >
@@ -231,11 +238,10 @@ export function AgentPanel({ enabled, open, about, onClose, onStatus, width, onW
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder={subject ? `Ask about ${subject.name}…` : 'Ask about your vault…'}
-          disabled={!enabled}
           aria-label="Message"
         />
-        <button className="button button--primary" disabled={!enabled || busy || !draft.trim()}>Send</button>
-      </form>
+        <button className="button button--primary" disabled={busy || !draft.trim()}>Send</button>
+      </form>}
     </aside>
   );
 }

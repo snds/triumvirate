@@ -20,6 +20,8 @@ export interface Inventory {
   loadoutStyles?: LoadoutStyles;
   /** Armor sets you own pieces of, for set bonuses. */
   itemSets?: Record<string, ArmorSet>;
+  /** Set on the device's saved copy, served by the service worker when there's no connection. */
+  offline?: boolean;
 }
 
 export interface ChatTurn {
@@ -27,10 +29,31 @@ export interface ChatTurn {
   content: string;
 }
 
-/** What to say when the app server isn't running or sent back nothing readable. */
-const SERVER_DOWN = 'The app server isn\'t responding. Check the terminal running pnpm dev for an error, then try again.';
+/**
+ * Why a load failed, so the app can show the right screen:
+ * - `bungie-down`: Bungie maintenance or an outage (retry on a timer)
+ * - `server-down`: our server isn't answering, usually restarting after an update (retry soon)
+ * - `access`: the Cloudflare Access sign-in for the site ran out (reload to sign in)
+ * - `offline`: this device has no connection
+ * - `other`: anything else; the message says what
+ */
+export type FailKind = 'bungie-down' | 'server-down' | 'access' | 'offline' | 'other';
 
-class ServerDown extends Error {}
+export class AppError extends Error {
+  constructor(readonly kind: FailKind, message: string) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+
+/** Sorts any thrown value into a FailKind. A fetch that never got an answer is offline or the server. */
+export function failKind(err: unknown): FailKind {
+  if (err instanceof AppError) return err.kind;
+  if (err instanceof TypeError) return navigator.onLine === false ? 'offline' : 'server-down';
+  return 'other';
+}
+
+const SERVER_DOWN = 'The app server isn\'t answering. It may be restarting after an update.';
 
 /**
  * Points every Bungie image at our own server, which keeps a copy on disk and tells the browser
@@ -41,23 +64,41 @@ const sameOriginImages = (text: string) => text.replaceAll('"https://www.bungie.
 async function json<T>(res: Response, transform?: (text: string) => string): Promise<T> {
   const raw = await res.text();
   const text = transform ? transform(raw) : raw;
-  let body: T & { error?: string };
-  // The dev proxy answers with an empty 500 or 502 when the server is down or restarting.
-  try { body = JSON.parse(text); } catch { throw new ServerDown(res.ok ? 'The app server sent back something unreadable.' : SERVER_DOWN); }
-  if (!res.ok) throw new Error(body.error ?? `Request failed (${res.status})`);
+  let body: T & { error?: string; kind?: string };
+  try { body = JSON.parse(text); } catch {
+    // Cloudflare answers an expired Access sign-in with its own HTML page; a proxy answers a
+    // stopped or restarting server with an empty 502.
+    if (res.status === 403 || res.status === 401) throw new AppError('access', 'Your sign-in to this site ran out.');
+    throw new AppError(res.ok ? 'other' : 'server-down', res.ok ? 'The app server sent back something unreadable.' : SERVER_DOWN);
+  }
+  if (!res.ok) {
+    const kind: FailKind = body.kind === 'bungie-down' || body.kind === 'access' ? body.kind : 'other';
+    throw new AppError(kind, body.error ?? `Request failed (${res.status})`);
+  }
   return body;
 }
 
-/** Resolves to null when not signed in. */
-export async function fetchInventory(refresh = false): Promise<Inventory | null> {
-  // The server restarts itself after a git pull; give it a few seconds before giving up.
+/** Not signed in to Bungie; `reason` is set when a sign-in ran out rather than never happened. */
+export interface SignedOut { signedIn: false; reason?: 'expired' }
+
+/** Resolves to SignedOut when not signed in. Throws an AppError when it can't load. */
+export async function fetchInventory(refresh = false): Promise<Inventory | SignedOut> {
+  // A restart takes a few seconds; ride out a short one before giving up.
   for (let attempt = 0; ; attempt++) {
     try {
-      const res = await fetch(`/api/inventory${refresh ? '?refresh=1' : ''}`);
-      if (res.status === 401) return null;
-      return await json<Inventory>(res, sameOriginImages);
+      // Our server never redirects this call, so a redirect is Cloudflare Access sending you to sign in.
+      const res = await fetch(`/api/inventory${refresh ? '?refresh=1' : ''}`, { redirect: 'manual' });
+      if (res.type === 'opaqueredirect') throw new AppError('access', 'Your sign-in to this site ran out.');
+      if (res.status === 401) {
+        const body = (await res.json().catch(() => ({}))) as { reason?: string };
+        return { signedIn: false, reason: body.reason === 'expired' ? 'expired' : undefined };
+      }
+      const inv = await json<Inventory>(res, sameOriginImages);
+      if (res.headers.get('x-triumvirate-saved')) inv.offline = true;
+      return inv;
     } catch (err) {
-      if (!(err instanceof ServerDown) || attempt >= 5) throw err;
+      const kind = failKind(err);
+      if (kind !== 'server-down' || attempt >= 3) throw err instanceof AppError ? err : new AppError(kind, kind === 'offline' ? 'You\'re offline.' : SERVER_DOWN);
       await new Promise((f) => setTimeout(f, 1000 + attempt * 500));
     }
   }

@@ -8,7 +8,7 @@ import {
 import type { LoadoutDraft } from '../api.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 
 type Targets = Record<ArmorStat, number>;
 const NO_TARGETS = Object.fromEntries(ARMOR_STATS.map((s) => [s, 0])) as Targets;
