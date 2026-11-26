@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { exoticGaps, filterNodes, filterRecords, recordRoots, recordsScreen, slimNodes, slimRecords, type RecordTables } from './records.ts';
+import { exoticGaps, filterNodes, filterRecords, markDeepsight, recordRoots, splitPatterns, recordsScreen, slimNodes, slimRecords, type RecordTables } from './records.ts';
 
 const obj = (objectiveHash: number, progress: number, completionValue: number) => ({ objectiveHash, progress, completionValue, complete: progress >= completionValue, visible: true });
 const NOT_DONE = 4;
@@ -128,6 +128,28 @@ test('catalysts come from their own root', () => {
   assert.equal(s.catalysts[0]!.name, 'Hand Cannons');
   assert.equal(s.catalysts[0]!.records![0]!.name, 'Ace of Spades Catalyst');
   assert.deepEqual(s.catalysts[0]!.records![0]!.path, ['Hand Cannons']);
+});
+
+test('patterns split from catalysts under the shared root (live manifest layout)', () => {
+  const rec = (hash: number, name: string, complete = false) => ({ hash, name, complete, redeemed: false, objectives: [], fraction: complete ? 1 : 0 });
+  const node = (hash: number, name: string, kids: { nodes?: any[]; records?: any[] }) => ({ hash, name, progress: 0, completion: 0, ...kids });
+  // Root › "Patterns & Catalysts" › Primary Weapon Patterns › Auto Rifles, and Exotic Catalysts › Hand Cannons.
+  const tree = [node(1, 'Patterns & Catalysts', { nodes: [
+    node(2, 'Primary Weapon Patterns', { nodes: [node(3, 'Auto Rifles', { records: [rec(10, 'Perpetualis'), rec(11, 'Edge of Intent', true)] })] }),
+    node(4, 'Exotic Catalysts', { nodes: [node(5, 'Hand Cannons', { records: [rec(20, 'Ace of Spades Catalyst')] })] }),
+  ] })];
+  const { catalysts, patterns } = splitPatterns(tree);
+  assert.deepEqual(catalysts.map((n) => n.name), ['Hand Cannons']);
+  assert.deepEqual(patterns.map((n) => n.name), ['Primary Weapon Patterns']);
+  const n = markDeepsight(patterns, [
+    { name: 'Perpetualis', deepsight: true }, { name: 'Perpetualis', deepsight: true },
+    { name: 'Edge of Intent', deepsight: true }, // pattern done: nothing left to extract
+    { name: 'Perpetualis' },
+  ]);
+  assert.equal(n, 2);
+  const autos = patterns[0]!.nodes![0]!.records!;
+  assert.equal(autos[0]!.deepsight, 2);
+  assert.equal(autos[1]!.deepsight, undefined);
 });
 
 test('exotic gaps: missing exotics once each, hidden and owned ones left out, with their source', () => {

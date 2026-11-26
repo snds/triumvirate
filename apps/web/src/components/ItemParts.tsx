@@ -96,6 +96,7 @@ export function VerdictLine({ item }: { item: AppraisedItem }) {
 export function ItemFacts({ item, copies }: { item: AppraisedItem; copies: number }) {
   const facts: { icon: Parameters<typeof Icon>[0]['name']; text: string }[] = [];
   if (item.crafted) facts.push({ icon: 'crafted', text: item.craftedLevel !== undefined ? `Crafted · Level ${item.craftedLevel}` : 'Crafted' });
+  if (item.deepsight) facts.push({ icon: 'deepsight', text: 'Deepsight · pattern to extract' });
   if (item.killTracker) facts.push({ icon: 'tracker', text: `${item.killTracker.count.toLocaleString('en-US')} ${shortTracker(item.killTracker.label)}` });
   if (item.ornament) facts.push({ icon: 'ornament', text: `${item.ornament.name} ornament` });
   if (copies > 0) facts.push({ icon: 'copies', text: `${copies} other ${copies === 1 ? 'copy' : 'copies'}` });

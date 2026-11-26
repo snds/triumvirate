@@ -310,6 +310,8 @@
   --vendor-rank-bar: var(--accent);
   --vendor-rank-track: var(--surface-hover);
   --vendor-cost-short: var(--danger);
+  /* Deepsight Resonance: the game marks these weapons with a red border. */
+  --deepsight: var(--danger);
   --vendor-owned: var(--verdict-good);
   --vendor-locked-opacity: 0.55;
 

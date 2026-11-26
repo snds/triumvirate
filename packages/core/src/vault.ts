@@ -20,6 +20,8 @@ export const DAMAGE_NAMES = ['', 'Kinetic', 'Arc', 'Solar', 'Void', 'Raid', 'Sta
 const STATE_LOCKED = 1;
 /** Bit 8 = crafted (shaped) weapon. */
 const STATE_CRAFTED = 8;
+/** Bit 16 = highlighted objective: a Deepsight weapon with a pattern to extract. */
+const STATE_DEEPSIGHT = 16;
 /** Bit 4 = masterworked (weapons and armor). */
 const STATE_MASTERWORK = 4;
 /** Socket categories on weapons. */
@@ -71,6 +73,8 @@ export interface ItemRow {
   /** Masterwork and weapon mod, in socket order. */
   mods?: PerkOption[];
   crafted?: boolean;
+  /** Deepsight Resonance: extracting it adds pattern progress (red border in game). */
+  deepsight?: boolean;
   /** Fully upgraded: gold border and holofoil in the UI, like in game. */
   masterworked?: boolean;
   craftedLevel?: number;
@@ -510,6 +514,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       ...(extras?.intrinsic ? { intrinsic: extras.intrinsic } : {}),
       ...(extras?.mods ? { mods: extras.mods } : {}),
       ...(crafted ? { crafted } : {}),
+      ...(isWeapon && (item.state & STATE_DEEPSIGHT) !== 0 ? { deepsight: true } : {}),
       ...((item.state & STATE_MASTERWORK) !== 0 ? { masterworked: true } : {}),
       ...(progress?.craftedLevel !== undefined ? { craftedLevel: progress.craftedLevel } : {}),
       ...(progress?.killTracker ? { killTracker: progress.killTracker } : {}),
