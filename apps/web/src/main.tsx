@@ -4,6 +4,9 @@ import 'material-symbols/rounded.css'; // self-hosted icon font, no network need
 import './tokens.css';
 import './app.css';
 import { App } from './App.tsx';
+import { watchViewport } from './viewport.ts';
+
+watchViewport();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

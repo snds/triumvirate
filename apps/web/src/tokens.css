@@ -307,3 +307,7 @@
     --hovercard-width: min(360px, calc(100vw - 2 * var(--space-4)));
   }
 }
+
+/* iOS Home Screen bug (see viewport.ts): the web view already ends well above the home indicator,
+   so its inset would only push bars and content further from the bottom edge. */
+:root[data-viewport-short] { --safe-bottom: 0px; }
