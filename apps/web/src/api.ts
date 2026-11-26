@@ -476,3 +476,12 @@ export const fetchRecords = async (characterId?: string, refresh = false): Promi
 };
 /** Tracks or untracks a triumph in this app. */
 export const trackRecord = (hash: number, tracked: boolean) => act<{ tracked?: number[]; error?: string }>('/api/records/track', { hash, tracked }, 'track that triumph');
+
+/** Claude connected to this server over MCP (see the server's mcp.ts). */
+export interface McpStatus {
+  /** The address to paste into Claude as a custom connector. */
+  url: string;
+  connections: { id: string; name: string; connectedAt: string; lastUsedAt?: string }[];
+}
+export const fetchMcp = async (): Promise<McpStatus> => json(await fetch('/api/mcp'));
+export const disconnectMcp = async (id: string): Promise<void> => { await json(await fetch(`/api/mcp/${encodeURIComponent(id)}`, { method: 'DELETE' })); };

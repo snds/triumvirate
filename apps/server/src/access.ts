@@ -3,6 +3,7 @@
 // must carry the signed token Cloudflare Access adds after you sign in, and we check that token
 // here too. That way a tunnel or Access rule set up wrong fails closed instead of open.
 import type { MiddlewareHandler } from 'hono';
+import { isMcpPublic } from './mcp.ts';
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 
 // The home screen icon is fetched by iOS outside Safari, without the Access sign-in cookie, so
@@ -28,7 +29,8 @@ export function accessGate(cfg: AccessConfig, keys?: JWTVerifyGetKey): Middlewar
   // jose caches the signing keys and refetches when Cloudflare rotates them.
   keys ??= createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
   return async (c, next) => {
-    if (isPublicAsset(c.req.path)) return next();
+    // MCP paths carry their own OAuth (Claude's servers can't pass Access); see mcp.ts.
+    if (isPublicAsset(c.req.path) || isMcpPublic(c.req.path)) return next();
     // Access sends the token as a header to the origin, and as a cookie to the browser.
     const token = c.req.header('cf-access-jwt-assertion')
       ?? c.req.header('cookie')?.match(/(?:^|;\s*)CF_Authorization=([^;]+)/)?.[1];

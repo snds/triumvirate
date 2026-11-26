@@ -17,7 +17,7 @@ import { RecordsView } from './components/RecordsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
-import { SettingsSheet } from './components/SettingsSheet.tsx';
+import { SettingsSheet, type Section as SettingsSection } from './components/SettingsSheet.tsx';
 import { SeasonSheet } from './components/SeasonSheet.tsx';
 import { WatchListSheet } from './components/WatchSheet.tsx';
 import { Icon } from './components/Icon.tsx';
@@ -84,6 +84,8 @@ export function App() {
   // Daily digest: the newest one's date, and the last one you opened (for the button's dot).
   const [digestOpen, setDigestOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Set when something opens Settings at a particular section (the chat's "Connect an agent"). */
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>();
   const [seasonOpen, setSeasonOpen] = useState(false);
   const [watchOpen, setWatchOpen] = useState(false);
   const [latestDigest, setLatestDigest] = useState('');
@@ -659,6 +661,7 @@ export function App() {
       {/* The chat floats above everything, item dialog included, and the button summons or hides it. */}
       <AgentPanel
         enabled={inv.agentEnabled}
+        onConnect={() => { setAgentOpen(false); setSettingsSection('agents'); setSettingsOpen(true); }}
         open={agentOpen}
         about={about}
         onClose={() => setAgentOpen(false)}
@@ -711,7 +714,8 @@ export function App() {
           autoRefresh={autoRefresh}
           onAutoRefresh={setAutoRefresh}
           onOpenDigest={() => { setSettingsOpen(false); setDigestOpen(true); }}
-          onClose={() => setSettingsOpen(false)}
+          initialSection={settingsSection}
+          onClose={() => { setSettingsOpen(false); setSettingsSection(undefined); }}
         />
       )}
       {digestOpen && (

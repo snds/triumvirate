@@ -21,7 +21,8 @@ import { createDefsCache } from './defs-cache.ts';
 import { createTrackedStore } from './tracked-store.ts';
 import type { Push } from './push.ts';
 import type { Store, Snapshot } from './store.ts';
-import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
+import { createMcp, type McpTool } from './mcp.ts';
+import { buildTools, streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
 import { stream } from 'hono/streaming';
 import { createChatStore, validChatId } from './chats.ts';
 import { createCommunity } from './community.ts';
@@ -277,15 +278,59 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return c.body(cache.body!);
   });
 
+  /** Loads your gear for the chat and MCP tools if this server hasn't yet. Undefined when signed out. */
+  async function ensureView(): Promise<AgentContext | undefined> {
+    if (lastView) return lastView;
+    const t = await validTokens();
+    if (!t) return undefined;
+    const snap = (await store.latestSnapshot()) ?? (await sync(t));
+    if (!manifest) await sync(t);
+    await buildView(snap);
+    return lastView;
+  }
+
+  // Triumvirate as an MCP server (see mcp.ts): the chat's read tools, plus move, equip, and lock,
+  // which go through this app's own routes so they get the same checks and queue as the UI.
+  const act = async (path: string, body: unknown) => {
+    const res = await app.request(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const out = (await res.json()) as { error?: string; item?: { name?: string; location?: string }; skipped?: unknown[] };
+    if (out.error) throw new Error(out.error);
+    return out.item ? { ok: true, name: out.item.name, now: out.item.location, skipped: out.skipped } : { ok: true, skipped: out.skipped };
+  };
+  const actionTools: McpTool[] = [
+    {
+      name: 'move_item',
+      readOnly: false,
+      description: 'Move one item (by instance id from the item tools) to a character id or "vault". Pulls from the postmaster and routes through the vault as needed.',
+      input_schema: { type: 'object', properties: { id: { type: 'string' }, to: { type: 'string', description: 'A character id from inventory_summary, or "vault".' } }, required: ['id', 'to'], additionalProperties: false },
+      run: (({ id, to }: { id: string; to: string }) => act('/api/move', { instanceId: id, to })) as McpTool['run'],
+    },
+    {
+      name: 'equip_items',
+      readOnly: false,
+      description: 'Equip one or more items (instance ids) on a character, moving them there first if needed. Up to 12 at once, e.g. a full build.',
+      input_schema: { type: 'object', properties: { ids: { type: 'array', items: { type: 'string' }, maxItems: 12 }, characterId: { type: 'string' } }, required: ['ids', 'characterId'], additionalProperties: false },
+      run: (({ ids, characterId }: { ids: string[]; characterId: string }) => act('/api/equip', { instanceIds: ids, characterId })) as McpTool['run'],
+    },
+    {
+      name: 'set_lock',
+      readOnly: false,
+      description: 'Lock or unlock one item (instance id) so it can\'t be dismantled by accident.',
+      input_schema: { type: 'object', properties: { id: { type: 'string' }, locked: { type: 'boolean' } }, required: ['id', 'locked'], additionalProperties: false },
+      run: (({ id, locked }: { id: string; locked: boolean }) => act('/api/lock', { instanceId: id, locked })) as McpTool['run'],
+    },
+  ];
+  app.route('/', createMcp({
+    dataDir: store.dataDir,
+    tools: async () => {
+      if (!(await ensureView())) throw new Error('Triumvirate isn\'t signed in to Bungie. Open the app and sign in first.');
+      return [...(buildTools(() => lastView!) as unknown as McpTool[]), ...actionTools];
+    },
+  }));
+
   app.post('/api/agent', async (c) => {
     if (!deps.anthropic) return c.json({ error: 'Add ANTHROPIC_API_KEY to .env to turn on the agent.' }, 400);
-    if (!lastView) {
-      const t = await validTokens();
-      if (!t) return c.json({ signedIn: false }, 401);
-      const snap = (await store.latestSnapshot()) ?? (await sync(t));
-      if (!manifest) await sync(t);
-      await buildView(snap);
-    }
+    if (!(await ensureView())) return c.json({ signedIn: false }, 401);
     const body = (await c.req.json()) as { messages?: ChatTurn[] };
     const history = (body.messages ?? []).filter((m) => (m.role === 'user' || m.role === 'assistant') && m.content);
     if (history.at(-1)?.role !== 'user') return c.json({ error: 'The last message must be from you.' }, 400);

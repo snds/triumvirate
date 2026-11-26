@@ -3,8 +3,8 @@
 // lists and saved data live on the server.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  addWishList, fetchBackup, fetchStatus, fetchWishLists, refreshWishLists, removeWishList, restoreBackup, setWishListEnabled,
-  type BackupFile, type ServerStatus, type WishListSourceInfo,
+  addWishList, disconnectMcp, fetchBackup, fetchMcp, fetchStatus, fetchWishLists, refreshWishLists, removeWishList, restoreBackup, setWishListEnabled,
+  type BackupFile, type McpStatus, type ServerStatus, type WishListSourceInfo,
 } from '../api.ts';
 import { AUTO_REFRESH, TILE_SCALES, allPrefs, restorePrefs, usePref } from '../prefs.ts';
 import { timeAgo } from '../inventory.ts';
@@ -17,16 +17,17 @@ import { Switch } from '../ui/Switch.tsx';
 import { Select } from '../ui/Select.tsx';
 import { Tab as TabButton, TabList, TabPanel, Tabs } from '../ui/Tabs.tsx';
 
-type Section = 'display' | 'rolls' | 'wishlists' | 'data' | 'status';
+export type Section = 'display' | 'rolls' | 'wishlists' | 'agents' | 'data' | 'status';
 const SECTIONS: { id: Section; label: string; icon: IconName }[] = [
   { id: 'display', label: 'Display', icon: 'options' },
   { id: 'rolls', label: 'Rolls', icon: 'rolls' },
   { id: 'wishlists', label: 'Wish lists', icon: 'wishlist' },
+  { id: 'agents', label: 'Agents', icon: 'chat' },
   { id: 'data', label: 'Backup', icon: 'save' },
   { id: 'status', label: 'Server', icon: 'server' },
 ];
 
-export function SettingsSheet({ tileScale, onTileScale, autoRefresh, onAutoRefresh, onOpenDigest, onClose }: {
+export function SettingsSheet({ tileScale, onTileScale, autoRefresh, onAutoRefresh, onOpenDigest, onClose, initialSection }: {
   tileScale: number;
   onTileScale: (v: number) => void;
   autoRefresh: number;
@@ -34,8 +35,12 @@ export function SettingsSheet({ tileScale, onTileScale, autoRefresh, onAutoRefre
   /** Alerts are set up next to the digest, where you see what they'll say. */
   onOpenDigest: () => void;
   onClose: () => void;
+  /** Opens on this section instead of the last one you looked at (e.g. Agents, from the chat). */
+  initialSection?: Section;
 }) {
   const [section, setSection] = useSettingsSection();
+  // Once, on open: after that the section buttons are in charge.
+  useEffect(() => { if (initialSection) setSection(initialSection); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Sheet title="Settings" onClose={onClose} wide full className="settings">
       <Tabs value={section} onChange={setSection}>
@@ -48,6 +53,7 @@ export function SettingsSheet({ tileScale, onTileScale, autoRefresh, onAutoRefre
       )}
       {section === 'rolls' && <RollsSection />}
       {section === 'wishlists' && <WishListsSection />}
+      {section === 'agents' && <AgentsSection />}
       {section === 'data' && <BackupSection />}
       {section === 'status' && <StatusSection />}
       </TabPanel>
@@ -286,6 +292,69 @@ const listOf = (parts: string[]) => (parts.length < 2 ? parts.join('') : `${part
 /** "3 AM" from an hour of the day. */
 const hourLabel = (h: number) => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'}`;
 const when = (iso: string | null | undefined) => (iso ? `${timeAgo(iso)} (${new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })})` : 'never');
+
+/**
+ * Two ways to put an agent on your gear: connect Claude with your own Claude sign-in (Triumvirate is
+ * an MCP server), or give this server an API key for the built-in chat.
+ */
+function AgentsSection() {
+  const [mcp, setMcp] = useState<McpStatus>();
+  const [agent, setAgent] = useState<boolean>();
+  const [error, setError] = useState<string>();
+  const [copied, setCopied] = useState(false);
+  const load = () => {
+    setError(undefined);
+    fetchMcp().then(setMcp).catch((e: Error) => setError(e.message));
+    fetchStatus().then((s) => setAgent(s.agent)).catch(() => {});
+  };
+  useEffect(load, []);
+  const copy = async (text: string) => {
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* the field is selectable */ }
+  };
+  const disconnect = async (id: string) => {
+    try { await disconnectMcp(id); load(); } catch (e) { setError((e as Error).message); }
+  };
+  return (
+    <>
+      <Group title="Connect Claude">
+        <p className="settings__hint">Claude uses your own Claude account, so this server needs no API key. Claude can read your gear and, when you ask, move, equip, and lock items. It can't dismantle anything.</p>
+        <ol className="agents__steps">
+          <li>In Claude, open <b>Settings, Connectors</b>, and choose <b>Add custom connector</b>.</li>
+          <li>
+            Paste this address:
+            {mcp ? (
+              <span className="agents__url">
+                <input className="search" readOnly value={mcp.url} aria-label="Connector address" onFocus={(e) => e.currentTarget.select()} />
+                <button className="button" onClick={() => void copy(mcp.url)}><Icon name={copied ? 'check' : 'copy'} /> {copied ? 'Copied' : 'Copy'}</button>
+              </span>
+            ) : error ? null : <span className="settings__hint"> loading…</span>}
+          </li>
+          <li>Claude opens a Triumvirate page. Choose <b>Allow</b>.</li>
+        </ol>
+        {error && <p className="settings__error" role="alert"><Icon name="warning" /> {error}</p>}
+        {mcp && (mcp.connections.length ? (
+          <ul className="agents__list">
+            {mcp.connections.map((c) => (
+              <li key={c.id}>
+                <span className="agents__name"><Icon name="checkCircle" /> {c.name}</span>
+                <span className="settings__hint">Connected {timeAgo(c.connectedAt)}{c.lastUsedAt ? `, last used ${timeAgo(c.lastUsedAt)}` : ''}</span>
+                <button className="button button--ghost" onClick={() => void disconnect(c.id)}>Disconnect</button>
+              </li>
+            ))}
+          </ul>
+        ) : <p className="settings__hint">Nothing connected yet.</p>)}
+        <details className="agents__help">
+          <summary>Claude says it can't reach the server</summary>
+          <p>Claude connects from its own servers, which can't pass your Cloudflare sign-in. In Cloudflare Zero Trust, add a <b>Bypass</b> application for these paths on this site. Each one checks its own sign-in; the Allow page stays behind Cloudflare.</p>
+          <code>/mcp, /oauth/register, /oauth/token, /.well-known/oauth-authorization-server, /.well-known/oauth-protected-resource</code>
+        </details>
+      </Group>
+      <Group title="Built-in chat" hint={<>The chat inside Triumvirate runs on this server and needs its own Anthropic API key: add <code>ANTHROPIC_API_KEY</code> to the server's environment and restart the app.</>}>
+        <p className="agents__state">{agent === undefined ? 'Checking…' : agent ? <><Icon name="checkCircle" /> On</> : 'Off: no API key on this server'}</p>
+      </Group>
+    </>
+  );
+}
 
 function StatusSection() {
   const [s, setS] = useState<ServerStatus>();
