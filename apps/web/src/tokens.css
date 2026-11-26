@@ -7,32 +7,48 @@
   color-scheme: dark;
 
   /* ── Global ─────────────────────────────────────────── */
-  --gray-950: #0b0d10;
-  --gray-900: #12151a;
-  --gray-850: #181c22;
-  --gray-800: #1f242c;
-  --gray-700: #2c333d;
-  --gray-500: #5d6673;
-  --gray-300: #a3abb6;
-  --gray-100: #e7eaee;
-
-  --gold-300: #e0c55a;
-  --gold-400: #ceae33;   /* Exotic */
-  --purple-500: #6b3f8a; /* Legendary */
-  --blue-500: #5076a3;   /* Rare */
-  --green-600: #366f42;  /* Uncommon */
-  --stone-300: #c3bcb4;  /* Common */
-
-  --cyan-300: #7aecf3;   /* Arc */
-  --orange-500: #f2721b; /* Solar */
-  --violet-400: #b185df; /* Void */
-  --azure-500: #4d88ff;  /* Stasis */
-  --mint-400: #35e366;   /* Strand */
-  --white-200: #d9d9d9;  /* Kinetic */
-  --red-500: #e5534b;
-  --amber-500: #f2a01b;
-  --yellow-400: #e8d23a;
-  --lime-400: #9ad14b;
+  /* Neutral: Ink, a custom Radix-shaped scale that keeps the app's blue-black grays (steps 1-4, 6, 11, 12 are today's values). */
+  --ink-1: #0b0d10; --ink-2: #12151a; --ink-3: #181c22; --ink-4: #1f242c; --ink-5: #262b34; --ink-6: #2c333d;
+  --ink-7: #3a404b; --ink-8: #525963; --ink-9: #5f6671; --ink-10: #6c737e; --ink-11: #a3abb6; --ink-12: #e7eaee;
+  /* Game scales: custom Radix-shaped scales anchored on the in-game hue (exotic at 9, rare at 9, void and strand at 11). */
+  --exotic-1: #15120d; --exotic-2: #1b1910; --exotic-3: #2c220b; --exotic-4: #3a2a05; --exotic-5: #473307; --exotic-6: #554110;
+  --exotic-7: #695321; --exotic-8: #75581b; --exotic-9: #ceae33; --exotic-10: #dbce3a; --exotic-11: #e0c55a; --exotic-12: #e6daab;
+  --rare-1: #12151a; --rare-2: #16191f; --rare-3: #1e2835; --rare-4: #243448; --rare-5: #2d4156; --rare-6: #394e66;
+  --rare-7: #485e79; --rare-8: #486181; --rare-9: #5076a3; --rare-10: #6d90b8; --rare-11: #8ba7c5; --rare-12: #c5d4de;
+  --void-1: #17111b; --void-2: #1d1523; --void-3: #2f1d3a; --void-4: #3b244d; --void-5: #462b5b; --void-6: #52366a;
+  --void-7: #634480; --void-8: #805aa8; --void-9: #7d46b4; --void-10: #8853bf; --void-11: #b185df; --void-12: #dccceb;
+  --strand-1: #0d1510; --strand-2: #111c15; --strand-3: #102e1a; --strand-4: #0a3d1e; --strand-5: #0f4b26; --strand-6: #18592f;
+  --strand-7: #1f6a39; --strand-8: #257f41; --strand-9: #26ac4d; --strand-10: #27b853; --strand-11: #35e366; --strand-12: #b1f8bc;
+  /* Radix Colors dark scales (v3), copied as literals: only the hues we use. Step roles: 3 fill, 6 border, 9 solid, 11 text. */
+  --red-1: #191111; --red-2: #201314; --red-3: #3b1219; --red-4: #500f1c; --red-5: #611623; --red-6: #72232d;
+  --red-7: #8c333a; --red-8: #b54548; --red-9: #e5484d; --red-10: #ec5d5e; --red-11: #ff9592; --red-12: #ffd1d9;
+  --orange-1: #17120e; --orange-2: #1e160f; --orange-3: #331e0b; --orange-4: #462100; --orange-5: #562800; --orange-6: #66350c;
+  --orange-7: #7e451d; --orange-8: #a35829; --orange-9: #f76b15; --orange-10: #ff801f; --orange-11: #ffa057; --orange-12: #ffe0c2;
+  --amber-1: #16120c; --amber-2: #1d180f; --amber-3: #302008; --amber-4: #3f2700; --amber-5: #4d3000; --amber-6: #5c3d05;
+  --amber-7: #714f19; --amber-8: #8f6424; --amber-9: #ffc53d; --amber-10: #ffd60a; --amber-11: #ffca16; --amber-12: #ffe7b3;
+  --yellow-1: #14120b; --yellow-2: #1b180f; --yellow-3: #2d2305; --yellow-4: #362b00; --yellow-5: #433500; --yellow-6: #524202;
+  --yellow-7: #665417; --yellow-8: #836a21; --yellow-9: #ffe629; --yellow-10: #ffff57; --yellow-11: #f5e147; --yellow-12: #f6eeb4;
+  --lime-1: #11130c; --lime-2: #151a10; --lime-3: #1f2917; --lime-4: #29371d; --lime-5: #334423; --lime-6: #3d522a;
+  --lime-7: #496231; --lime-8: #577538; --lime-9: #bdee63; --lime-10: #d4ff70; --lime-11: #bde56c; --lime-12: #e3f7ba;
+  --green-1: #0e1512; --green-2: #121b17; --green-3: #132d21; --green-4: #113b29; --green-5: #174933; --green-6: #20573e;
+  --green-7: #28684a; --green-8: #2f7c57; --green-9: #30a46c; --green-10: #33b074; --green-11: #3dd68c; --green-12: #b1f1cb;
+  --grass-1: #0e1511; --grass-2: #141a15; --grass-3: #1b2a1e; --grass-4: #1d3a24; --grass-5: #25482d; --grass-6: #2d5736;
+  --grass-7: #366740; --grass-8: #3e7949; --grass-9: #46a758; --grass-10: #53b365; --grass-11: #71d083; --grass-12: #c2f0c2;
+  --sky-1: #0d141f; --sky-2: #111a27; --sky-3: #112840; --sky-4: #113555; --sky-5: #154467; --sky-6: #1b537b;
+  --sky-7: #1f6692; --sky-8: #197cae; --sky-9: #7ce2fe; --sky-10: #a8eeff; --sky-11: #75c7f0; --sky-12: #c2f3ff;
+  --blue-1: #0d1520; --blue-2: #111927; --blue-3: #0d2847; --blue-4: #003362; --blue-5: #004074; --blue-6: #104d87;
+  --blue-7: #205d9e; --blue-8: #2870bd; --blue-9: #0090ff; --blue-10: #3b9eff; --blue-11: #70b8ff; --blue-12: #c2e6ff;
+  --indigo-1: #11131f; --indigo-2: #141726; --indigo-3: #182449; --indigo-4: #1d2e62; --indigo-5: #253974; --indigo-6: #304384;
+  --indigo-7: #3a4f97; --indigo-8: #435db1; --indigo-9: #3e63dd; --indigo-10: #5472e4; --indigo-11: #9eb1ff; --indigo-12: #d6e1ff;
+  --purple-1: #18111b; --purple-2: #1e1523; --purple-3: #301c3b; --purple-4: #3d224e; --purple-5: #48295c; --purple-6: #54346b;
+  --purple-7: #664282; --purple-8: #8457aa; --purple-9: #8e4ec6; --purple-10: #9a5cd0; --purple-11: #d19dff; --purple-12: #ecd9fa;
+  --pink-1: #191117; --pink-2: #21121d; --pink-3: #37172f; --pink-4: #4b143d; --pink-5: #591c47; --pink-6: #692955;
+  --pink-7: #833869; --pink-8: #a84885; --pink-9: #d6409f; --pink-10: #de51a8; --pink-11: #ff8dcc; --pink-12: #fdd1ea;
+  --gold-1: #121211; --gold-2: #1b1a17; --gold-3: #24231f; --gold-4: #2d2b26; --gold-5: #38352e; --gold-6: #444039;
+  --gold-7: #544f46; --gold-8: #696256; --gold-9: #978365; --gold-10: #a39073; --gold-11: #cbb99f; --gold-12: #e8e2d9;
+  /* Ammo Special and Heavy are game iconography: literal, outside the scales, so they never move with Void or Strand. */
+  --ammo-special-global: #7af48b;
+  --ammo-heavy-global: #b286ff;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -58,7 +74,7 @@
   --size-560: 560px;
   --size-720: 720px;
   --white-a06: rgb(255 255 255 / 0.06);
-  --gray-850-a70: rgb(24 28 34 / 0.7); /* gray-850 at 70% */
+  --ink-2-a70: rgb(18 21 26 / 0.7); /* ink-2 at 70% */
   --radius-pill: 999px;
   --white-a12: rgb(255 255 255 / 0.12);
   --blur-lg: 24px;
@@ -89,52 +105,107 @@
   --ease-in-cubic: cubic-bezier(0.4, 0, 1, 1);
   --ease-in-out-cubic: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out-quint: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --gold-banner-a22: rgb(193 175 41 / 0.22); /* --masterwork-banner at 22% */
+  --exotic-9-a22: rgb(206 174 51 / 0.22); /* exotic-9 at 22% */
+  --exotic-11-a28: rgb(224 197 90 / 0.28); /* exotic-11 at 28% */
 
   /* ── Semantic ───────────────────────────────────────── */
-  --surface-page: var(--gray-950);
-  --surface-panel: var(--gray-900);
-  --surface-raised: var(--gray-850);
-  --surface-hover: var(--gray-800);
-  --border-subtle: var(--gray-700);
-  --text-primary: var(--gray-100);
-  --text-secondary: var(--gray-300);
-  --text-muted: var(--gray-500);
-  --accent: var(--gold-400);
-  --accent-hover: var(--gold-300);
-  --on-accent: var(--gray-950);
-  --warning: var(--orange-500);
-  --danger: #e5534b;
-  --success: var(--mint-400);
-  /* Text on a danger fill: dark, since light text on this red measures about 3:1. */
-  --on-danger: var(--gray-950);
+  --surface-page: var(--ink-1);
+  --surface-panel: var(--ink-2);
+  --surface-raised: var(--ink-3);
+  --surface-hover: var(--ink-4);
+  --surface-active: var(--ink-5);
+  --border-subtle: var(--ink-6);
+  --border-strong: var(--ink-7);
+  --focus-ring: var(--exotic-9);
+  --text-primary: var(--ink-12);
+  --text-secondary: var(--ink-11);
+  /* Muted is for non-essential text only (timestamps, placeholders): 3.8:1 on panels, under the 4.5:1 body bar. */
+  --text-muted: var(--ink-10);
+  --text-disabled: var(--ink-8);
+  --accent: var(--exotic-9);
+  --accent-hover: var(--exotic-10);
+  --accent-text: var(--exotic-11);
+  --accent-subtle: var(--exotic-3);
+  --on-accent: var(--ink-1);
 
-  --tier-exotic: var(--gold-400);
-  --tier-legendary: var(--purple-500);
-  --tier-rare: var(--blue-500);
-  --tier-uncommon: var(--green-600);
-  --tier-common: var(--stone-300);
+  /* Status: the same five roles per status. Status always pairs color with an icon and a label,
+     so it can share a hue with an element (warning and Solar are both orange). */
+  --status-info-subtle: var(--indigo-3);
+  --status-info-border: var(--indigo-6);
+  --status-info-solid: var(--indigo-9);
+  --status-info-text: var(--indigo-11);
+  --status-info-on-solid: var(--ink-12);
+  --status-success-subtle: var(--green-3);
+  --status-success-border: var(--green-6);
+  --status-success-solid: var(--green-9);
+  --status-success-text: var(--green-11);
+  --status-success-on-solid: var(--ink-1);
+  --status-warning-subtle: var(--orange-3);
+  --status-warning-border: var(--orange-6);
+  --status-warning-solid: var(--orange-9);
+  --status-warning-text: var(--orange-11);
+  --status-warning-on-solid: var(--ink-1);
+  --status-danger-subtle: var(--red-3);
+  --status-danger-border: var(--red-6);
+  --status-danger-solid: var(--red-9);
+  --status-danger-text: var(--red-11);
+  /* Dark text on the danger fill: light text on this red measures about 3:1. */
+  --status-danger-on-solid: var(--ink-1);
+  --warning: var(--status-warning-solid);
+  --danger: var(--status-danger-solid);
+  --success: var(--status-success-text);
+  --on-danger: var(--status-danger-on-solid);
 
-  --masterwork: var(--gold-300);
+  /* Rarity: the band at the foot of each tile and its border. Exact in-game hues win over Radix where they differ. */
+  --tier-exotic: var(--exotic-9);
+  --tier-legendary: var(--purple-7);
+  --tier-rare: var(--rare-9);
+  --tier-uncommon: var(--grass-7);
+  --tier-common: var(--gold-11);
+
+  --masterwork: var(--exotic-11);
   /* Masterwork banner pattern fill, shown at --masterwork-banner-opacity. */
-  --masterwork-banner: #c1af29;
+  --masterwork-banner: var(--exotic-9);
   --masterwork-banner-opacity: 0.68;
-  --tier-diamond: var(--white-200);
+  --tier-diamond: var(--ink-12);
 
-  --verdict-god: var(--gold-400);
-  --verdict-good: var(--mint-400);
-  --verdict-bad: var(--danger);
+  --verdict-god: var(--exotic-9);
+  --verdict-good: var(--green-11);
+  --verdict-bad: var(--red-9);
   --overlay-scrim: rgb(0 0 0 / 0.55);
 
-  --element-kinetic: var(--white-200);
-  --element-arc: var(--cyan-300);
-  --element-solar: var(--orange-500);
-  --element-void: var(--violet-400);
-  --element-stasis: var(--azure-500);
-  --element-strand: var(--mint-400);
+  /* Damage elements: glyph, subtle fill (3), border (6), and text (11), so cards and chips use steps, not one hex. */
+  --element-kinetic: var(--ink-12);
+  --element-kinetic-subtle: var(--ink-3);
+  --element-kinetic-border: var(--ink-6);
+  --element-kinetic-text: var(--ink-12);
+  --element-arc: var(--sky-9);
+  --element-arc-subtle: var(--sky-3);
+  --element-arc-border: var(--sky-6);
+  --element-arc-text: var(--sky-11);
+  --element-solar: var(--orange-9);
+  --element-solar-subtle: var(--orange-3);
+  --element-solar-border: var(--orange-6);
+  --element-solar-text: var(--orange-11);
+  --element-void: var(--void-11);
+  --element-void-subtle: var(--void-3);
+  --element-void-border: var(--void-6);
+  --element-void-text: var(--void-11);
+  --element-stasis: var(--blue-9);
+  --element-stasis-subtle: var(--blue-3);
+  --element-stasis-border: var(--blue-6);
+  --element-stasis-text: var(--blue-11);
+  --element-strand: var(--strand-11);
+  --element-strand-subtle: var(--strand-3);
+  --element-strand-border: var(--strand-6);
+  --element-strand-text: var(--strand-11);
+  --element-prismatic: var(--pink-11);
+  --element-prismatic-subtle: var(--pink-3);
+  --element-prismatic-border: var(--pink-6);
+  --element-prismatic-text: var(--pink-11);
 
-  --scrollbar-thumb: var(--gray-700);
-  --scrollbar-thumb-hover: var(--gray-500);
+  --scrollbar-thumb: var(--ink-6);
+  --scrollbar-thumb-hover: var(--ink-10);
   --scrollbar-track: transparent;
 
   /* Layout and touch. --page-gutter is the space between content and the screen edge;
@@ -154,7 +225,7 @@
   --shadow-sheet: var(--shadow-up-xl);
   /* Glass: the floating material for chrome over content (iOS 26 Liquid Glass, approximated with
      a translucent fill, background blur and saturation, a hairline edge, and a top highlight). */
-  --surface-glass: var(--gray-850-a70);
+  --surface-glass: var(--ink-2-a70);
   --border-glass: var(--white-a12);
   --highlight-glass: var(--white-a06);
   --fill-glass-selected: var(--white-a12);
@@ -205,15 +276,15 @@
   --engram-empty: var(--border-subtle);
   --set-badge-size: var(--size-28);
   --chat-fab-size: 56px;
-  --stat-bar: var(--gray-300);
+  --stat-bar: var(--ink-11);
   /* Subclass accents for build cards */
-  --subclass-arc: var(--cyan-300);
-  --subclass-solar: var(--orange-500);
-  --subclass-void: var(--violet-400);
-  --subclass-stasis: var(--azure-500);
-  --subclass-strand: var(--mint-400);
-  --subclass-prismatic: #f08bd0;
-  --stat-bonus: var(--mint-400);
+  --subclass-arc: var(--element-arc);
+  --subclass-solar: var(--element-solar);
+  --subclass-void: var(--element-void);
+  --subclass-stasis: var(--element-stasis);
+  --subclass-strand: var(--element-strand);
+  --subclass-prismatic: var(--element-prismatic);
+  --stat-bonus: var(--status-success-text);
   /* Optimizer: the tick marking a stat target on its bar. */
   --optimizer-goal: var(--text-primary);
   --sheet-width-optimizer: 1120px;
@@ -227,13 +298,13 @@
   --switch-track-on: var(--accent);
   --switch-thumb-color: var(--text-primary);
   --switch-thumb-on: var(--switch-thumb-color);
-  --perk-enhanced: var(--gold-400);
-  --perk-active-fill: var(--blue-500);
-  --perk-active-border: var(--gray-100);
+  --perk-enhanced: var(--exotic-9);
+  --perk-active-fill: var(--rare-9);
+  --perk-active-border: var(--ink-12);
   /* Ammo type colors, as the game shows them. */
-  --ammo-primary: #f2f2f2;
-  --ammo-special: #7af48b;
-  --ammo-heavy: #b286ff;
+  --ammo-primary: var(--ink-12);
+  --ammo-special: var(--ammo-special-global);
+  --ammo-heavy: var(--ammo-heavy-global);
   /* A thin dark halo so the badge reads on the tier band and on weapon art. */
   --ammo-shadow: rgb(0 0 0 / 0.55);
   --agent-width: 460px; /* default; the user's drag overrides it */
@@ -247,18 +318,19 @@
   --tile-element-size: 7px;
 
   /* Roll appraiser: popularity grades (F red → S green) and where a perk is favored. */
-  --grade-s: var(--mint-400);
-  --grade-a: var(--lime-400);
-  --grade-b: var(--yellow-400);
-  --grade-c: var(--amber-500);
-  --grade-d: var(--orange-500);
-  --grade-f: var(--red-500);
-  --grade-none: var(--gray-500);
-  --use-pve: var(--azure-500);
-  --use-pvp: var(--red-500);
-  --use-both: var(--gold-400);
+  /* All six grades sit on step 11 of their hue, so they share one lightness. */
+  --grade-s: var(--green-11);
+  --grade-a: var(--lime-11);
+  --grade-b: var(--yellow-11);
+  --grade-c: var(--amber-11);
+  --grade-d: var(--orange-11);
+  --grade-f: var(--red-11);
+  --grade-none: var(--ink-9);
+  --use-pve: var(--blue-11);
+  --use-pvp: var(--red-11);
+  --use-both: var(--exotic-9);
   /* Cleanup: where an armor piece is best in slot (endgame, PvP, casual). */
-  --activity-endgame: var(--violet-400);
+  --activity-endgame: var(--purple-11);
   --activity-pvp: var(--use-pvp);
   --activity-casual: var(--use-pve);
   --roll-perk-size: 36px;
@@ -327,8 +399,8 @@
   --record-bar-fill: var(--accent);
   --record-bar-done: var(--verdict-good);
   --record-done: var(--verdict-good);
-  --title-earned: var(--gold-400);
-  --title-gilded: var(--gold-300);
+  --title-earned: var(--exotic-9);
+  --title-gilded: var(--exotic-11);
 
   /* At a glance: subclass setup, set bonuses, and artifact perks under each loadout. Abilities and
      aspects read first, fragments a step smaller; the super is the one big glyph, as in game. */
@@ -355,7 +427,7 @@
   --item-art-ground: var(--surface-raised);
   --item-art-fade-in: var(--reveal-duration);
   --item-art-tag-bg: rgb(0 0 0 / 0.45);
-  --masterwork-glow: rgb(224 197 90 / 0.28); /* --gold-300 at 28% */
+  --masterwork-glow: var(--exotic-11-a28);
 
   /* App loader: the mark writes its V (left arm, point, right arm), holds, and lets go in the same order.
      index.html repeats these values as fallbacks, since it paints before this file loads. */
@@ -363,7 +435,7 @@
   --loader-cycle: var(--duration-1800);
   --loader-step: var(--duration-160);
   --loader-lit: var(--masterwork-banner);
-  --loader-unlit: var(--gold-banner-a22);
+  --loader-unlit: var(--exotic-9-a22);
   --loader-label: var(--text-muted);
 
   /* Skeletons: placeholder blocks for content that loads on its own. They wait --skeleton-wait before
