@@ -2697,3 +2697,13 @@ li.title-card { cursor: default; }
 .agents__help summary { cursor: pointer; color: var(--text-primary); }
 .agents__help p { margin: var(--space-2) 0; }
 .agents__help code { display: block; padding: var(--space-2); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--text-primary); font-size: var(--font-size-12); word-break: break-word; }
+
+/* ── Item dialog: Lore tab ── */
+.lore { max-width: 65ch; display: grid; gap: var(--space-3); padding-block: var(--space-1) var(--space-4); }
+.lore__name.drawer__section { margin: 0; }
+.lore__quote {
+  margin: 0; padding: var(--space-1) 0 var(--space-1) var(--space-4); border-left: 2px solid var(--accent);
+  font-size: var(--font-size-18); font-style: italic; line-height: var(--leading-snug); color: var(--text-primary);
+}
+.lore__para { margin: 0; white-space: pre-line; font-size: var(--font-size-16); line-height: var(--leading-relaxed); color: var(--text-secondary); }
+.lore__error { display: flex; align-items: center; gap: var(--space-2); color: var(--status-warning-text); }

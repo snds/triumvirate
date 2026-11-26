@@ -225,6 +225,10 @@ export async function applyPerks(instanceId: string, plugs: { socketIndex: numbe
 export const fetchOrnaments = async (instanceId: string): Promise<WeaponOrnaments> =>
   json(await fetch(`/api/items/${encodeURIComponent(instanceId)}/ornaments`), sameOriginImages);
 
+export interface Lore { name: string; subtitle?: string; text: string }
+/** One lore entry, for the item dialog's Lore tab. */
+export const fetchLore = async (hash: number): Promise<Lore> => json(await fetch(`/api/lore/${hash}`));
+
 export interface VendorOffers {
   fetchedAt: string;
   /** Vendor weapons, shaped like inventory rows; location is the vendor's name. */
