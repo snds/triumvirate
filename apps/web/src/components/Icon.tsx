@@ -70,6 +70,11 @@ const GLYPHS = {
   image: 'image',
   watch: 'notification_add',
   watching: 'notifications_active',
+  builds: 'style',
+  shield: 'shield_with_heart',
+  endgame: 'skull',
+  casual: 'explore',
+  set: 'join',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

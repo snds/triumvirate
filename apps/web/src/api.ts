@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RollOptions, SavedLoadout, WatchEntry, WatchHit } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RollOptions, SavedLoadout, WatchEntry, WatchHit } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -276,6 +276,10 @@ export interface CleanupStatus {
   clearedWeek: number;
   /** When community grades last updated; absent before the first crawl. */
   community?: { builtAt: string; samples: number };
+  /** Armor kept on purpose because of armor sets and popular builds. */
+  keeps?: ArmorKeep[];
+  /** Builds switched on. */
+  builds?: number;
 }
 export const fetchCleanup = async (): Promise<CleanupStatus> => json(await fetch('/api/cleanup'), sameOriginImages);
 /** Dismantle queues, keep locks in game, undo forgets (and unlocks what keep locked). */
@@ -284,6 +288,20 @@ export const decideCleanup = (instanceIds: string[], action: 'dismantle' | 'keep
 /** Brings the queue out of the vault onto a character, where the game can dismantle it. */
 export const pullCleanup = (characterId: string) =>
   act<Partial<CleanupStatus> & ActionResult>('/api/cleanup/pull', { characterId }, 'pull the queue');
+// ── Popular builds (for armor cleanup) ───────────────────────
+export interface BuildsResponse { builds: PopularBuild[]; custom: boolean; error?: string }
+export const fetchBuilds = async (): Promise<BuildsResponse> => json(await fetch('/api/builds'));
+/** Saves the list; `reset` goes back to the starting list. */
+export async function saveBuilds(body: { builds: PopularBuild[] } | { reset: true }): Promise<BuildsResponse> {
+  try {
+    const res = await fetch('/api/builds', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const out = (await res.json().catch(() => ({}))) as BuildsResponse;
+    if (!res.ok && !out.error) out.error = res.status === 401 ? 'Sign in again to save builds.' : `Couldn't save builds (${res.status})`;
+    return out;
+  } catch (err) {
+    return { builds: [], custom: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
 // ── Farming targets ───────────────────────────────────────────
 export interface FarmingResponse {
   targets: FarmTarget[];

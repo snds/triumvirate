@@ -552,6 +552,8 @@ export function App() {
         ) : (
           <CleanupView
             characters={inv.characters}
+            items={inv.items}
+            itemSets={inv.itemSets}
             characterId={inv.characters.some((c) => c.id === store) ? store : inv.characters[0]?.id ?? ''}
             onCharacter={setStore}
             filter={(i) => matches(i, query, kind)}

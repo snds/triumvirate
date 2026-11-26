@@ -219,6 +219,10 @@
   --use-pve: var(--azure-500);
   --use-pvp: var(--red-500);
   --use-both: var(--gold-400);
+  /* Cleanup: where an armor piece is best in slot (endgame, PvP, casual). */
+  --activity-endgame: var(--violet-400);
+  --activity-pvp: var(--use-pvp);
+  --activity-casual: var(--use-pve);
   --roll-perk-size: 36px;
   --roll-rail-width: 240px;
 

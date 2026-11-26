@@ -3,15 +3,19 @@
 // Bungie's API can't dismantle, so the queue is pulled onto a character and shards in game,
 // then leaves the list on its own at the next sync.
 import { useCallback, useEffect, useState } from 'react';
-import { dimSearch, type AppraisedItem, type CharacterRow, type CleanupCandidate } from '@triumvirate/core/browser';
+import { ACTIVITY_LABEL, dimSearch, type AppraisedItem, type ArmorKeep, type ArmorSet, type CharacterRow, type CleanupCandidate } from '@triumvirate/core/browser';
 import { decideCleanup, fetchCleanup, pullCleanup, type CleanupStatus } from '../api.ts';
 import { Icon } from './Icon.tsx';
 import { ItemTile } from './ItemTile.tsx';
+import { ACTIVITY_HINT, ACTIVITY_ICON, BuildsSheet } from './BuildsSheet.tsx';
 
 const VERDICT_LABEL = { god: 'God roll', good: 'Good roll', meh: 'No match', trash: 'Trash roll', unrated: 'Unrated' } as const;
 
-export function CleanupView({ characters, characterId, onCharacter, filter, onSelect, onPatch, onChanged, onToast }: {
+export function CleanupView({ characters, items, itemSets, characterId, onCharacter, filter, onSelect, onPatch, onChanged, onToast }: {
   characters: CharacterRow[];
+  /** The whole inventory, for the builds editor's exotic suggestions. */
+  items: AppraisedItem[];
+  itemSets?: Record<string, ArmorSet>;
   characterId: string;
   onCharacter: (id: string) => void;
   /** The app's search and item-kind filter. */
@@ -28,6 +32,9 @@ export function CleanupView({ characters, characterId, onCharacter, filter, onSe
   /** Instance ids with a request in flight, or 'all' / 'pull' for the bulk actions. */
   const [busy, setBusy] = useState<Set<string>>(new Set());
   const [copied, setCopied] = useState(false);
+  const [buildsOpen, setBuildsOpen] = useState(false);
+  /** Show every best-in-slot piece, not only the ones the set and build checks saved. */
+  const [allKeeps, setAllKeeps] = useState(false);
 
   const load = useCallback(() => fetchCleanup().then((s) => { setStatus(s); setError(undefined); }, (e: Error) => setError(e.message)), []);
   useEffect(() => { void load(); }, [load]);
@@ -87,15 +94,29 @@ export function CleanupView({ characters, characterId, onCharacter, filter, onSe
             {picks.length === 0
               ? 'Nothing new to decide on.'
               : `${safe.length} safe ${safe.length === 1 ? 'pick' : 'picks'} and ${check.length} worth a look, from your wish list${status.community ? ', community popularity,' : ''} and armor stats.`}
-            {' '}Locked and equipped items are never picked.
+            {' '}Locked and equipped items are never picked, and armor keeps your best set pieces and the best in slot for {status.builds ?? 0} popular builds.
           </p>
         </div>
-        {safeIds.length > 0 && (
-          <button className="button button--primary" disabled={busy.has('all')} onClick={() => void decide(safeIds, 'dismantle', ['all'])}>
-            <Icon name="delete" /> Queue {safeIds.length} safe {safeIds.length === 1 ? 'pick' : 'picks'}
+        <div className="cleanup__header-actions">
+          <button className="button" onClick={() => setBuildsOpen(true)} aria-haspopup="dialog">
+            <Icon name="builds" /> Builds
           </button>
-        )}
+          {safeIds.length > 0 && (
+            <button className="button button--primary" disabled={busy.has('all')} onClick={() => void decide(safeIds, 'dismantle', ['all'])}>
+              <Icon name="delete" /> Queue {safeIds.length} safe {safeIds.length === 1 ? 'pick' : 'picks'}
+            </button>
+          )}
+        </div>
       </header>
+      {buildsOpen && (
+        <BuildsSheet
+          items={items}
+          itemSets={itemSets}
+          classType={character?.classType}
+          onClose={() => setBuildsOpen(false)}
+          onSaved={() => { void load(); onChanged(); onToast('Builds saved. Cleanup picks are up to date.'); }}
+        />
+      )}
 
       {queue.length > 0 && (
         <section className="cleanup-queue" aria-label="Dismantle queue">
@@ -145,6 +166,8 @@ export function CleanupView({ characters, characterId, onCharacter, filter, onSe
       <PickGroup title="Safe picks" note="Duplicates you have a better copy of, armor beaten in every stat, and rolls both the wish list and players pass on." picks={safe} busy={busy} onSelect={onSelect} decide={decide} />
       <PickGroup title="Worth a look" note="Judgment calls: check these before they go." picks={check} busy={busy} onSelect={onSelect} decide={decide} />
 
+      <KeptGroup keeps={(status.keeps ?? []).filter((k) => filter(k.item))} all={allKeeps} onAll={setAllKeeps} onSelect={onSelect} />
+
       {(status.kept > 0 || status.cleared.length > 0) && (
         <footer className="cleanup__footer muted">
           {status.clearedWeek > 0 && <span><Icon name="check" /> {status.clearedWeek} cleared this week</span>}
@@ -179,8 +202,9 @@ function PickGroup({ title, note, picks, busy, onSelect, decide }: {
               <div className="cleanup__body">
                 <strong>{c.item.name}</strong> <span className="muted">· {c.item.type} · {c.item.location}</span>
                 <p className="cleanup__reason">{c.reason}</p>
-                {(v || g) && (
+                {(v || g || c.signals?.set) && (
                   <div className="cleanup__signals">
+                    {c.signals?.set && <span className="pill pill--neutral cleanup__set"><Icon name="set" /> {c.signals.set}</span>}
                     {v && <span className={`pill pill--wish-${v === 'god' || v === 'good' ? v : 'none'}`}>{VERDICT_LABEL[v]}</span>}
                     {g && <span className={`grade grade--xs grade--${g.toLowerCase()}`} title={`Community popularity grade ${g}`} aria-label={`Community grade ${g}`}>{g}</span>}
                   </div>
@@ -200,6 +224,72 @@ function PickGroup({ title, note, picks, busy, onSelect, decide }: {
           );
         })}
       </ul>
+    </section>
+  );
+}
+
+/** Activity tags: where a piece is best in slot. */
+function ActivityTags({ activities }: { activities: ArmorKeep['activities'] }) {
+  if (!activities.length) return null;
+  return (
+    <>
+      {activities.map((a) => (
+        <span key={a} className={`pill activity-pill activity-pill--${a}`} title={`Best in slot for a ${ACTIVITY_LABEL[a]} build: ${ACTIVITY_HINT[a].toLowerCase()}`}>
+          <Icon name={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Armor cleanup keeps on purpose. By default only the pieces a plain stat check would have
+ * picked (so the set or a build is what saved them); "Show all" lists every best-in-slot piece.
+ */
+function KeptGroup({ keeps, all, onAll, onSelect }: {
+  keeps: ArmorKeep[];
+  all: boolean;
+  onAll: (on: boolean) => void;
+  onSelect: (i: AppraisedItem) => void;
+}) {
+  const saved = keeps.filter((k) => k.saved);
+  const list = all ? keeps : saved;
+  if (keeps.length === 0) return null;
+  return (
+    <section className="cleanup__group cleanup__group--kept">
+      <h3 className="cleanup__group-head"><Icon name="shield" /> Kept for sets and builds <span className="muted">{list.length}</span></h3>
+      <p className="cleanup__group-note muted">
+        {all
+          ? `Every armor piece that's best in slot for a build, or the best of its set. ${saved.length} of them would be picks on stats alone.`
+          : saved.length
+            ? 'Another piece beats these in every stat, but they complete a set or are the best you have for a build.'
+            : 'No armor needed saving this time.'}
+        {' '}
+        <button className="link-button" onClick={() => onAll(!all)}>
+          {all ? 'Show only saved pieces' : `Show all ${keeps.length} best-in-slot pieces`}
+        </button>
+      </p>
+      {list.length > 0 && (
+        <ul className="cleanup__list">
+          {list.map((k) => (
+            <li className="cleanup__row cleanup__row--kept" key={k.item.instanceId}>
+              <ItemTile item={k.item} onSelect={onSelect} />
+              <div className="cleanup__body">
+                <strong>{k.item.name}</strong> <span className="muted">· {k.item.type} · {k.item.location}</span>
+                {k.reasons.map((r) => <p key={r} className="cleanup__reason">{r}</p>)}
+                <div className="cleanup__signals">
+                  <ActivityTags activities={k.activities} />
+                  {k.set && (
+                    <span className="pill pill--neutral cleanup__set" title={`${k.set.pieces} of 5 ${k.set.name} pieces for this class`}>
+                      <Icon name="set" /> {k.set.name} {k.set.pieces}/5
+                    </span>
+                  )}
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

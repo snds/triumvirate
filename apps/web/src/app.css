@@ -1811,6 +1811,48 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   /* The × grows an invisible hit area to the touch minimum without growing the glyph. */
   .cleanup-queue__undo::after { content: ''; position: absolute; inset: -12px; }
 }
+/* Set- and build-aware armor: activity tags, set pill, the kept group, and the builds editor. */
+.cleanup__header-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); justify-content: flex-end; }
+.cleanup__group-head .icon { font-size: 18px; vertical-align: -3px; color: var(--text-secondary); }
+.cleanup__signals { flex-wrap: wrap; }
+.cleanup__set, .activity-pill { display: inline-flex; align-items: center; gap: 2px; }
+.cleanup__set .icon, .activity-pill .icon { font-size: 14px; }
+.activity-pill--endgame { background: color-mix(in srgb, var(--activity-endgame) 20%, transparent); color: var(--activity-endgame); }
+.activity-pill--pvp { background: color-mix(in srgb, var(--activity-pvp) 20%, transparent); color: var(--activity-pvp); }
+.activity-pill--casual { background: color-mix(in srgb, var(--activity-casual) 20%, transparent); color: var(--activity-casual); }
+.cleanup__row--kept { grid-template-columns: var(--tile-size) minmax(0, 1fr); }
+.link-button { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link-button:hover { color: var(--accent-hover); }
+.builds__intro { margin: 0; font-size: 13px; max-width: 60ch; }
+.builds__classes-wrap .segmented { width: 100%; }
+.builds__classes .segmented__option { flex: 1; }
+.builds__error { color: var(--grade-f); font-size: 13px; }
+.builds__list { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--space-3); }
+.build-row { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.build-row.is-off { opacity: 0.6; }
+.build-row__head { display: flex; align-items: center; gap: var(--space-2); }
+.build-row__name { flex: 1; min-width: 0; font-weight: 600; }
+.build-row__delete .icon { font-size: 18px; }
+.build-row__activities { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.activity-chip.is-selected.activity-chip--endgame { border-color: var(--activity-endgame); color: var(--activity-endgame); }
+.activity-chip.is-selected.activity-chip--pvp { border-color: var(--activity-pvp); color: var(--activity-pvp); }
+.activity-chip.is-selected.activity-chip--casual { border-color: var(--activity-casual); color: var(--activity-casual); }
+.build-row__fields { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.build-row__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+.build-row__hint { font-size: 11px; }
+.builds__add { justify-self: start; }
+.builds__footer { display: flex; align-items: center; gap: var(--space-2); width: 100%; }
+.builds__spacer { flex: 1; }
+.builds { container: builds / inline-size; }
+@container builds (max-width: 480px) {
+  .build-row__fields { grid-template-columns: 1fr; }
+  .activity-chip { min-height: var(--control-size); padding-inline: var(--space-3); }
+}
+@container cleanup (max-width: 560px) {
+  .cleanup__header-actions { justify-content: stretch; width: 100%; }
+  .cleanup__header-actions .button { flex: 1; justify-content: center; }
+}
+
 @container cleanup (max-width: 560px) {
   .cleanup__row { grid-template-columns: var(--tile-size) minmax(0, 1fr); }
   /* Actions sit under the text, lined up with it, so each row stays short. */
