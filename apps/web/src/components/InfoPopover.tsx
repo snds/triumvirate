@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { TOUCH_QUERY, useMediaQuery } from '../media.ts';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 
 const GAP = 8;
 /** Delays so sweeping the mouse past a trigger doesn't flash a card, and crossing the gap to it doesn't close it. */

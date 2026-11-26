@@ -9,6 +9,7 @@ import { useInventory } from '../inventory-context.ts';
 import { TOUCH_QUERY, useMediaQuery } from '../media.ts';
 import { WatchButton } from './WatchSheet.tsx';
 import { Reveal, SkPerks } from './Skeleton.tsx';
+import { ItemDialog } from '../ui/ItemDialog.tsx';
 
 interface Props {
   item: AppraisedItem;
@@ -18,6 +19,8 @@ interface Props {
   /** Other copies of the same item you own. */
   copies: AppraisedItem[];
   onSelect: (item: AppraisedItem) => void;
+  /** The chat is open beside the dialog: the dialog stops being modal so you can type there. */
+  chatOpen?: boolean;
 }
 
 type Tab = 'roll' | 'all' | 'details';
@@ -27,7 +30,7 @@ type Tab = 'roll' | 'all' | 'details';
  * the copy you clicked, with its own perks and stats; "All rolls" shows every perk the weapon can
  * drop with and its base stats; "Details" has the rest.
  */
-export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
+export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = false }: Props) {
   const closeRef = useRef<HTMLButtonElement>(null);
   const isWeapon = item.itemType === 3;
   const [tab, setTab] = useState<Tab>('roll');
@@ -36,17 +39,8 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
   useEffect(() => {
     if (lastHash.current !== item.itemHash) { setTab('roll'); lastHash.current = item.itemHash; }
   }, [item.itemHash]);
-  // Escape closes, like any dialog, unless you're typing in the floating chat (it has its own Escape).
-  // Focus moves in so keyboard users land here.
-  useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape' || (e.target instanceof Element && e.target.closest('.agent'))) return;
-      onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [item, onClose]);
+  // Land on the close button, so keyboard users start inside the dialog.
+  useEffect(() => { closeRef.current?.focus(); }, [item]);
 
   const a = item.appraisal;
   const tabs: { id: Tab; label: string }[] = [
@@ -55,8 +49,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
     { id: 'details', label: 'Details' },
   ];
   return (
-    <div className="dialog-scrim" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="dialog item-dialog" role="dialog" aria-modal="true" aria-label={item.name}>
+    <ItemDialog label={item.name} onClose={onClose} modal={!chatOpen}>
         <ItemHeader item={item} size="dialog">
           <button ref={closeRef} className="icon-button item-header__close" onClick={onClose} aria-label="Close" title="Close">
             <Icon name="close" />
@@ -150,8 +143,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
           {tab === 'all' && <AllRolls item={item} />}
           {tab === 'details' && <Details item={item} />}
         </div>
-      </div>
-    </div>
+    </ItemDialog>
   );
 }
 

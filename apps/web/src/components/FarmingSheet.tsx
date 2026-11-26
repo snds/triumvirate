@@ -6,7 +6,7 @@ import { fetchFarming, type FarmingResponse } from '../api.ts';
 import { timeAgo } from '../inventory.ts';
 import { Icon } from './Icon.tsx';
 import { ItemTile } from './ItemTile.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 
 type Show = 'all' | 'sale' | 'owned';
 const SHOW_LABEL: Record<Show, string> = { all: 'All', sale: 'On sale now', owned: 'You own one' };

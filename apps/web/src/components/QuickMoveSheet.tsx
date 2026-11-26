@@ -1,6 +1,6 @@
 import type { AppraisedItem } from '@triumvirate/core/browser';
 import { useInventory } from '../inventory-context.ts';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { EquipButtons, LockButton } from './ItemDetail.tsx';
