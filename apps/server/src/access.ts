@@ -5,6 +5,14 @@
 import type { MiddlewareHandler } from 'hono';
 import { createRemoteJWKSet, jwtVerify, type JWTVerifyGetKey } from 'jose';
 
+// The home screen icon is fetched by iOS outside Safari, without the Access sign-in cookie, so
+// behind the gate it got the sign-in page instead and iOS fell back to a letter tile. These files
+// are only the app's own artwork (no account data), so they're served to anyone.
+const PUBLIC_PATHS = [/^\/icons\/[\w-]+\.(png|svg)$/, /^\/apple-touch-icon(-precomposed)?(-\d+x\d+)?\.png$/, /^\/favicon\.ico$/];
+
+/** True for the icon files that must load without signing in (see PUBLIC_PATHS). */
+export const isPublicAsset = (path: string) => PUBLIC_PATHS.some((re) => re.test(path));
+
 export interface AccessConfig {
   /** e.g. "snds.cloudflareaccess.com" (Zero Trust > Settings > Custom Pages shows the team name). */
   teamDomain: string;
@@ -20,6 +28,7 @@ export function accessGate(cfg: AccessConfig, keys?: JWTVerifyGetKey): Middlewar
   // jose caches the signing keys and refetches when Cloudflare rotates them.
   keys ??= createRemoteJWKSet(new URL(`${issuer}/cdn-cgi/access/certs`));
   return async (c, next) => {
+    if (isPublicAsset(c.req.path)) return next();
     // Access sends the token as a header to the origin, and as a cookie to the browser.
     const token = c.req.header('cf-access-jwt-assertion')
       ?? c.req.header('cookie')?.match(/(?:^|;\s*)CF_Authorization=([^;]+)/)?.[1];

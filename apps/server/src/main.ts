@@ -69,6 +69,11 @@ if (webDist && existsSync(webDist)) {
   const fresh = serveStatic({ root: webDist, onFound: (_p, c) => c.header('Cache-Control', 'no-cache') });
   root.get('/sw.js', fresh);
   root.get('/manifest.webmanifest', fresh);
+  // iOS also asks for the home screen icon at the site root, whatever the page links to.
+  const touchIcon = serveStatic({ root: webDist, path: 'icons/apple-touch-icon.png', onFound: (_p, c) => c.header('Cache-Control', 'public, max-age=86400') });
+  root.get('/apple-touch-icon.png', touchIcon);
+  root.get('/apple-touch-icon-precomposed.png', touchIcon);
+  root.get('/favicon.ico', serveStatic({ root: webDist, path: 'icons/icon-192.png' }));
   // "/" is answered here with index.html, which must not be cached either, so new builds show up.
   root.use('*', serveStatic({ root: webDist, onFound: (p, c) => { if (p.endsWith('index.html')) c.header('Cache-Control', 'no-cache'); } }));
   // Single-page app: anything else gets index.html (never cached, so new builds show up).

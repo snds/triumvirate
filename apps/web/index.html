@@ -13,7 +13,8 @@
     <!-- use-credentials: the manifest sits behind the Cloudflare sign-in, so its request needs the cookie. -->
     <link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials" />
     <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <!-- Public (no sign-in needed): iOS fetches it without Safari's cookies. ?v= skips iOS's cached failed fetch. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=2" />
     <title>Triumvirate</title>
   </head>
   <body>
