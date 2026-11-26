@@ -6,6 +6,7 @@ import { ACTIVITY_LABEL, ARMOR_STATS, BUILD_ACTIVITIES, type AppraisedItem, type
 import { fetchBuilds, saveBuilds } from '../api.ts';
 import { Icon, type IconName } from './Icon.tsx';
 import { Sheet } from './Sheet.tsx';
+import { Reveal, SkCards } from './Skeleton.tsx';
 
 const CLASSES = ['Titan', 'Hunter', 'Warlock'] as const;
 export const ACTIVITY_ICON: Record<BuildActivity, IconName> = { endgame: 'endgame', pvp: 'pvp', casual: 'casual' };
@@ -96,9 +97,9 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
         </div>
       </div>
       {error && <p className="builds__error" role="alert">{error}</p>}
-      {!builds && !error && <p className="empty">Loading builds…</p>}
 
       <datalist id="build-exotics">{exotics.map((n) => <option key={n} value={n} />)}</datalist>
+      <Reveal loading={!builds && !error} skeleton={<SkCards count={4} />} label="Loading builds">
       <ul className="builds__list">
         {shown.map((b) => (
           <li key={b.id} className={`build-row${b.off ? ' is-off' : ''}`}>
@@ -187,6 +188,7 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
           </li>
         ))}
       </ul>
+      </Reveal>
       {builds && (
         <button className="button builds__add" onClick={add}><Icon name="add" /> Add a {CLASSES[classType]} build</button>
       )}

@@ -533,7 +533,7 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   box-shadow: 0 24px 64px rgb(0 0 0 / 0.55);
   overflow: hidden;
   transform-origin: bottom right;
-  animation: chat-in 140ms ease-out;
+  animation: chat-in var(--motion-normal) var(--motion-enter);
 }
 .agent[hidden] { display: none; }
 @keyframes chat-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } }
@@ -551,7 +551,7 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   background: var(--accent); color: var(--on-accent);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
   cursor: pointer;
-  transition: transform 120ms ease, background 120ms ease;
+  transition: transform var(--motion-fast) var(--motion-move), background var(--motion-fast) var(--motion-move);
 }
 .chat-fab .icon { font-size: 26px; }
 .chat-fab:hover { background: var(--accent-hover); transform: scale(1.05); }
@@ -709,14 +709,14 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
   position: absolute;
   inset: 0 3px;
   background: transparent;
-  transition: background 120ms;
+  transition: background var(--motion-fast) var(--motion-move);
 }
 .agent__resize:hover::after, .agent__resize:focus-visible::after, .agent__resize.is-dragging::after { background: var(--accent); }
 .agent__resize:focus-visible { outline: none; }
 .app.is-resizing { cursor: col-resize; user-select: none; }
 
 /* ── Moving items ─────────────────────────────────────────── */
-.column { position: relative; transition: box-shadow 120ms ease; }
+.column { position: relative; transition: box-shadow var(--motion-fast) var(--motion-move); }
 /* While dragging: every place it can go gets a faint ring, the one under the pointer a strong one. */
 .column.is-drop-candidate { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
 .column.is-drop-ok { box-shadow: inset 0 0 0 2px var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface-panel)); }
@@ -739,7 +739,7 @@ body.is-dragging-item .tile { pointer-events: none; }
 
 /* Hover lift: the tile grows a little, casts a shadow, and leans toward the pointer.
    --mx and --my run from -1 to 1 across the tile and are set as the pointer moves. */
-.tile { transition: transform 140ms ease, box-shadow 140ms ease; }
+.tile { transition: transform var(--motion-fast) var(--motion-move), box-shadow var(--motion-fast) var(--motion-move); }
 @media (hover: hover) {
   .tile:hover {
     z-index: 2;
@@ -748,7 +748,7 @@ body.is-dragging-item .tile { pointer-events: none; }
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .tile { transition: box-shadow 140ms ease; }
+  .tile { transition: box-shadow var(--motion-fast) var(--motion-move); }
   .tile:hover { transform: none; }
 }
 .tile.is-moving { opacity: 0.6; }
@@ -1014,7 +1014,7 @@ body.is-dragging-item .tile { pointer-events: none; }
 .rolls__head p { margin: var(--space-1) 0 0; font-size: 13px; }
 .rolls__group { margin-bottom: var(--space-4); }
 .rolls__group-head { display: flex; align-items: center; gap: var(--space-2); width: 100%; background: none; border: 0; border-bottom: 1px solid var(--border-subtle); color: var(--text-primary); font: inherit; font-size: 15px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: var(--space-2) 0; cursor: pointer; text-align: left; }
-.rolls__group-head .icon { transition: transform 120ms; }
+.rolls__group-head .icon { transition: transform var(--motion-fast) var(--motion-move); }
 .rolls__group-head .icon.is-rotated { transform: rotate(-90deg); }
 .rolls__cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: var(--space-3); padding-top: var(--space-3); }
 
@@ -1153,7 +1153,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   width: 100%; height: 100%;
   /* Renders put the gun right of center; some are trimmed, so crop rather than trust 16:9. */
   object-fit: cover; object-position: 70% 45%;
-  opacity: 0; transition: opacity var(--item-art-fade-in) ease-out;
+  opacity: 0; transition: opacity var(--item-art-fade-in) var(--motion-enter);
 }
 .item-header.is-art-loaded .item-header__backdrop { opacity: 1; }
 .item-header__scrim {
@@ -1349,7 +1349,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
     /* Secondary, not muted: 10–11px labels need full text contrast. */
     color: var(--text-secondary); font: inherit; font-size: 10px; font-weight: 600;
     cursor: pointer;
-    transition: background 160ms ease, color 160ms ease;
+    transition: background var(--motion-fast) var(--motion-move), color var(--motion-fast) var(--motion-move);
   }
   /* The selected tab sits in a lighter pill inside the capsule, as on iOS. */
   .tabbar__tab.is-selected { background: var(--fill-glass-selected); color: var(--accent); }
@@ -1371,7 +1371,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   @keyframes tab-pulse { 50% { opacity: 0.45; } }
 
   /* Search mode: the tabs fold into one round button, the field takes the row, scopes float above. */
-  .tabbar--searching .tabbar__row, .tabbar--searching .tabbar__scopes { animation: bar-morph 180ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+  .tabbar--searching .tabbar__row, .tabbar--searching .tabbar__scopes { animation: bar-morph var(--motion-normal) var(--motion-surface); }
   .tabbar__round .icon--filled { color: var(--accent); }
   .tabbar__field {
     flex: 1; min-width: 0;
@@ -1443,7 +1443,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   .rolls__tool .rolls__dot { position: static; }
 
   /* Bottom sheet, shared shape: rounded top, a grab handle, and the home indicator's inset. */
-  .sheet-scrim { position: fixed; inset: 0; z-index: 10; background: var(--overlay-scrim); animation: fade-in 160ms ease-out; }
+  .sheet-scrim { position: fixed; inset: 0; z-index: 10; background: var(--overlay-scrim); animation: fade-in var(--motion-normal) var(--motion-enter); }
   .rolls__rail--sheet {
     position: fixed; z-index: 11; inset: auto 0 0 0; top: auto;
     max-height: var(--sheet-max-height);
@@ -1454,7 +1454,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
     background: var(--surface-sheet);
     box-shadow: var(--shadow-sheet);
     overflow: hidden;
-    animation: sheet-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: sheet-in var(--motion-normal) var(--motion-surface);
   }
   .rolls__rail--sheet .rolls__rail-body { overflow-y: auto; overscroll-behavior: contain; padding-bottom: var(--space-4); }
   .rolls__rail--sheet .rolls__panels { justify-content: flex-start; gap: var(--target-gap); }
@@ -1612,7 +1612,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 
 @media (max-width: 640px) {
   /* Phone: the sheet rises from the bottom edge, under the thumb. */
-  .sheet-layer { padding: 0; place-items: end stretch; animation: fade-in 160ms ease-out; }
+  .sheet-layer { padding: 0; place-items: end stretch; animation: fade-in var(--motion-normal) var(--motion-enter); }
   .sheet {
     width: 100%; max-height: var(--sheet-max-height);
     border: 0; border-top: 1px solid var(--border-subtle);
@@ -1620,7 +1620,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
     box-shadow: var(--shadow-sheet);
     padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
     grid-template-rows: auto auto minmax(0, 1fr) auto;
-    animation: sheet-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    animation: sheet-in var(--motion-normal) var(--motion-surface);
   }
   .sheet > .sheet__handle { display: block; margin-top: var(--space-2); margin-bottom: 0; }
   .sheet__header { padding-top: var(--space-1); }
@@ -1820,12 +1820,12 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .switch:disabled { opacity: 0.6; cursor: progress; }
 .switch__track {
   position: relative; width: var(--switch-width); height: var(--switch-height);
-  border-radius: var(--radius-pill); background: var(--switch-track-off); transition: background-color 150ms ease;
+  border-radius: var(--radius-pill); background: var(--switch-track-off); transition: background-color var(--motion-fast) var(--motion-move);
 }
 .switch__thumb {
   position: absolute; top: calc((var(--switch-height) - var(--switch-thumb)) / 2); left: calc((var(--switch-height) - var(--switch-thumb)) / 2);
   width: var(--switch-thumb); height: var(--switch-thumb); border-radius: 50%;
-  background: var(--switch-thumb-color); box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); transition: transform 150ms ease;
+  background: var(--switch-thumb-color); box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); transition: transform var(--motion-fast) var(--motion-move);
 }
 .switch[aria-checked="true"] .switch__track { background: var(--switch-track-on); }
 .switch[aria-checked="true"] .switch__thumb { background: var(--switch-thumb-on); transform: translateX(calc(var(--switch-width) - var(--switch-height))); }
@@ -2185,3 +2185,80 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .material__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .materials__group + .materials__group { padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
 .info-sheet .materials__list { grid-template-columns: 1fr; }
+
+/* ── Loading: launch handoff, skeletons, and content reveal ─────────────────
+   Timings are motion tokens (tokens.css); the reduced-motion tier there zeroes rise and stagger. */
+@keyframes rise-in { from { opacity: 0; transform: translateY(var(--motion-rise)); } }
+@keyframes reveal-in { from { opacity: 0; transform: translateY(var(--reveal-rise)); } }
+@keyframes fade-out { to { opacity: 0; } }
+@keyframes fade-in { from { opacity: 0; } }
+
+/* Launch: the loader leaves (index.html), then the top bar, then the columns left to right.
+   fill-mode backwards only: no transform lingers afterwards to trap fixed-position children. */
+.app--entering .topbar,
+.app--entering .tabbar,
+.app--entering .store-switcher,
+.app--entering .chat-fab { animation: rise-in var(--motion-normal) var(--motion-enter) var(--motion-normal) backwards; }
+.app--entering .inventory > *,
+.app--entering .main > :not(.inventory, .store-switcher) {
+  animation: rise-in var(--reveal-duration) var(--motion-enter) backwards;
+  animation-delay: calc(var(--motion-normal) + var(--duration-80) + var(--launch-i, 0) * var(--motion-stagger));
+}
+.app--entering .inventory > :nth-child(2) { --launch-i: 1; }
+.app--entering .inventory > :nth-child(3) { --launch-i: 2; }
+.app--entering .inventory > :nth-child(n + 4) { --launch-i: 3; }
+
+/* Sign-in and error screens settle in too, with the mark above the wordmark. */
+.center > * { animation: rise-in var(--reveal-duration) var(--motion-enter) backwards; }
+.center__mark { width: var(--loader-mark-size); height: var(--loader-mark-size); fill: var(--loader-lit); }
+
+/* Skeleton block. The sheen is fixed to the screen rather than to each block, so one light passes over
+   every skeleton at once (repaints only these few blocks; never used on item tiles). Rests between passes. */
+.sk {
+  display: block;
+  border-radius: var(--skeleton-radius);
+  background-color: var(--skeleton-fill);
+  background-image: linear-gradient(100deg, transparent 35%, var(--skeleton-sheen) 50%, transparent 65%);
+  background-size: 200vw 100%;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  animation: sk-sweep var(--skeleton-sweep) var(--motion-move) infinite;
+}
+@keyframes sk-sweep { 0% { background-position: 100vw 0; } 70%, 100% { background-position: -100vw 0; } }
+.sk--line { height: var(--skeleton-line); }
+.sk--title { height: var(--skeleton-title); }
+.sk--round { border-radius: 50%; }
+.sk-stack { display: grid; gap: var(--space-2); flex: 1; min-width: 0; }
+.sk-stack--loose { gap: var(--space-4); }
+.sk-row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+.sk-perks { display: grid; grid-template-columns: repeat(var(--sk-columns), var(--roll-perk-size)); gap: var(--space-2) var(--space-4); }
+.sk-perks .sk { width: var(--roll-perk-size); height: var(--roll-perk-size); }
+.sk-cards { display: grid; gap: var(--space-3); }
+.sk-card { display: grid; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-panel); }
+
+/* Skeleton and content share one grid cell and cross-fade in place, so nothing below them jumps.
+   The skeleton waits --skeleton-wait before it shows, so a quick load never flashes one. */
+.reveal { display: grid; min-width: 0; }
+.reveal > * { grid-area: 1 / 1; min-width: 0; }
+.reveal__skeleton { animation: rise-in var(--motion-normal) var(--motion-enter) var(--skeleton-wait) backwards; }
+.reveal__skeleton.is-leaving { animation: fade-out var(--skeleton-exit) var(--motion-exit) forwards; pointer-events: none; }
+.reveal__content > * { animation: reveal-in var(--reveal-duration) var(--motion-enter) backwards; animation-delay: var(--motion-stagger); }
+.reveal__content > :nth-child(2) { animation-delay: calc(2 * var(--motion-stagger)); }
+.reveal__content > :nth-child(n + 3) { animation-delay: calc(3 * var(--motion-stagger)); }
+
+/* Weapon render: the art ground holds the passing light until the image arrives. */
+.item-header.has-art::before { content: ""; position: absolute; inset: 0; z-index: -4; }
+.item-header.has-art:not(.is-art-loaded)::before {
+  background-image: linear-gradient(100deg, transparent 35%, var(--skeleton-sheen) 50%, transparent 65%);
+  background-size: 200vw 100%; background-attachment: fixed; background-repeat: no-repeat;
+  animation: sk-sweep var(--skeleton-sweep) var(--motion-move) infinite;
+}
+
+/* Item tile art: hidden until it loads, then fades in over the tier border. Cached art shows at once. */
+.tile__icon:not([data-art]) { opacity: 0; }
+.tile__icon[data-art="fresh"] { animation: fade-in var(--tile-art-fade) var(--motion-enter); }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Flat blocks and a still ground; the cross-fades stay, since they carry the change of state. */
+  .sk, .item-header.has-art:not(.is-art-loaded)::before { animation: none; background-image: none; }
+}

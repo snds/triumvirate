@@ -4,6 +4,7 @@ import remarkGfm from 'remark-gfm';
 import type { Element, Text } from 'hast';
 import { ItemChip } from './ItemChip.tsx';
 import { BuildCard, type Build } from './BuildCard.tsx';
+import { Sk } from './Skeleton.tsx';
 
 // react-markdown strips unknown URL schemes; keep our item: links, sanitize everything else as usual.
 const urlTransform = (url: string) => (url.startsWith('item:') ? url : defaultUrlTransform(url));
@@ -21,7 +22,14 @@ const components: Components = {
       const raw = (code.children[0] as Text | undefined)?.value ?? '';
       const build = parseBuild(raw);
       // While streaming, the JSON is incomplete; show a placeholder until it closes.
-      return build ? <BuildCard build={build} /> : <div className="build-pending"><span className="spinner" /> Putting the build together…</div>;
+      return build ? <div className="reveal__content"><BuildCard build={build} /></div> : (
+        <div className="build-pending" role="status">
+          <span className="visually-hidden">Putting the build together</span>
+          <div className="sk-row" aria-hidden><Sk kind="round" style={{ width: 40, height: 40 }} /><div className="sk-stack"><Sk kind="title" style={{ width: '60%' }} /><Sk kind="line" style={{ width: '38%' }} /></div></div>
+          <div className="sk-row" aria-hidden>{[0, 1, 2, 3].map((i) => <Sk key={i} kind="block" style={{ width: 36, height: 36 }} />)}</div>
+          <Sk kind="line" style={{ width: '80%' }} />
+        </div>
+      );
     }
     return <pre>{children}</pre>;
   },

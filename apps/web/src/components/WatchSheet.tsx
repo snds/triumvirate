@@ -7,6 +7,7 @@ import { timeAgo } from '../inventory.ts';
 import { Icon } from './Icon.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { Sheet } from './Sheet.tsx';
+import { Reveal, SkCards, SkPerks } from './Skeleton.tsx';
 
 /** "Kill Clip Enhanced" and "Kill Clip" are the same choice. */
 const base = (name: string) => name.replace(/\s+Enhanced$/i, '').trim();
@@ -130,7 +131,7 @@ export function WatchEditor({ weapon, onClose, onSaved }: {
         </div>
       )}
     >
-      {!rolls && !error && <p className="muted"><span className="spinner" /> Loading every roll…</p>}
+      <Reveal loading={!rolls && !error} skeleton={<SkPerks />} label="Loading every roll">
       {rolls && (
         <div className="watch-editor">
           <p className="watch-editor__summary" aria-live="polite">
@@ -183,6 +184,7 @@ export function WatchEditor({ weapon, onClose, onSaved }: {
           </div>
         </div>
       )}
+      </Reveal>
     </Sheet>
   );
 }
@@ -232,7 +234,7 @@ export function WatchListSheet({ items, onSelect, onClose }: {
         </div>
       )}
     >
-      {!data && !error && <p className="muted">Loading…</p>}
+      <Reveal loading={!data && !error} skeleton={<SkCards />} label="Loading your watch list">
       {data && (
         <div className="watch-list">
           <p className="muted watch-list__status">
@@ -266,6 +268,7 @@ export function WatchListSheet({ items, onSelect, onClose }: {
           </ul>
         </div>
       )}
+      </Reveal>
       {editing && (
         <WatchEditor
           weapon={{ itemHash: editing.itemHash, name: editing.name }}

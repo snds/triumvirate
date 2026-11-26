@@ -8,6 +8,7 @@ import { ItemTile } from './ItemTile.tsx';
 import { useInventory } from '../inventory-context.ts';
 import { TOUCH_QUERY, useMediaQuery } from '../media.ts';
 import { WatchButton } from './WatchSheet.tsx';
+import { Reveal, SkPerks } from './Skeleton.tsx';
 
 interface Props {
   item: AppraisedItem;
@@ -194,7 +195,20 @@ function AllRolls({ item }: { item: AppraisedItem }) {
   }, [item.itemHash]);
 
   if (error) return <p className="error">{error}</p>;
-  if (!data) return <p className="muted"><span className="spinner" /> Loading every roll…</p>;
+  return (
+    <Reveal loading={!data} skeleton={<SkPerks columns={5} rows={5} />} label="Loading every roll">
+      {data && <RollsBody item={item} data={data} focus={focus} setFocus={setFocus} touch={touch} />}
+    </Reveal>
+  );
+}
+
+function RollsBody({ item, data, focus, setFocus, touch }: {
+  item: AppraisedItem;
+  data: RollOptions;
+  focus: PerkOption | null;
+  setFocus: (p: PerkOption | null) => void;
+  touch: boolean;
+}) {
 
   const mine = new Map<string, boolean>(); // perk name → selected on this copy
   for (const col of item.perks ?? []) for (const p of col) mine.set(base(p.name), p.active || mine.get(base(p.name)) === true);
