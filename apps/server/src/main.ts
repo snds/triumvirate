@@ -8,6 +8,7 @@ import { createApp } from './app.ts';
 import Anthropic from '@anthropic-ai/sdk';
 import { createStore } from './store.ts';
 import { createWishListCache } from './wishlist-cache.ts';
+import { createPush, loadPushConfig, type PushConfig } from './push.ts';
 
 // A stray failed promise (say, writing to a chat stream after the browser closed it) should be
 // logged, not take the whole server down. Node exits on these by default.
@@ -21,6 +22,9 @@ const env = (k: string) => {
 
 // DATA_DIR lets the Docker image keep tokens, snapshots, and caches on a mounted volume.
 const dataDir = process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : join(import.meta.dirname, '../../../.data');
+// Web Push keys are read (or made) the first time something needs them.
+let pushConfig: Promise<PushConfig> | undefined;
+const push = createPush(dataDir, () => (pushConfig ??= loadPushConfig(dataDir, process.env).catch((e) => { pushConfig = undefined; throw e; })));
 const app = createApp(
   { apiKey: env('BUNGIE_API_KEY'), clientId: env('BUNGIE_CLIENT_ID'), clientSecret: env('BUNGIE_CLIENT_SECRET') },
   createStore(dataDir),
@@ -32,6 +36,8 @@ const app = createApp(
     communityCrawlHour: process.env.COMMUNITY_CRAWL_HOUR ? Number(process.env.COMMUNITY_CRAWL_HOUR) : undefined,
     // e.g. DIGEST_HOUR=7 builds the daily digest at 7 AM (after the night's crawl).
     digestHour: process.env.DIGEST_HOUR ? Number(process.env.DIGEST_HOUR) : undefined,
+    // The morning alert on your phone when the digest is ready (Settings in the digest sheet).
+    push,
   },
 );
 const port = Number(process.env.API_PORT ?? 5444);

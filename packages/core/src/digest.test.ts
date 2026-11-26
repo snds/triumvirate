@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { armorNote, buildDigest, digestFacts } from './digest.ts';
+import { armorNote, buildDigest, clip, digestFacts, digestNotice } from './digest.ts';
 
 const w = (id: string, over: object = {}) => ({ instanceId: id, itemHash: Number(id.replace(/\D/g, '')) || 1, name: `Gun ${id}`, tier: 'Legendary', type: 'Hand Cannon', itemType: 3, location: 'Vault', ...over });
 const a = (id: string, stats: Record<string, number>, over: object = {}) => ({ instanceId: id, itemHash: 2, name: `Helm ${id}`, tier: 'Legendary', type: 'Helmet', itemType: 2, location: 'Warlock', stats, ...over });
@@ -38,4 +38,21 @@ test('vendors: only A or better, or wish list picks', () => {
 
 test('armorNote uses base stats and tier', () => {
   assert.equal(armorNote({ gearTier: 4, statDetails: [{ hash: 1, name: 'Melee', value: 35, bonus: 10, numeric: false }] }), 'Tier 4 · Stat total 25: Melee 25');
+});
+
+test('digestNotice names the best news', () => {
+  const items = [w('1'), w('2', { name: 'Fatebringer', appraisal: { verdict: 'god' } }), w('3')];
+  const d = buildDigest({ ...base, items, prevSeen: ['1'], grades: {} });
+  assert.deepEqual(digestNotice(d), { title: 'New god roll: Fatebringer', body: '2 new items · vault 500/700' });
+  assert.equal(digestNotice({ ...d, lede: 'Keep Fatebringer. Then clear out the vault.' }).body, 'Keep Fatebringer. Then clear out the vault.');
+  const quiet = buildDigest({ ...base, items: [w('1')], prevSeen: ['1'], grades: {} });
+  assert.deepEqual(digestNotice(quiet), { title: 'Your daily digest', body: 'No new items · vault 500/700' });
+  const first = buildDigest({ ...base, items: [w('1'), w('2')], grades: {} });
+  assert.equal(digestNotice(first).body, 'It took stock of 2 items. New drops show up from tomorrow on.');
+});
+
+test('clip ends on a sentence or a word', () => {
+  assert.equal(clip('One two. Three four five six seven.', 20), 'One two.');
+  assert.equal(clip('alpha beta gamma delta', 13), 'alpha beta…');
+  assert.equal(clip('short', 20), 'short');
 });
