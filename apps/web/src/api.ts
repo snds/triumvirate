@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -397,3 +397,20 @@ export const fetchVendors = async (characterId?: string, refresh = false): Promi
   if (refresh) q.set('refresh', '1');
   return json(await fetch(`/api/vendors${q.size ? `?${q}` : ''}`), sameOriginImages);
 };
+// ── Records ───────────────────────────────────────────────────
+export type RecordsResponse = RecordsScreen & {
+  characterId?: string;
+  characters: { id: string; className: string }[];
+  fetchedAt: string;
+  /** Record hashes tracked in this app. */
+  pinned: number[];
+};
+/** Titles, triumphs, tracked, and nearly done for one character; `refresh` asks Bungie again. */
+export const fetchRecords = async (characterId?: string, refresh = false): Promise<RecordsResponse> => {
+  const q = new URLSearchParams();
+  if (characterId) q.set('character', characterId);
+  if (refresh) q.set('refresh', '1');
+  return json(await fetch(`/api/records${q.size ? `?${q}` : ''}`), sameOriginImages);
+};
+/** Tracks or untracks a triumph in this app. */
+export const trackRecord = (hash: number, tracked: boolean) => act<{ tracked?: number[]; error?: string }>('/api/records/track', { hash, tracked }, 'track that triumph');

@@ -18,3 +18,4 @@ export * from './rolls.ts';
 export * from './community.ts';
 export * from './vendors.ts';
 export * from './vendor-screen.ts';
+export * from './records.ts';

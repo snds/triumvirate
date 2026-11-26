@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -17,6 +17,7 @@ import {
 } from '@triumvirate/core';
 import type { WishListCache } from './wishlist-cache.ts';
 import { createDefsCache } from './defs-cache.ts';
+import { createTrackedStore } from './tracked-store.ts';
 import type { Push } from './push.ts';
 import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
@@ -525,6 +526,64 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     };
     vendorScreens.set(characterId, { at: Date.now(), key, body });
     return c.json(body);
+  });
+
+  // Records: titles, the triumph tree, tracked triumphs, and the ones nearly done. The record and
+  // presentation node tables are large, so they load (and trim) on first visit, not at start up.
+  const tracked = createTrackedStore(store.dataDir);
+  let recordTables: Promise<RecordTables> | undefined;
+  const recordScreens = new Map<string, { at: number; key: string; profile: DestinyProfileResponse }>();
+  /** The trimmed tables for the current manifest; a new manifest version loads new ones. */
+  const tablesFor = async (http: ReturnType<typeof createHttpClient>, retry = true): Promise<RecordTables> => {
+    if (!recordTables) recordTables = loadRecordTables(http, join(store.dataDir, 'manifest')).catch((e) => { recordTables = undefined; throw e; });
+    const t = await recordTables;
+    // Loaded under an older manifest: load once more (Bungie's live version wins either way).
+    if (retry && manifest && t.version !== manifest.version) { recordTables = undefined; return tablesFor(http, false); }
+    return t;
+  };
+  app.get('/api/records', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { view, http } = await ready(t);
+    if (!current || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const chars = [...view.characters].sort((a, b) => Date.parse(b.lastPlayed) - Date.parse(a.lastPlayed));
+    const characterId = chars.some((ch) => ch.id === c.req.query('character')) ? c.req.query('character')! : chars[0]?.id;
+    const tables = await tablesFor(http);
+    // One profile pull (all characters) serves every character for 5 minutes.
+    const key = `${current.membershipId}.${manifest.version}`;
+    let hit = recordScreens.get(current.membershipId);
+    if (!hit || hit.key !== key || c.req.query('refresh') || Date.now() - hit.at > 5 * 60_000) {
+      // Characters, PresentationNodes, Records.
+      const { Response: profile } = await getProfile(http, { membershipType: current.membershipType, destinyMembershipId: current.membershipId, components: [200, 700, 900] as never });
+      hit = { at: Date.now(), key, profile };
+      recordScreens.set(current.membershipId, hit);
+    }
+    const p = hit.profile;
+    const ch = characterId ? p.characters?.data?.[characterId] : undefined;
+    const pinned = await tracked.read();
+    const screen = recordsScreen({
+      tables, objectives: manifest.objectives,
+      profileRecords: p.profileRecords?.data as never,
+      characterRecords: characterId ? p.characterRecords?.data?.[characterId] as never : undefined,
+      profileNodes: p.profilePresentationNodes?.data?.nodes as never,
+      characterNodes: characterId ? p.characterPresentationNodes?.data?.[characterId]?.nodes as never : undefined,
+      gender: ch?.genderType === 1 ? 'Female' : 'Male',
+      tracked: pinned,
+    });
+    return c.json({
+      pinned,
+      characterId,
+      characters: chars.map((x) => ({ id: x.id, className: x.className })),
+      fetchedAt: new Date(hit.at).toISOString(),
+      ...screen,
+    });
+  });
+  /** Tracks or untracks a triumph here (the game's own tracked triumph is separate). */
+  app.post('/api/records/track', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { hash?: unknown; tracked?: unknown };
+    const hash = Number(body.hash);
+    if (!tracked.valid(hash)) return c.json({ error: 'Pick a triumph to track.' }, 400);
+    return c.json({ tracked: await tracked.set(hash, body.tracked !== false) });
   });
 
   // Farming targets: god rolls you're missing, where they drop, and vendors selling them now.
@@ -1211,10 +1270,10 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   });
 
   // One file with everything you'd hate to lose: loadouts, builds, cleanup decisions, the watch
-  // list, and wish list sources. Never tokens, snapshots, or caches. The web app adds its own prefs.
+  // list, tracked triumphs, and wish list sources. Never tokens, snapshots, or caches. The web app adds its own prefs.
   app.get('/api/backup', async (c) => {
-    const [saved, builds, cleanup, watchState, lists] = await Promise.all([
-      loadouts.list(), buildStore.get(), cleanupStore.get(), watch.read(), deps.wishLists?.sources(),
+    const [saved, builds, cleanup, watchState, lists, trackedRecords] = await Promise.all([
+      loadouts.list(), buildStore.get(), cleanupStore.get(), watch.read(), deps.wishLists?.sources(), tracked.read(),
     ]);
     c.header('Cache-Control', 'no-store');
     return c.json({
@@ -1225,6 +1284,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
         cleanup,
         watch: { entries: watchState.entries },
         ...(lists ? { wishLists: lists } : {}),
+        trackedRecords,
       },
     });
   });
@@ -1257,6 +1317,11 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
         .map((e) => ({ ...e, itemHash: Number(e.itemHash), perks: cleanWantedPerks(e.perks) }));
       await watch.update((s) => ({ state: { ...s, entries }, result: undefined }));
       restored.push(`${entries.length} watched weapon${entries.length === 1 ? '' : 's'}`);
+    }
+    if (Array.isArray(d.trackedRecords)) {
+      const list = await tracked.replace(d.trackedRecords);
+      // An empty list still replaces what's here, but isn't worth announcing.
+      if (list.length) restored.push(`${list.length} tracked triumph${list.length === 1 ? '' : 's'}`);
     }
     if (Array.isArray(d.wishLists) && deps.wishLists) {
       await deps.wishLists.restore(d.wishLists as never);

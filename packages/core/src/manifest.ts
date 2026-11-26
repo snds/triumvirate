@@ -22,6 +22,7 @@ import {
   type DestinySandboxPerkDefinition,
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
+import { recordRoots, slimNodes, slimRecords, type RecordTables } from './records.ts';
 
 export interface ManifestTables {
   version: string;
@@ -257,18 +258,11 @@ const TABLES = {
 const SLIM_VERSION = 5;
 
 /**
- * Returns the manifest tables, or undefined when `currentVersion` is already the
- * live version (so a caller holding the tables in memory can skip re-parsing).
+ * Opens the live manifest: its version, and a loader that downloads a table once and keeps it on
+ * disk per version (trimmed first when `slim` is given, so only the small file is kept).
  */
-export async function loadManifest(http: HttpClient, cacheDir: string, lang?: string): Promise<ManifestTables>;
-export async function loadManifest(
-  http: HttpClient, cacheDir: string, lang: string, currentVersion: string | undefined,
-): Promise<ManifestTables | undefined>;
-export async function loadManifest(
-  http: HttpClient, cacheDir: string, lang = 'en', currentVersion?: string,
-): Promise<ManifestTables | undefined> {
+async function openManifest(http: HttpClient, cacheDir: string, lang: string) {
   const { Response: m } = await getDestinyManifest(http);
-  if (currentVersion && currentVersion === m.version) return undefined;
   const dir = join(cacheDir, m.version.replace(/[^\w.-]/g, '_'));
   await mkdir(dir, { recursive: true });
   const paths = m.jsonWorldComponentContentPaths[lang];
@@ -281,7 +275,6 @@ export async function loadManifest(
     if (!res.ok) throw new Error(`Manifest download failed for ${table}: ${res.status}`);
     return res.text();
   };
-  // Cached as-is, or (when `slim` is given) trimmed first so only the small file is kept.
   const load = async <T>(table: string, slim?: (full: any) => T): Promise<T> => {
     const file = join(dir, `${table}${slim ? `.slim${SLIM_VERSION}` : ''}.json`);
     try {
@@ -297,6 +290,22 @@ export async function loadManifest(
       return trimmed;
     }
   };
+  return { m, load };
+}
+
+/**
+ * Returns the manifest tables, or undefined when `currentVersion` is already the
+ * live version (so a caller holding the tables in memory can skip re-parsing).
+ */
+export async function loadManifest(http: HttpClient, cacheDir: string, lang?: string): Promise<ManifestTables>;
+export async function loadManifest(
+  http: HttpClient, cacheDir: string, lang: string, currentVersion: string | undefined,
+): Promise<ManifestTables | undefined>;
+export async function loadManifest(
+  http: HttpClient, cacheDir: string, lang = 'en', currentVersion?: string,
+): Promise<ManifestTables | undefined> {
+  const { m, load } = await openManifest(http, cacheDir, lang);
+  if (currentVersion && currentVersion === m.version) return undefined;
 
   const [items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets] = await Promise.all([
     load<ManifestTables['items']>(TABLES.items),
@@ -336,4 +345,19 @@ export async function loadManifest(
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
   return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources, season };
+}
+
+/**
+ * The Records screen's tables: record and presentation node definitions, trimmed, plus the
+ * global constants for the legacy roots. Loaded on first use, not at start up (they're large).
+ */
+export async function loadRecordTables(http: HttpClient, cacheDir: string, lang = 'en'): Promise<RecordTables> {
+  const { m, load } = await openManifest(http, cacheDir, lang);
+  const [records, nodes, constants] = await Promise.all([
+    load('DestinyRecordDefinition', slimRecords),
+    load('DestinyPresentationNodeDefinition', slimNodes),
+    // Tiny; without it only the legacy sections go missing.
+    load<Record<string, any>>('DestinyGlobalConstantsDefinition').catch(() => undefined),
+  ]);
+  return { version: m.version, roots: recordRoots(constants), records, nodes };
 }

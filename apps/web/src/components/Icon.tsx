@@ -78,6 +78,10 @@ const GLYPHS = {
   upload: 'upload',
   server: 'dns',
   wishlist: 'playlist_add_check',
+  records: 'emoji_events',
+  title: 'workspace_premium',
+  pin: 'keep',
+  gilded: 'auto_awesome',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;
