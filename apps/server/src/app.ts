@@ -331,11 +331,12 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     },
   });
   if (deps.communityCrawlHour !== undefined) community.schedule(deps.communityCrawlHour);
+  else console.log('[community] Nightly crawl is off (COMMUNITY_CRAWL_HOUR is not set).');
   app.get('/api/community/status', async (c) => c.json(await community.status()));
   app.post('/api/community/crawl', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { maxRequests?: number };
     const maxRequests = Math.min(Math.max(Number(body.maxRequests) || 3000, 1), 20_000);
-    community.crawl({ maxRequests }).catch((e) => console.error('Community crawl failed:', e));
+    community.crawl({ maxRequests }, 'manual').catch((e) => console.error('[community] Crawl (manual) failed:', e));
     return c.json(await community.status(), 202);
   });
   app.post('/api/community/stop', (c) => { community.stop(); return c.json({ ok: true }); });

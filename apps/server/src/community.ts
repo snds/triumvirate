@@ -23,6 +23,8 @@ const PROFILE_COMPONENTS = [100, 205, 305];
 const KEEP_SEEN = 50_000;
 const KEEP_FRONTIER = 5_000;
 const ROLLUP_DAYS = 30;
+/** A Bungie call that hangs longer than this is given up on, so a crawl can never stay "running" forever. */
+const CALL_TIMEOUT_MS = 30_000;
 
 export interface Player { membershipType: number; membershipId: string }
 
@@ -61,7 +63,16 @@ export interface CommunityDeps {
   seed: () => Promise<Player | undefined>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
+  /** Where crawl and schedule messages go. Default: the console, so they show in `docker logs`. */
+  log?: (msg: string) => void;
+  /** Where failures go. Default: console.error. */
+  logError?: (msg: string, err?: unknown) => void;
+  /** Default: the JS default (process.env.TZ or the system zone). Only for tests. */
+  timeZone?: string;
 }
+
+/** Why a crawl started, for the log. */
+export type CrawlTrigger = 'schedule' | 'manual';
 
 const month = (iso: string) => iso.slice(0, 7);
 
@@ -69,6 +80,9 @@ export function createCommunity(deps: CommunityDeps) {
   const dir = join(deps.dataDir, 'community');
   const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const now = deps.now ?? (() => new Date());
+  const log = deps.log ?? ((msg: string) => console.log(`[community] ${msg}`));
+  const logError = deps.logError ?? ((msg: string, err?: unknown) => console.error(`[community] ${msg}`, ...(err === undefined ? [] : [err])));
+  const timeOf = (d: Date) => d.toLocaleString('en-US', { timeZone: deps.timeZone, dateStyle: 'medium', timeStyle: 'short' });
   let status: CrawlStatus = { running: false, requests: 0, matches: 0, samples: 0 };
   let stopRequested = false;
   let current: CommunityRollup | undefined;
@@ -95,7 +109,7 @@ export function createCommunity(deps: CommunityDeps) {
         last = Date.now();
         status.requests++;
         try {
-          return await http<T>(config);
+          return await withTimeout(http<T>(config), CALL_TIMEOUT_MS);
         } catch (e) {
           // 1672 ThrottleLimitExceeded, 36/51 per-endpoint throttles, or a non-JSON 5xx page.
           const msg = String((e as Error).message);
@@ -107,11 +121,16 @@ export function createCommunity(deps: CommunityDeps) {
     };
   }
 
-  async function crawl(opts: CrawlOptions = {}): Promise<CrawlStatus> {
-    if (status.running) return status;
+  async function crawl(opts: CrawlOptions = {}, trigger: CrawlTrigger = 'manual'): Promise<CrawlStatus> {
+    if (status.running) {
+      log(`Crawl (${trigger}) not started: another crawl has been running since ${status.startedAt}.`);
+      return status;
+    }
     const o: Required<CrawlOptions> = { maxRequests: 3000, maxAgeHours: 6, ratePerSecond: 4, ...opts };
     stopRequested = false;
-    status = { running: true, startedAt: now().toISOString(), requests: 0, matches: 0, samples: 0, lastRun: status.lastRun };
+    const started = now();
+    status = { running: true, startedAt: started.toISOString(), requests: 0, matches: 0, samples: 0, lastRun: status.lastRun };
+    let discovery = 0;
     const found: Sample[] = [];
     let state: State = { seen: [], frontier: [] };
     let loaded = false;
@@ -122,12 +141,16 @@ export function createCommunity(deps: CommunityDeps) {
       loaded = true;
       const seen = new Set(state.seen);
       const queued = new Set(state.frontier.map((p) => p.membershipId));
+      let seeded = false;
       if (!state.frontier.length) {
         const me = await deps.seed();
         if (!me) throw new Error('Sign in once so the crawl has a starting player.');
         state.frontier.push(me);
         queued.add(me.membershipId);
+        seeded = true;
       }
+      log(`Crawl (${trigger}) started: ${seeded ? 'fresh start from your own account' : `${state.frontier.length} players queued`}, ` +
+        `budget ${o.maxRequests} requests, matches from the last ${o.maxAgeHours} hours.`);
       const http = paced(deps.http, o);
       const profiles = new Map<string, DestinyProfileResponse | undefined>();
       const profileOf = async (p: Player) => {
@@ -143,12 +166,24 @@ export function createCommunity(deps: CommunityDeps) {
         return profiles.get(p.membershipId);
       };
       const cutoff = now().getTime() - o.maxAgeHours * 3_600_000;
+      const enqueue = (pgcr: DestinyPostGameCarnageReportData) => {
+        for (const e of pgcr.entries) {
+          const u = e.player.destinyUserInfo;
+          const p = { membershipType: u.crossSaveOverride || u.membershipType, membershipId: u.membershipId };
+          if (!queued.has(p.membershipId) && state.frontier.length < KEEP_FRONTIER) {
+            state.frontier.push(p);
+            queued.add(p.membershipId);
+          }
+        }
+      };
 
       try {
         while (state.frontier.length) {
           const player = state.frontier.shift()!;
           queued.delete(player.membershipId);
           const profile = await profileOf(player);
+          // Matches too old to sample. They still name other players to visit.
+          const older: string[] = [];
           for (const characterId of profile?.profile?.data?.characterIds ?? []) {
             let recent;
             try {
@@ -161,7 +196,8 @@ export function createCommunity(deps: CommunityDeps) {
             }
             for (const a of recent) {
               const id = a.activityDetails.instanceId;
-              if (seen.has(id) || Date.parse(a.period) < cutoff) continue;
+              if (seen.has(id)) continue;
+              if (Date.parse(a.period) < cutoff) { older.push(id); continue; }
               seen.add(id);
               let pgcr: DestinyPostGameCarnageReportData;
               try {
@@ -174,16 +210,26 @@ export function createCommunity(deps: CommunityDeps) {
               const byId: Record<string, DestinyProfileResponse | undefined> = {};
               for (const e of pgcr.entries) {
                 const u = e.player.destinyUserInfo;
-                const p = { membershipType: u.crossSaveOverride || u.membershipType, membershipId: u.membershipId };
-                byId[p.membershipId] = await profileOf(p);
-                if (!queued.has(p.membershipId) && state.frontier.length < KEEP_FRONTIER) {
-                  state.frontier.push(p);
-                  queued.add(p.membershipId);
-                }
+                byId[u.membershipId] = await profileOf({ membershipType: u.crossSaveOverride || u.membershipType, membershipId: u.membershipId });
               }
+              enqueue(pgcr);
               const s = extractSamples(manifest, pgcr, byId);
               found.push(...s);
               status.samples += s.length;
+            }
+          }
+          // About to run out of players (say, a fresh start when you haven't played tonight):
+          // use this player's older matches only to find more players. Nothing is sampled from them,
+          // because the gear people wear now may not be what they used back then.
+          if (!state.frontier.length) {
+            for (const id of older) {
+              seen.add(id);
+              try {
+                enqueue((await getPostGameCarnageReport(http, { activityId: id })).Response);
+                discovery++;
+              } catch (e) {
+                if (e instanceof StopCrawl) throw e;
+              }
             }
           }
         }
@@ -195,13 +241,22 @@ export function createCommunity(deps: CommunityDeps) {
       await rebuild(manifest);
     } catch (e) {
       status.error = (e as Error).message;
+      // The scheduler can't see this (crawl resolves either way), so say it here.
+      logError(`Crawl (${trigger}) failed:`, e);
       // Keep whatever was collected before the failure.
-      await saveSamples(found).catch(() => {});
+      await saveSamples(found).catch((err) => logError('Could not save samples:', err));
     } finally {
       const { requests, matches, samples, error } = status;
       state.lastRun = { finishedAt: now().toISOString(), requests, matches, samples, ...(error ? { error } : {}) };
-      if (loaded) await writeJson('state.json', state).catch(() => {});
+      // A run that failed before reading state.json (say, item data didn't load) still records its
+      // result there, so a failed night is visible on disk and not mistaken for one that never ran.
+      if (!loaded) state = { ...((await readJson<State>('state.json')) ?? state), lastRun: state.lastRun };
+      await writeJson('state.json', state).catch((err) => logError('Could not save state.json:', err));
       status = { ...status, running: false, lastRun: state.lastRun, totalSamples: await countSamples().catch(() => undefined) };
+      const minutes = Math.round((now().getTime() - started.getTime()) / 60_000);
+      log(`Crawl (${trigger}) ${error ? 'stopped early' : 'finished'} after ${minutes} min: ${requests} requests, ${matches} matches, ` +
+        `${samples} samples${discovery ? `, ${discovery} older matches used to find players` : ''}, ${state.frontier.length} players left to visit.`);
+      if (!error && !matches) log('No recent matches were found, so no new data. The next run picks up from the players found this time.');
     }
     return status;
   }
@@ -285,16 +340,52 @@ export function createCommunity(deps: CommunityDeps) {
       }));
       return { builtAt: current?.builtAt, samples: current?.samples ?? 0, weapon: current?.weapons[itemHash] ?? null, trend };
     },
-    /** Runs a crawl once a day at `hour` (local time) while the server is up. */
+    /**
+     * Runs a crawl once a day at `hour` (local time) while the server is up. Checks every 5 minutes,
+     * so it starts between :00 and :05. Logs the plan at startup and every skip, so a missed night
+     * shows up in `docker logs` with its reason.
+     */
     schedule(hour: number, opts?: CrawlOptions) {
+      if (!Number.isInteger(hour) || hour < 0 || hour > 23) {
+        logError(`COMMUNITY_CRAWL_HOUR must be a whole hour from 0 to 23, not "${hour}". The nightly crawl is off.`);
+        return () => {};
+      }
+      const zone = deps.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+      const tz = process.env.TZ;
+      if (!deps.timeZone && tz && tz !== zone) {
+        logError(`TZ="${tz}" isn't a time zone this server knows, so hours are in ${zone}. Use a name like America/Los_Angeles.`);
+      }
+      const next = () => {
+        const d = new Date(now());
+        d.setMinutes(0, 0, 0);
+        // Step an hour at a time (not set hours) so daylight-saving changes can't skip a day.
+        do d.setTime(d.getTime() + 3_600_000); while (d.getHours() !== hour);
+        return d;
+      };
+      log(`Nightly crawl scheduled for ${String(hour).padStart(2, '0')}:00 ${zone}${!deps.timeZone && !tz ? ' (TZ is not set)' : ''} (server time now ${timeOf(now())}). Next run: ${timeOf(next())}.`);
       let lastDay = '';
       const tick = () => {
         const d = now();
         const day = d.toDateString();
-        if (d.getHours() === hour && day !== lastDay && !status.running) {
-          lastDay = day;
-          crawl(opts).catch((e) => console.error('Community crawl failed:', e));
+        if (d.getHours() !== hour || day === lastDay) return;
+        lastDay = day;
+        if (status.running) {
+          log(`Nightly crawl skipped: a crawl has been running since ${status.startedAt}.`);
+          return;
         }
+        run(1);
+      };
+      // A run that fails before it gets going (Bungie or the network is down) tries again
+      // 15 minutes later, up to 3 tries in all. A run that got going and then failed is not retried.
+      const run = (attempt: number) => {
+        crawl(opts, 'schedule')
+          .then((r) => {
+            if (r.error && r.requests < 10 && attempt < 3) {
+              log(`Nightly crawl will try again in 15 minutes (try ${attempt + 1} of 3).`);
+              setTimeout(() => run(attempt + 1), 15 * 60_000).unref();
+            } else log(`Next nightly crawl: ${timeOf(next())}.`);
+          })
+          .catch((e) => logError('Nightly crawl failed:', e));
       };
       const t = setInterval(tick, 5 * 60_000);
       t.unref();
@@ -305,3 +396,11 @@ export function createCommunity(deps: CommunityDeps) {
 export type Community = ReturnType<typeof createCommunity>;
 
 class StopCrawl extends Error {}
+
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Bungie didn't answer within ${ms / 1000} seconds.`)), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}

@@ -86,9 +86,14 @@ Only legendary and exotic weapons are counted, and only item hashes are saved, n
 - Start a crawl by hand (PowerShell): `Invoke-RestMethod -Method Post http://127.0.0.1:5444/api/community/crawl`
 - Check on it: `Invoke-RestMethod http://127.0.0.1:5444/api/community/status`
 - Run it nightly: set `COMMUNITY_CRAWL_HOUR=3` in `.env`.
+  At startup the log says when the next run is, in which time zone (set `TZ`, e.g. `America/Los_Angeles`).
+  Every run logs its start, its finish (requests, matches, samples), and any error, all tagged `[community]`.
+  On Unraid: `docker logs triumvirate-app-1 2>&1 | grep community`. If a key appears twice in `.env`, the last line wins.
 - Data for one weapon: `GET /api/community/items/<itemHash>`.
 
 Files live in `.data/community/`. A crawl makes at most 3,000 requests at 4 per second (about 15 minutes).
+A crawl only samples matches from the last 6 hours. When it runs out of players to visit (say, a fresh
+start when you haven't played tonight), it uses older matches only to find more players.
 
 ## Daily digest
 
