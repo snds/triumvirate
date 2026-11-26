@@ -343,10 +343,11 @@ export function App() {
         setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
       },
       collectPostmaster: collect,
+      patch: (item) => { if (item.instanceId) patchItem(item.instanceId, item); },
       itemSets: inv?.itemSets,
       allItems: inv?.items ?? [],
     };
-  }, [state, moving, move, recentMoves, equip, lock, selecting, picked, collect]);
+  }, [state, moving, move, recentMoves, equip, lock, selecting, picked, collect, patchItem]);
 
   // Bulk moves go one at a time through the latest `move`, so each sees where the last one landed.
   const moveRef = useRef(move);

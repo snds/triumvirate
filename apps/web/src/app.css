@@ -1181,6 +1181,53 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 }
 .item-header--dialog.has-art .item-header__tag::before { content: 'Ornament · '; opacity: 0.75; }
 
+/* Previewing an ornament: the header tag says so. */
+.item-header--dialog.has-art .item-header__tag.is-preview::before { content: 'Preview · '; }
+
+/* ── Ornament strip (item dialog) ──────────────────────────── */
+.ornaments { display: grid; gap: var(--space-2); }
+.ornaments__title { margin: 0; }
+.ornaments__count { margin-left: var(--space-1); text-transform: none; letter-spacing: 0; font-weight: 400; color: var(--text-muted); }
+.ornaments__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ornaments__previewing { flex: 1 1 auto; min-width: 0; font-size: 13px; color: var(--text-muted); }
+.ornaments__previewing strong { color: var(--text-primary); font-weight: 600; }
+.ornaments__locked { display: inline-flex; align-items: center; gap: 4px; color: var(--text-muted); font-size: 13px; }
+.ornaments__locked .icon { font-size: 16px; }
+/* One row that scrolls sideways on narrow widths, snapping to whole tiles. */
+.ornaments__list {
+  display: flex; gap: var(--space-2); margin: 0; padding: 2px 2px var(--space-1); list-style: none;
+  overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: thin;
+}
+.ornaments__list > li { flex: none; scroll-snap-align: start; }
+.ornament {
+  display: grid; justify-items: center; gap: 4px; width: calc(var(--ornament-size) + var(--space-3));
+  padding: 0; border: 0; background: none; color: inherit; cursor: pointer; font: inherit;
+}
+.ornament__art {
+  position: relative; width: var(--ornament-size); height: var(--ornament-size);
+  border-radius: var(--tile-radius); overflow: hidden; outline: 2px solid transparent; outline-offset: 2px;
+  background: var(--surface-raised);
+}
+.ornament__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ornament.is-locked .ornament__art img { opacity: var(--ornament-locked-opacity); filter: grayscale(0.6); }
+.ornament.is-selected .ornament__art { outline-color: var(--ornament-ring); }
+.ornament:focus-visible { outline: none; }
+.ornament:focus-visible .ornament__art { outline-color: var(--focus-ring); }
+.ornament__lock, .ornament__applied {
+  position: absolute; right: 2px; bottom: 2px; display: grid; place-items: center;
+  width: 18px; height: 18px; border-radius: 50%; background: var(--ornament-badge-bg); color: var(--text-muted);
+}
+.ornament__applied { color: var(--accent); }
+.ornament__lock .icon, .ornament__applied .icon { font-size: 13px; }
+.ornament__name {
+  width: 100%; font-size: 11px; line-height: 1.25; text-align: center; color: var(--text-muted);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.ornament.is-selected .ornament__name { color: var(--text-primary); }
+.ornaments__notice { margin: 0; font-size: 13px; color: var(--text-muted); }
+.ornaments__notice.is-error { color: var(--danger); }
+@media (pointer: coarse) { .ornament { min-height: var(--control-size, 44px); } }
+
 /* ── Component containers ─────────────────────────────────
    Components lay themselves out by their own width, not the window's. The item dialog squeezed
    beside the desktop chat, the chat at its narrowest drag width, and a roll card in a tight grid

@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -179,6 +179,10 @@ export async function applyPerks(instanceId: string, plugs: { socketIndex: numbe
     return { error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+/** The ornaments one weapon copy can wear, default first. Empty when it has none to choose. */
+export const fetchOrnaments = async (instanceId: string): Promise<WeaponOrnaments> =>
+  json(await fetch(`/api/items/${encodeURIComponent(instanceId)}/ornaments`), sameOriginImages);
 
 export interface VendorOffers {
   fetchedAt: string;
