@@ -23,6 +23,7 @@ import {
 } from 'bungie-api-ts/destiny2';
 import { BUNGIE_ROOT } from './bungie.ts';
 import { recordRoots, slimNodes, slimRecords, type RecordTables } from './records.ts';
+import { slimIdentity, type IdentityTables } from './identity.ts';
 
 export interface ManifestTables {
   version: string;
@@ -49,6 +50,8 @@ export interface ManifestTables {
   sources?: Record<string, string>;
   /** Seasons, season passes, artifacts, and the rank progressions the season tracker reads. */
   season?: SeasonTables;
+  /** Guardian Rank names and art, and the commendation groups' colors. */
+  identity?: IdentityTables;
 }
 
 export interface ProgressionInfo {
@@ -269,10 +272,12 @@ const TABLES = {
   seasonPasses: 'DestinySeasonPassDefinition',
   progressions: 'DestinyProgressionDefinition',
   artifacts: 'DestinyArtifactDefinition',
+  guardianRanks: 'DestinyGuardianRankDefinition',
+  commendationNodes: 'DestinySocialCommendationNodeDefinition',
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 8;
+const SLIM_VERSION = 9;
 
 /**
  * Opens the live manifest: its version, and a loader that downloads a table once and keeps it on
@@ -359,9 +364,13 @@ export async function loadManifest(
     load<Record<string, any>>(TABLES.seasons), load<Record<string, any>>(TABLES.seasonPasses),
     load<Record<string, any>>(TABLES.progressions), load<Record<string, any>>(TABLES.artifacts),
   ]).then(([a, b, c, d]) => slimSeason(a, b, c, d)).catch(() => undefined);
+  // Guardian Rank and commendation colors: two tiny tables, cosmetic, never blocking.
+  const identity = await Promise.all([
+    load<Record<string, any>>(TABLES.guardianRanks), load<Record<string, any>>(TABLES.commendationNodes),
+  ]).then(([r, n]) => slimIdentity(r, n)).catch(() => undefined);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources, season };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources, season, identity };
 }
 
 /**

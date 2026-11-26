@@ -1,6 +1,7 @@
 // Turns a raw GetProfile response into a flat, readable list of items by location.
 import type { DestinyProfileResponse, DestinyItemComponent } from 'bungie-api-ts/destiny2';
 import type { ManifestTables } from './manifest.ts';
+import { guardianIdentity, type GuardianIdentity } from './identity.ts';
 
 export const VAULT_BUCKET = 138197802;
 /** "Lost Items": the postmaster. Lives in each character's inventory and holds 21 items. */
@@ -144,6 +145,10 @@ export interface CharacterRow {
   classType: number;
   light: number;
   emblemBackground?: string;
+  /** The emblem's 1958×146 wide banner (secondarySpecial), for headers wider than the nameplate. */
+  emblemBanner?: string;
+  /** The emblem's crest on transparency (secondaryOverlay), 96 px square. */
+  emblemCrest?: string;
   lastPlayed: string;
   /** Equipped title, e.g. "Iron Lord". */
   title?: string;
@@ -216,6 +221,8 @@ export interface AccountSummary {
   materials?: Material[];
   /** Items in the vault and how many it holds. */
   vault: { used: number; capacity: number };
+  /** Guardian Rank and commendations. Optional for older servers. */
+  guardian?: GuardianIdentity;
 }
 
 export const bungieUrl = (path?: string) => (path ? `https://www.bungie.net${path}` : undefined);
@@ -285,6 +292,8 @@ export function summarizeCharacters(
       classType: ch.classType,
       light: ch.light,
       emblemBackground: bungieUrl(ch.emblemBackgroundPath),
+      ...(manifest?.items?.[ch.emblemHash]?.secondarySpecial ? { emblemBanner: bungieUrl(manifest.items[ch.emblemHash]!.secondarySpecial) } : {}),
+      ...(manifest?.items?.[ch.emblemHash]?.secondaryOverlay ? { emblemCrest: bungieUrl(manifest.items[ch.emblemHash]!.secondaryOverlay) } : {}),
       lastPlayed: ch.dateLastPlayed,
       title: titles[id],
       subclass: manifest?.items && manifest.extras
@@ -304,13 +313,14 @@ export function summarizeCharacters(
 }
 
 /** Profile-wide numbers for the vault header: currencies and vault space. */
-export function summarizeAccount(profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items' | 'buckets'>): AccountSummary {
+export function summarizeAccount(profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items' | 'buckets'> & Partial<Pick<ManifestTables, 'identity'>>): AccountSummary {
   const currencies = (profile.profileCurrencies?.data?.items ?? []).map((c) => {
     const d = manifest.items[c.itemHash];
     return { name: d?.displayProperties.name || 'Currency', quantity: c.quantity, icon: bungieUrl(d?.displayProperties.icon) };
   });
   const used = (profile.profileInventory?.data?.items ?? []).filter((i) => i.bucketHash === VAULT_BUCKET).length;
-  return { currencies, materials: summarizeMaterials(profile, manifest), vault: { used, capacity: manifest.buckets[VAULT_BUCKET]?.itemCount ?? 0 } };
+  const guardian = guardianIdentity(profile, manifest.identity);
+  return { currencies, materials: summarizeMaterials(profile, manifest), vault: { used, capacity: manifest.buckets[VAULT_BUCKET]?.itemCount ?? 0 }, ...(guardian ? { guardian } : {}) };
 }
 
 /**

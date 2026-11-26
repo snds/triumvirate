@@ -221,7 +221,16 @@ html, body, #root { height: 100%; overflow: clip; }
   background: var(--surface-raised) left center / cover no-repeat;
   text-shadow: 0 1px 2px rgb(0 0 0 / 0.8);
 }
+.character__banner.has-wide { background-position: center; padding-left: calc(56px + var(--space-3)); position: relative; }
+.character__crest { position: absolute; left: 0; top: 0; width: 56px; height: 56px; object-fit: contain; }
 .character__name { display: grid; line-height: var(--leading-tight); }
+/* Guardian Rank badge beside the class: the rank's emblem and its number. */
+.rank-badge {
+  display: inline-flex; align-items: center; gap: var(--space-0-5); margin-left: var(--space-2); vertical-align: 2px;
+  padding: 0 var(--space-1-5, 6px) 0 var(--space-0-5); border-radius: var(--radius-pill);
+  background: rgb(0 0 0 / 0.45); font-size: var(--font-size-11); font-weight: var(--font-weight-bold); color: var(--text-primary);
+}
+.rank-badge img { width: var(--rank-badge-size); height: var(--rank-badge-size); }
 .character__class { font-size: var(--font-size-16); font-weight: var(--font-weight-bold); }
 .character__title { font-size: var(--font-size-12); color: var(--accent); font-weight: var(--font-weight-semibold); text-transform: uppercase; letter-spacing: var(--tracking-caps); }
 .character__light { display: flex; gap: var(--space-0-5); align-items: baseline; font-size: var(--font-size-20); font-weight: var(--font-weight-bold); color: var(--accent); }
@@ -2753,3 +2762,18 @@ li.title-card { cursor: default; }
 }
 .lore__para { margin: 0; white-space: pre-line; font-size: var(--font-size-16); line-height: var(--leading-relaxed); color: var(--text-secondary); }
 .lore__error { display: flex; align-items: center; gap: var(--space-2); color: var(--status-warning-text); }
+
+/* ── Profile menu: identity card ── */
+.identity { display: grid; gap: var(--space-3); min-width: 240px; padding-top: var(--space-1); }
+.identity__rank { display: flex; align-items: center; gap: var(--space-2); }
+.identity__rank-icon { width: 40px; height: 40px; flex: none; }
+.identity__rank > span { display: grid; }
+.identity__label { font-size: var(--font-size-12); color: var(--text-secondary); }
+.identity__name { font-size: var(--font-size-16); font-weight: var(--font-weight-bold); color: var(--text-primary); }
+.identity__commendations { display: grid; gap: var(--space-1-5, 6px); }
+.identity__bar { display: flex; gap: 2px; height: 6px; border-radius: var(--radius-pill); overflow: hidden; background: var(--surface-hover); }
+.identity__bar > span { flex-basis: 0; min-width: 2px; }
+.identity__legend { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-0-5) var(--space-3); margin: 0; padding: 0; list-style: none; font-size: var(--font-size-12); color: var(--text-primary); }
+.identity__legend li { display: flex; align-items: center; gap: var(--space-1); }
+.identity__dot { width: 8px; height: 8px; border-radius: var(--radius-circle); flex: none; }
+.store-switcher__crest { position: absolute; right: var(--space-1-5); top: 50%; translate: 0 -50%; width: 28px; height: 28px; object-fit: contain; pointer-events: none; }

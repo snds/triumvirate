@@ -21,6 +21,8 @@ export function CharacterPicker({ characters, value, onChange, className, label 
         <Segment key={c.id} id={c.id} className="store-switcher__tab">
           {/* The emblem's left square is its icon; the banner art is cropped to show just that. */}
           <span className="store-switcher__emblem" style={c.emblemBackground ? { backgroundImage: `url(${c.emblemBackground})` } : undefined} aria-hidden />
+          {/* The emblem's crest at the chip's end, full strength, so each character reads at a glance. */}
+          {c.emblemCrest && <img className="store-switcher__crest" src={c.emblemCrest} alt="" />}
           <span className="store-switcher__text">
             <span className="store-switcher__name">{c.className}</span>
             <span className="store-switcher__meta"><Icon name="power" filled />{c.light}</span>

@@ -9,6 +9,8 @@ import { useInventory } from '../inventory-context.ts';
 
 interface Props {
   character: CharacterRow;
+  /** Guardian Rank (account-wide), shown as a small badge beside the class. */
+  rank?: { number: number; name: string; icon?: string };
   /** Every item on this character (already filtered by search). */
   items: AppraisedItem[];
   /** Postmaster items, unfiltered, so the count is always the true one. */
@@ -16,7 +18,7 @@ interface Props {
   onSelect: (i: AppraisedItem) => void;
 }
 
-export function CharacterColumn({ character, items, postmaster, onSelect }: Props) {
+export function CharacterColumn({ character, items, postmaster, rank, onSelect }: Props) {
   const { recentMoves, allItems, collectPostmaster, select } = useInventory();
   const mine = useMemo(() => allItems.filter((i) => i.owner === character.id), [allItems, character.id]);
   const worn = useMemo(() => mine.filter((i) => i.equipped), [mine]);
@@ -34,12 +36,23 @@ export function CharacterColumn({ character, items, postmaster, onSelect }: Prop
     <section className={`column${drop.className}`} aria-label={`${character.className} gear`} {...drop.props}>
       {drop.note && <p className="drop-note" role="status">{drop.note}</p>}
       <header className="character" style={{ gridRow: rowOf('header') }}>
+        {/* The emblem's wide banner when it has one (its motif is centered, so it crops evenly at any
+            column width) with the crest on the left; otherwise the 474-px nameplate as before. */}
         <div
-          className="character__banner"
-          style={character.emblemBackground ? { backgroundImage: `url(${character.emblemBackground})` } : undefined}
+          className={`character__banner${character.emblemBanner ? ' has-wide' : ''}`}
+          style={character.emblemBanner || character.emblemBackground ? { backgroundImage: `url(${character.emblemBanner ?? character.emblemBackground})` } : undefined}
         >
+          {character.emblemBanner && character.emblemCrest && <img className="character__crest" src={character.emblemCrest} alt="" />}
           <span className="character__name">
-            <span className="character__class">{character.className}</span>
+            <span className="character__class">
+              {character.className}
+              {rank && (
+                <span className="rank-badge" title={`Guardian Rank ${rank.number}: ${rank.name}`}>
+                  {rank.icon && <img src={rank.icon} alt="" />}
+                  <span className="visually-hidden">Guardian Rank </span>{rank.number}
+                </span>
+              )}
+            </span>
             {character.title && <span className="character__title">{character.title}</span>}
           </span>
           <PowerBreakdown character={character} />
