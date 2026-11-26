@@ -27,6 +27,8 @@ export interface PopularBuild {
   stats: ArmorStat[];
   /** Off builds are kept in the list but don't protect anything. */
   off?: boolean;
+  /** Added from the community crawl's suggestions (see build-usage.ts). */
+  source?: 'community';
 }
 
 /** The starting list: four well-known builds per class, spread across endgame, PvP, and casual. */
@@ -65,6 +67,7 @@ export function cleanBuilds(input: unknown): PopularBuild[] {
       ...(typeof b.set === 'string' && b.set.trim() ? { set: b.set.trim().slice(0, 80) } : {}),
       stats: [...new Set(stats)].slice(0, 6),
       ...(b.off ? { off: true } : {}),
+      ...(b.source === 'community' ? { source: 'community' as const } : {}),
     });
   }
   return out.slice(0, 100);

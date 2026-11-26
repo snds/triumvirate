@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments, BuildSuggestion } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -342,7 +342,15 @@ export const decideCleanup = (instanceIds: string[], action: 'dismantle' | 'keep
 export const pullCleanup = (characterId: string) =>
   act<Partial<CleanupStatus> & ActionResult>('/api/cleanup/pull', { characterId }, 'pull the queue');
 // ── Popular builds (for armor cleanup) ───────────────────────
-export interface BuildsResponse { builds: PopularBuild[]; custom: boolean; error?: string }
+export interface BuildsResponse {
+  builds: PopularBuild[];
+  custom: boolean;
+  /** Popular exotics from the community crawl that the list doesn't have yet. Optional so an older server still renders. */
+  suggestions?: BuildSuggestion[];
+  /** When the community build data was built and from how many samples; absent before any crawl. */
+  community?: { builtAt: string; samples: number };
+  error?: string;
+}
 export const fetchBuilds = async (): Promise<BuildsResponse> => json(await fetch('/api/builds'));
 /** Saves the list; `reset` goes back to the starting list. */
 export async function saveBuilds(body: { builds: PopularBuild[] } | { reset: true }): Promise<BuildsResponse> {

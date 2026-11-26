@@ -3,7 +3,7 @@
 // match how you play. One class at a time keeps the list short on a phone.
 import { useEffect, useMemo, useState } from 'react';
 import { ACTIVITY_LABEL, ARMOR_STATS, BUILD_ACTIVITIES, type AppraisedItem, type ArmorSet, type ArmorStat, type BuildActivity, type PopularBuild } from '@triumvirate/core/browser';
-import { fetchBuilds, saveBuilds } from '../api.ts';
+import { fetchBuilds, saveBuilds, type BuildsResponse } from '../api.ts';
 import { Icon, type IconName } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards } from './Skeleton.tsx';
@@ -26,13 +26,14 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
   onSaved: () => void;
 }) {
   const [builds, setBuilds] = useState<PopularBuild[]>();
+  const [community, setCommunity] = useState<Pick<BuildsResponse, 'suggestions' | 'community'>>();
   const [classType, setClassType] = useState(startClass);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchBuilds().then((r) => setBuilds(r.builds), (e: Error) => setError(e.message));
+    fetchBuilds().then((r) => { setBuilds(r.builds); setCommunity({ suggestions: r.suggestions, community: r.community }); }, (e: Error) => setError(e.message));
   }, []);
 
   // Exotic armor you own for this class, for the exotic field's suggestions.
@@ -64,6 +65,12 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
   };
 
   const shown = builds?.filter((b) => b.classType === classType) ?? [];
+  // Suggestions for this class that aren't on the list yet (added ones drop out right away).
+  const norm = (x: string) => x.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const onList = new Set((builds ?? []).flatMap((b) => [b.id, ...(b.exotic ? [`${b.classType}|${norm(b.exotic)}`] : [])]));
+  const suggested = (community?.suggestions ?? []).filter((s) => s.build.classType === classType
+    && !onList.has(s.build.id) && !onList.has(`${s.build.classType}|${norm(s.build.exotic ?? '')}`));
+  const adopt = (b: PopularBuild) => { setBuilds((list) => [...(list ?? []), b]); setDirty(true); };
 
   return (
     <Sheet
@@ -191,6 +198,36 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
       </Reveal>
       {builds && (
         <button className="button builds__add" onClick={add}><Icon name="add" /> Add a {CLASSES[classType]} build</button>
+      )}
+      {builds && (
+        <section className="builds__community" aria-label="Popular in the community">
+          <h3 className="drawer__section">Popular in the community</h3>
+          {!community?.community
+            ? <p className="muted builds__community-hint">Suggestions show up here once the nightly community crawl has seen what players wear.</p>
+            : !suggested.length
+              ? <p className="muted builds__community-hint">Your list already has the most worn {CLASSES[classType]} exotics. Checked from {community.community.samples.toLocaleString()} players over the last 30 days.</p>
+              : (
+                <>
+                  <p className="muted builds__community-hint">The most worn {CLASSES[classType]} exotics in recent public matches that your list doesn't have. Stats are what their wearers push highest.</p>
+                  <ul className="suggestions">
+                    {suggested.map((s) => (
+                      <li key={s.build.id} className="suggestion">
+                        <div className="suggestion__text">
+                          <span className="suggestion__name">{s.build.name}</span>
+                          <span className="suggestion__why">{s.why}</span>
+                          <span className="suggestion__meta">
+                            {s.build.activities.map((a) => <span key={a} className={`chip activity-chip activity-chip--${a} is-static`}><Icon name={ACTIVITY_ICON[a]} /> {ACTIVITY_LABEL[a]}</span>)}
+                            <span className="suggestion__stats">{s.build.stats.join(' › ')}</span>
+                            {s.build.set && <span className="suggestion__stats">{s.build.set} set</span>}
+                          </span>
+                        </div>
+                        <button className="button" onClick={() => adopt(s.build)}><Icon name="add" /> Add</button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+        </section>
       )}
     </Sheet>
   );
