@@ -15,6 +15,7 @@ import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
 import { SeasonSheet } from './components/SeasonSheet.tsx';
+import { WatchListSheet } from './components/WatchSheet.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
 import { INVENTORY_ROWS, planBulkMove, SLOT_ORDER } from './inventory.ts';
@@ -62,19 +63,22 @@ export function App() {
   // Daily digest: the newest one's date, and the last one you opened (for the button's dot).
   const [digestOpen, setDigestOpen] = useState(false);
   const [seasonOpen, setSeasonOpen] = useState(false);
+  const [watchOpen, setWatchOpen] = useState(false);
   const [latestDigest, setLatestDigest] = useState('');
   const [seenDigest, setSeenDigest] = usePref('digestSeen', '');
   // Tapping the morning alert opens the digest: as ?open=digest on a fresh launch, or as a
   // message from the service worker when the app was already open in the background.
   useEffect(() => {
     const url = new URL(location.href);
-    if (url.searchParams.get('open') === 'digest') {
-      setDigestOpen(true);
+    const view = url.searchParams.get('open');
+    if (view === 'digest' || view === 'watch') {
+      (view === 'digest' ? setDigestOpen : setWatchOpen)(true);
       url.searchParams.delete('open');
       history.replaceState(history.state, '', url.pathname + url.search + url.hash);
     }
     const onMessage = (e: MessageEvent<{ type?: string; view?: string }>) => {
       if (e.data?.type === 'open' && e.data.view === 'digest') setDigestOpen(true);
+      if (e.data?.type === 'open' && e.data.view === 'watch') setWatchOpen(true);
     };
     navigator.serviceWorker?.addEventListener('message', onMessage);
     return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
@@ -544,7 +548,7 @@ export function App() {
             onToast={(text) => setToast({ id: Date.now(), text })}
           />
         ) : view === 'rolls' ? (
-          <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} />
+          <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} onWatchList={() => setWatchOpen(true)} />
         ) : (
           <CleanupView
             characters={inv.characters}
@@ -613,6 +617,13 @@ export function App() {
           onSelect={(i) => { setDigestOpen(false); setSelected(i); }}
           onClose={() => setDigestOpen(false)}
           onSeen={(date) => { setSeenDigest(date); setLatestDigest((l) => (l < date ? date : l)); }}
+        />
+      )}
+      {watchOpen && (
+        <WatchListSheet
+          items={inv.items}
+          onSelect={(i) => { setWatchOpen(false); setSelected(i); }}
+          onClose={() => setWatchOpen(false)}
         />
       )}
       {selected && (

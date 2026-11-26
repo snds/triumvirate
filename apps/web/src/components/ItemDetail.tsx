@@ -7,6 +7,7 @@ import { ItemFacts, PerkCell, PerkGrid, StatBars, VerdictLine } from './ItemPart
 import { ItemTile } from './ItemTile.tsx';
 import { useInventory } from '../inventory-context.ts';
 import { TOUCH_QUERY, useMediaQuery } from '../media.ts';
+import { WatchButton } from './WatchSheet.tsx';
 
 interface Props {
   item: AppraisedItem;
@@ -68,6 +69,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect }: Props) {
           </div>
           <div className="drawer__actions">
             <LockButton item={item} />
+            <WatchButton item={item} />
             <button className="button" onClick={() => onAsk(item)}>
               <Icon name="chat" /> Ask about this item
             </button>
