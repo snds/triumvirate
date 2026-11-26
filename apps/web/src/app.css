@@ -2601,3 +2601,15 @@ li.title-card { cursor: default; }
 }
 .status-banner__action:hover { background: var(--surface-hover); }
 @media (prefers-reduced-motion: reduce) { .status-banner { animation: none; } }
+
+/* ── Inventory search with no matches, and the chat when it's turned off ── */
+.no-matches { display: grid; justify-items: center; gap: var(--space-2); padding: var(--space-6) var(--page-gutter); margin-top: var(--space-6); text-align: center; }
+.no-matches__icon { width: var(--size-44); height: var(--size-44); border-radius: var(--radius-circle); display: grid; place-items: center; color: var(--text-secondary); background: var(--surface-raised); }
+.no-matches__title { margin: 0; font-weight: var(--font-weight-semibold); text-wrap: balance; }
+.no-matches__query { display: inline-block; padding: 0 var(--space-2); border-radius: var(--radius-pill); background: var(--surface-hover); }
+.no-matches__text { margin: 0; color: var(--text-secondary); font-size: var(--font-size-13); }
+.no-matches__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); margin-top: var(--space-2); }
+.agent__off { margin: auto; display: grid; justify-items: center; gap: var(--space-2); max-width: 32ch; text-align: center; }
+.agent__off p { margin: 0; }
+.agent__off code { padding: 0 var(--space-1); border-radius: var(--radius-sm); background: var(--surface-hover); color: var(--text-primary); }
+.agent__off-mark { width: var(--size-36); height: var(--size-28); fill: var(--border-subtle); }
