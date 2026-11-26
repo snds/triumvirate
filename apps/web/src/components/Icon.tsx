@@ -57,6 +57,8 @@ const GLYPHS = {
   alertsOff: 'notifications_off',
   autopilot: 'auto_delete',
   pull: 'unarchive',
+  season: 'military_tech',
+  timer: 'hourglass',
   info: 'info',
   select: 'checklist',
   checkCircle: 'check_circle',

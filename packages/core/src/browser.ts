@@ -3,6 +3,7 @@ export * from './cleanup.ts';
 export * from './autopilot.ts';
 export * from './farming.ts';
 export * from './share.ts';
+export * from './season.ts';
 export * from './wishlist.ts';
 export * from './vault.ts'; // type-only imports from manifest.ts, so no Node built-ins
 export type * from './subclass.ts';
