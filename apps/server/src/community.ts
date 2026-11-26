@@ -248,7 +248,10 @@ export function createCommunity(deps: CommunityDeps) {
     } finally {
       const { requests, matches, samples, error } = status;
       state.lastRun = { finishedAt: now().toISOString(), requests, matches, samples, ...(error ? { error } : {}) };
-      if (loaded) await writeJson('state.json', state).catch((err) => logError('Could not save state.json:', err));
+      // A run that failed before reading state.json (say, item data didn't load) still records its
+      // result there, so a failed night is visible on disk and not mistaken for one that never ran.
+      if (!loaded) state = { ...((await readJson<State>('state.json')) ?? state), lastRun: state.lastRun };
+      await writeJson('state.json', state).catch((err) => logError('Could not save state.json:', err));
       status = { ...status, running: false, lastRun: state.lastRun, totalSamples: await countSamples().catch(() => undefined) };
       const minutes = Math.round((now().getTime() - started.getTime()) / 60_000);
       log(`Crawl (${trigger}) ${error ? 'stopped early' : 'finished'} after ${minutes} min: ${requests} requests, ${matches} matches, ` +
@@ -370,8 +373,18 @@ export function createCommunity(deps: CommunityDeps) {
           log(`Nightly crawl skipped: a crawl has been running since ${status.startedAt}.`);
           return;
         }
+        run(1);
+      };
+      // A run that fails before it gets going (Bungie or the network is down) tries again
+      // 15 minutes later, up to 3 tries in all. A run that got going and then failed is not retried.
+      const run = (attempt: number) => {
         crawl(opts, 'schedule')
-          .then(() => log(`Next nightly crawl: ${timeOf(next())}.`))
+          .then((r) => {
+            if (r.error && r.requests < 10 && attempt < 3) {
+              log(`Nightly crawl will try again in 15 minutes (try ${attempt + 1} of 3).`);
+              setTimeout(() => run(attempt + 1), 15 * 60_000).unref();
+            } else log(`Next nightly crawl: ${timeOf(next())}.`);
+          })
           .catch((e) => logError('Nightly crawl failed:', e));
       };
       const t = setInterval(tick, 5 * 60_000);

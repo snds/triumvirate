@@ -183,3 +183,46 @@ test('the schedule says when it will run, fires once in its hour, and rejects a 
   assert.ok(logs.some((m) => m.startsWith('Next nightly crawl')));
   stop();
 });
+
+test('a run that fails before loading keeps the saved players and records the failure', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'tri-community-'));
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  await mkdir(join(dataDir, 'community'), { recursive: true });
+  const frontier = [{ membershipType: 3, membershipId: 'p9' }];
+  await writeFile(join(dataDir, 'community', 'state.json'), JSON.stringify({ seen: ['m0'], frontier }));
+  const c = createCommunity({
+    dataDir, http: fakeBungie().http, manifest: async () => { throw new Error('fetch failed'); }, seed: async () => undefined,
+    sleep: async () => {}, now: () => NOW, log: () => {}, logError: () => {},
+  });
+  await c.crawl();
+  const saved = JSON.parse(await readFile(join(dataDir, 'community', 'state.json'), 'utf8'));
+  assert.deepEqual(saved.frontier, frontier);
+  assert.deepEqual(saved.seen, ['m0']);
+  assert.equal(saved.lastRun.error, 'fetch failed');
+});
+
+test('a scheduled run that fails before it gets going tries again 15 minutes later, 3 tries in all', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout'] });
+  const dataDir = await mkdtemp(join(tmpdir(), 'tri-community-'));
+  const clock = new Date('2026-11-26T03:02:00Z');
+  const logs: string[] = [];
+  let tries = 0;
+  const c = createCommunity({
+    dataDir, http: fakeBungie().http, manifest: async () => { tries++; throw new Error('fetch failed'); }, seed: async () => undefined,
+    sleep: async () => {}, now: () => clock, timeZone: 'UTC', log: (m) => logs.push(m), logError: () => {},
+  });
+  const stop = c.schedule(clock.getHours());
+  // Each run reads and writes files, so spin the event loop until it has logged what comes next.
+  const ends = () => logs.filter((m) => m.includes('try again') || m.startsWith('Next nightly')).length;
+  const settle = async (n: number) => { for (let i = 0; i < 100_000 && ends() < n; i++) await new Promise<void>((r) => setImmediate(r)); };
+  t.mock.timers.tick(5 * 60_000);
+  await settle(1);
+  t.mock.timers.tick(15 * 60_000);
+  await settle(2);
+  t.mock.timers.tick(15 * 60_000);
+  await settle(3);
+  assert.equal(tries, 3);
+  assert.equal(logs.filter((m) => m.includes('try again')).length, 2);
+  assert.ok(logs.at(-1)!.startsWith('Next nightly crawl'));
+  stop();
+});
