@@ -1876,7 +1876,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   display: grid; place-items: center; min-height: var(--control-size); padding: 0; flex: none;
   background: none; border: 0; cursor: pointer; border-radius: var(--radius-pill);
 }
-.switch:disabled { opacity: 0.6; cursor: progress; }
+.switch:disabled, .switch[data-disabled] { opacity: 0.6; cursor: progress; }
 .switch__track {
   position: relative; width: var(--switch-width); height: var(--switch-height);
   border-radius: var(--radius-pill); background: var(--switch-track-off); transition: background-color var(--motion-fast) var(--motion-move);
@@ -1886,10 +1886,10 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   width: var(--switch-thumb); height: var(--switch-thumb); border-radius: var(--radius-circle);
   background: var(--switch-thumb-color); box-shadow: 0 1px 3px rgb(0 0 0 / 0.4); transition: transform var(--motion-fast) var(--motion-move);
 }
-.switch[aria-checked="true"] .switch__track { background: var(--switch-track-on); }
-.switch[aria-checked="true"] .switch__thumb { background: var(--switch-thumb-on); transform: translateX(calc(var(--switch-width) - var(--switch-height))); }
+.switch[aria-checked="true"] .switch__track, .switch[data-selected] .switch__track { background: var(--switch-track-on); }
+.switch[aria-checked="true"] .switch__thumb, .switch[data-selected] .switch__thumb { background: var(--switch-thumb-on); transform: translateX(calc(var(--switch-width) - var(--switch-height))); }
 .switch:focus-visible { outline: none; }
-.switch:focus-visible .switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch:focus-visible .switch__track, .switch[data-focus-visible] .switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switch__track, .switch__thumb { transition: none; } }
 
 /* ── Cleanup autopilot ─────────────────────────────────────── */
@@ -2341,6 +2341,7 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 /* ── Settings ──────────────────────────────────────────────── */
 .settings .sheet__content { align-content: start; gap: var(--space-4); }
 /* Section tabs: one row that scrolls sideways on a phone rather than wrapping. */
+.settings__panel { display: grid; gap: var(--space-4); align-content: start; outline: none; }
 .settings__nav { position: sticky; top: 0; z-index: 1; background: var(--surface-sheet); overflow-x: auto; scrollbar-width: none; }
 .settings__nav::-webkit-scrollbar { display: none; }
 .settings__nav .segmented__option { display: inline-flex; align-items: center; gap: var(--space-1); flex: 1 0 auto; justify-content: center; white-space: nowrap; min-height: var(--control-size); }
@@ -2689,3 +2690,17 @@ li.title-card { cursor: default; }
 
 /* React Aria tab roots and titled segment content draw nothing; the caller's layout holds. */
 .tabs-root, .segment__inner { display: contents; }
+
+/* Select: our own trigger and list (ui/Select.tsx). The trigger keeps each caller's look
+   (optimizer__select, rolls__select); these rules only lay out the value and chevron. */
+.select__trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  font: inherit; text-align: left; cursor: pointer;
+}
+.select__trigger[data-focus-visible] { outline: none; box-shadow: var(--ring-focus); }
+.select__value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select__chevron { flex: none; color: var(--text-secondary); font-size: var(--font-size-20); margin-right: calc(var(--space-1) * -1); }
+.select__trigger[aria-expanded="true"] .select__chevron { transform: rotate(180deg); }
+.select__list { width: var(--trigger-width); max-width: calc(100vw - var(--space-4) * 2); max-height: min(360px, var(--visual-viewport-height, 60vh)); overflow: auto; }
+.select__options { display: grid; gap: var(--space-1); outline: none; }
+.menu__end { flex: none; color: var(--accent-text); }

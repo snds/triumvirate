@@ -18,6 +18,7 @@ import { useCompact } from '../media.ts';
 import { FarmingSheet } from './FarmingSheet.tsx';
 import { Sk } from './Skeleton.tsx';
 import { Tab as TabButton, TabList, TabPanel, Tabs } from '../ui/Tabs.tsx';
+import { Select } from '../ui/Select.tsx';
 
 const VERDICTS: { value: Verdict; label: string }[] = [
   { value: 'god', label: 'Wish list god roll' },
@@ -586,8 +587,6 @@ function Radio({ name, checked, onChange, children }: { name: string; checked: b
 
 function GradeSelect({ label, value, onChange }: { label: string; value: Grade; onChange: (g: Grade) => void }) {
   return (
-    <select className="rolls__select" aria-label={`${label} grade`} value={value} onChange={(e) => onChange(e.target.value as Grade)}>
-      {GRADE_ORDER.map((g) => <option key={g} value={g}>{g}</option>)}
-    </select>
+    <Select ariaLabel={`${label} grade`} triggerClassName="select__trigger rolls__select" value={value} onChange={onChange} options={GRADE_ORDER.map((g) => ({ value: g, label: g }))} />
   );
 }
