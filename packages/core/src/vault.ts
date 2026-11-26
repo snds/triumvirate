@@ -6,6 +6,11 @@ export const VAULT_BUCKET = 138197802;
 /** "Lost Items": the postmaster. Lives in each character's inventory and holds 21 items. */
 export const POSTMASTER_BUCKET = 215593132;
 export const POSTMASTER_CAPACITY = 21;
+/** A character's engram slots. Engrams can't go to the vault, so a full row means new ones land in the postmaster. */
+export const ENGRAM_BUCKET = 375726501;
+export const ENGRAM_CAPACITY = 10;
+/** Account-wide materials and consumables (upgrade materials, ciphers, keys, Synthweave…). */
+export const CONSUMABLES_BUCKET = 1469714392;
 /** Character stats in in-game order (Armor 3.0 names: Weapons, Health, Class, Grenade, Super, Melee). */
 const CHARACTER_STAT_ORDER = [2996146975, 392767087, 1943323491, 1735777505, 144602215, 4244567218];
 export const CLASS_NAMES = ['Titan', 'Hunter', 'Warlock'];
@@ -88,6 +93,10 @@ export interface ItemRow {
   pullOnly?: boolean;
   /** Armor: the set it belongs to (see ManifestTables.itemSets), for set bonuses. */
   setHash?: number;
+  /** Stack size, when more than one (materials and consumables in the postmaster). */
+  quantity?: number;
+  /** Postmaster items: the bucket it goes to once pulled (e.g. Helmet, Engrams, Consumables). */
+  homeBucketHash?: number;
 }
 
 export type AmmoType = 'Primary' | 'Special' | 'Heavy';
@@ -169,8 +178,36 @@ export interface Currency {
   icon?: string;
 }
 
+/** One kind of material or consumable, with how many you have across the account. */
+export interface Material {
+  itemHash: number;
+  name: string;
+  icon?: string;
+  quantity: number;
+  /** Which list it goes in, e.g. "Upgrade materials" (see MATERIAL_GROUPS). */
+  group: MaterialGroup;
+}
+
+/** Material groups, in the order the card lists them. */
+export const MATERIAL_GROUPS = ['Upgrade materials', 'Currencies and keys', 'Synthweave', 'Materials', 'Consumables'] as const;
+export type MaterialGroup = typeof MATERIAL_GROUPS[number];
+
+/**
+ * Sorts a material into a group by its name and type. Bungie has no category for these, and DIM
+ * keeps its own hash lists; name patterns hold up better across seasons for a single-user app.
+ */
+export function materialGroup(name: string, type = ''): MaterialGroup {
+  if (/enhancement (core|prism)|ascendant (alloy|shard)|exotic cipher|deepsight|upgrade module/i.test(name)) return 'Upgrade materials';
+  if (/synthweave|synthcord|synthstrand/i.test(name)) return 'Synthweave';
+  if (/cipher|\bkeys?\b|spoils|\bcoins?\b|\bmarks?\b|\bcredits?\b|token|engram|deathmark/i.test(name)) return 'Currencies and keys';
+  if (/consumable|boost|treat|buff|snack|tonic/i.test(type)) return 'Consumables';
+  return 'Materials';
+}
+
 export interface AccountSummary {
   currencies: Currency[];
+  /** Materials and consumables across the account (vault, profile, and characters). Optional for older servers. */
+  materials?: Material[];
   /** Items in the vault and how many it holds. */
   vault: { used: number; capacity: number };
 }
@@ -267,7 +304,28 @@ export function summarizeAccount(profile: DestinyProfileResponse, manifest: Pick
     return { name: d?.displayProperties.name || 'Currency', quantity: c.quantity, icon: bungieUrl(d?.displayProperties.icon) };
   });
   const used = (profile.profileInventory?.data?.items ?? []).filter((i) => i.bucketHash === VAULT_BUCKET).length;
-  return { currencies, vault: { used, capacity: manifest.buckets[VAULT_BUCKET]?.itemCount ?? 0 } };
+  return { currencies, materials: summarizeMaterials(profile, manifest), vault: { used, capacity: manifest.buckets[VAULT_BUCKET]?.itemCount ?? 0 } };
+}
+
+/**
+ * Every material and consumable stack, added up by item. They sit in the profile's consumables
+ * bucket, in the vault, and on characters; postmaster stacks are left out (they aren't usable yet).
+ */
+export function summarizeMaterials(profile: DestinyProfileResponse, manifest: Pick<ManifestTables, 'items'>): Material[] {
+  const totals = new Map<number, number>();
+  const add = (i: DestinyItemComponent) => {
+    if (i.bucketHash === POSTMASTER_BUCKET) return;
+    if (manifest.items[i.itemHash]?.inventory?.bucketTypeHash !== CONSUMABLES_BUCKET) return;
+    totals.set(i.itemHash, (totals.get(i.itemHash) ?? 0) + (i.quantity || 1));
+  };
+  for (const i of profile.profileInventory?.data?.items ?? []) add(i);
+  for (const inv of Object.values(profile.characterInventories?.data ?? {})) for (const i of inv.items) add(i);
+  return [...totals].flatMap(([itemHash, quantity]): Material[] => {
+    const d = manifest.items[itemHash];
+    const name = d?.displayProperties.name;
+    if (!name) return [];
+    return [{ itemHash, name, icon: bungieUrl(d.displayProperties.icon), quantity, group: materialGroup(name, d.itemTypeDisplayName) }];
+  }).sort((a, b) => MATERIAL_GROUPS.indexOf(a.group) - MATERIAL_GROUPS.indexOf(b.group) || a.name.localeCompare(b.name));
 }
 
 export function summarizeProfile(profile: DestinyProfileResponse, manifest: ManifestTables): ItemRow[] {
@@ -468,6 +526,8 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       ...(movable ? { movable } : {}),
       ...(movable && inPostmaster && notTransferrable ? { pullOnly: true } : {}),
       ...(manifest.extras?.[item.itemHash]?.itemSetHash ? { setHash: manifest.extras[item.itemHash]!.itemSetHash } : {}),
+      ...(item.quantity > 1 ? { quantity: item.quantity } : {}),
+      ...(inPostmaster && def?.inventory?.bucketTypeHash ? { homeBucketHash: def.inventory.bucketTypeHash } : {}),
     };
   };
 

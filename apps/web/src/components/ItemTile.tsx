@@ -76,7 +76,7 @@ export const ItemTile = memo(function ItemTile({
   const isMoving = !!item.instanceId && moving.has(item.instanceId);
   const draggable = !!item.movable && !item.equipped && !isMoving && !selecting;
   const verdict = item.appraisal?.verdict;
-  const label = [item.name, item.type, item.damage, item.power && `${item.power} power`,
+  const label = [item.name, item.quantity && `${item.quantity} in the stack`, item.type, item.damage, item.power && `${item.power} power`,
     verdict && VERDICT_LABEL[verdict], item.gearTier && `tier ${item.gearTier}`, item.masterworked && 'masterworked', item.locked && 'locked'].filter(Boolean).join(' · ');
   return (
     <button
@@ -117,6 +117,8 @@ export const ItemTile = memo(function ItemTile({
           {item.power}
         </span>
       )}
+      {/* Stacks (materials in the postmaster) show their count where power would go. */}
+      {item.power === undefined && item.quantity && <span className="tile__power">{item.quantity}</span>}
       {item.locked && <span className="tile__lock"><Icon name="lock" filled /></span>}
       {isMoving && <span className="tile__moving"><span className="spinner" /></span>}
       {isPicked && <span className="tile__picked"><Icon name="checkCircle" filled /></span>}
