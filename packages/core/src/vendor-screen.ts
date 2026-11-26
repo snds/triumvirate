@@ -11,6 +11,8 @@ export interface VendorInfo {
   name: string;
   subtitle?: string;
   icon?: string;
+  /** The vendor's 525×150 portrait banner (largeIcon). */
+  banner?: string;
   /** Vendor group (Tower, Destinations...) from the definition, when the response doesn't place it. */
   groupHash?: number;
   /** Destination names, by the response's vendorLocationIndex. */
@@ -93,6 +95,8 @@ export interface VendorCard {
   name: string;
   subtitle?: string;
   icon?: string;
+  /** 525×150 portrait banner; the card's head shows it when present. */
+  banner?: string;
   location?: string;
   /** When its stock changes next. */
   refreshesAt?: string;
@@ -238,6 +242,7 @@ export function vendorScreen(input: VendorScreenInput): VendorGroupView[] {
     if (!categories.length && !rank) return undefined;
     return {
       hash: vendorHash, name: info.name, subtitle: info.subtitle, icon: info.icon,
+      ...(info.banner ? { banner: info.banner } : {}),
       location: info.locations[v.vendorLocationIndex] ?? info.locations[0],
       refreshesAt: v.nextRefreshDate && !v.nextRefreshDate.startsWith('9999') ? v.nextRefreshDate : undefined,
       ...(rank ? { rank } : {}),

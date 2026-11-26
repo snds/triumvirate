@@ -601,6 +601,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
           name: d.displayProperties.name,
           subtitle: d.displayProperties.subtitle || undefined,
           icon: bungieUrl(d.displayProperties.smallTransparentIcon || d.displayProperties.icon),
+          banner: bungieUrl(d.displayProperties.largeIcon) || undefined,
           groupHash: d.groups?.[0]?.vendorGroupHash,
           locations: (d.locations ?? []).map((l) => ddefs.get(l.destinationHash)?.displayProperties?.name || undefined),
           categories: (d.displayCategories ?? []).map((x) => x.displayProperties?.name ?? ''),
