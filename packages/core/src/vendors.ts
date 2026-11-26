@@ -17,7 +17,10 @@ export function vendorWeapons(
   responses: { characterId: string; vendors: DestinyVendorsResponse }[],
   manifest: ManifestTables,
   vendorName: (hash: number) => string,
+  /** Also read rolled armor (stats), for the Vendors screen. Off for the roll appraiser. */
+  opts: { armor?: boolean; dedupe?: boolean } = {},
 ): VendorRow[] {
+  const dedupe = opts.dedupe ?? true;
   const out: VendorRow[] = [];
   const seen = new Set<string>();
   for (const { characterId, vendors } of responses) {
@@ -29,8 +32,9 @@ export function vendorWeapons(
       const fake = { instances: {}, sockets: {}, reusablePlugs: {}, stats: {} } as Record<string, Record<string, unknown>>;
       for (const [idx, sale] of Object.entries(set.saleItems ?? {})) {
         const def = manifest.items[sale.itemHash];
-        // Only weapons that roll perks; the appraiser has nothing to say about the rest.
-        if (def?.itemType !== 3 || !comps?.sockets?.data?.[Number(idx)]) continue;
+        // Only weapons that roll perks (and, when asked, armor that rolls stats).
+        const wanted = def?.itemType === 3 || (opts.armor && def?.itemType === 2);
+        if (!wanted || !comps?.sockets?.data?.[Number(idx)]) continue;
         const id = `vendor-${vendorHash}-${idx}`;
         ids.set(id, idx);
         (items.data!.items as unknown[]).push({ itemHash: sale.itemHash, itemInstanceId: id, bucketHash: VAULT_BUCKET, state: 0, transferStatus: 2, quantity: 1 });
@@ -46,8 +50,8 @@ export function vendorWeapons(
       } as unknown as DestinyProfileResponse;
       for (const row of summarizeProfile(profile, manifest)) {
         if (row.tier !== 'Legendary' && row.tier !== 'Exotic') continue;
-        const key = `${row.itemHash}:${(row.perks ?? []).map((c) => c.map((p) => p.hash).join(',')).join('|')}`;
-        if (seen.has(key)) continue;
+        const key = `${row.itemHash}:${(row.perks ?? []).map((c) => c.map((p) => p.hash).join(',')).join('|')}:${JSON.stringify(row.stats ?? {})}`;
+        if (dedupe && seen.has(key)) continue;
         seen.add(key);
         const name = vendorName(vendorHash);
         const { movable: _m, pullOnly: _p, ...rest } = row;

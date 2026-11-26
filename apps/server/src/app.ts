@@ -5,14 +5,19 @@ import { dirname, join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Hono, type Context } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
+import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
+  type SavedLoadout, type CleanupState, type WatchEntry,
+  vendorScreen, balancesFrom, bestInSlot,
 } from '@triumvirate/core';
+import type { WishListCache } from './wishlist-cache.ts';
+import { createDefsCache } from './defs-cache.ts';
+import { createTrackedStore } from './tracked-store.ts';
 import type { Push } from './push.ts';
 import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
@@ -50,6 +55,8 @@ const IMAGE_TYPES: Record<string, string> = {
 export interface AppDeps {
   /** Returns the parsed community wish list; may download it. */
   wishList: () => Promise<WishList>;
+  /** Manages the wish list sources behind `wishList` (Settings). Optional so tests can pass a plain function. */
+  wishLists?: WishListCache;
   /** Present when ANTHROPIC_API_KEY is set. */
   anthropic?: Anthropic;
   /** Local hour (0-23) for the nightly community crawl; off when unset. */
@@ -377,7 +384,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   /** Vendor weapons with grades. Needs a loaded inventory. */
   async function vendorOffers(t: Tokens, refresh: boolean) {
     if (!current || !lastView || !manifest) throw new Error('Load your inventory first.');
-    const key = `${current.membershipId}.${manifest.version}`;
+    const key = `${current.membershipId}.${manifest.version}.${deps.wishLists?.version ?? 0}`;
     if (!vendorCache || vendorCache.key !== key || refresh || Date.now() - vendorCache.at > 15 * 60_000) {
       const http = createHttpClient(cfg.apiKey, t.accessToken);
       const responses = [];
@@ -415,6 +422,170 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     if (!current || !lastView || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
     return c.json(await vendorOffers(t, !!c.req.query('refresh')));
   });
+  // ── Vendors screen ─────────────────────────────────────────
+  // Everything one character's vendors sell, grouped like the game does, with costs, ownership,
+  // ranks, weapon grades, and armor that beats what you have for a build. One pull per character
+  // is reused for 15 minutes (or until ?refresh).
+  const defs = createDefsCache(store.dataDir);
+  const vendorScreens = new Map<string, { at: number; key: string; body: unknown }>();
+  app.get('/api/vendors', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { snap, view, http } = await ready(t);
+    if (!current || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const chars = [...view.characters].sort((a, b) => Date.parse(b.lastPlayed) - Date.parse(a.lastPlayed));
+    const characterId = chars.some((ch) => ch.id === c.req.query('character')) ? c.req.query('character')! : chars[0]?.id;
+    if (!characterId) return c.json({ error: 'No characters on this account.' }, 409);
+    const key = `${current.membershipId}.${manifest.version}.${deps.wishLists?.version ?? 0}.${buildStore.version}.${snapVersion}`;
+    const hit = vendorScreens.get(characterId);
+    if (hit && hit.key === key && !c.req.query('refresh') && Date.now() - hit.at < 15 * 60_000) return c.json(hit.body);
+
+    const mv = manifest.version;
+    const [{ Response: vendors }, { Response: collections }] = await Promise.all([
+      getVendors(http, {
+        membershipType: current.membershipType, destinyMembershipId: current.membershipId, characterId,
+        // Vendors, VendorCategories, VendorSales, ItemInstances, ItemStats, ItemSockets, ItemReusablePlugs.
+        components: [400, 401, 402, 300, 304, 305, 310] as never,
+        filter: 0 as never,
+      }),
+      // Collectibles: which cosmetics and gear you already own.
+      getProfile(http, { membershipType: current.membershipType, destinyMembershipId: current.membershipId, components: [800] as never }),
+    ]);
+    const vendorHashes = Object.keys(vendors.vendors?.data ?? {}).map(Number);
+    const vdefs = await defs.many<DestinyVendorDefinition>(http, mv, 'DestinyVendorDefinition', vendorHashes);
+    const groupHashes = [
+      ...(vendors.vendorGroups?.data?.groups ?? []).map((g) => g.vendorGroupHash),
+      ...[...vdefs.values()].map((d) => d.groups?.[0]?.vendorGroupHash).filter((h): h is number => !!h),
+    ];
+    const destHashes = [...vdefs.values()].flatMap((d) => (d.locations ?? []).map((l) => l.destinationHash)).filter(Boolean);
+    const progHashes = Object.values(vendors.vendors?.data ?? {}).map((v) => v.progression?.progressionHash).filter((h): h is number => !!h && !manifest!.season?.progressions[h]);
+    const [gdefs, ddefs, pdefs] = await Promise.all([
+      defs.many<DestinyVendorGroupDefinition>(http, mv, 'DestinyVendorGroupDefinition', groupHashes),
+      defs.many<DestinyDestinationDefinition>(http, mv, 'DestinyDestinationDefinition', destHashes),
+      defs.many<DestinyProgressionDefinition>(http, mv, 'DestinyProgressionDefinition', progHashes),
+    ]);
+
+    // Rolled weapons and armor, read like inventory rows so they can be graded.
+    const rows = vendorWeapons([{ characterId, vendors }], manifest, (h) => vdefs.get(h)?.displayProperties.name || 'Vendor', { armor: true, dedupe: false });
+    const list = await deps.wishList();
+    const r = await community.rollup();
+    const items: Record<string, AppraisedItem> = {};
+    const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
+    const fits: Record<string, string[]> = {};
+    const { builds } = await buildStore.get();
+    const ownedArmor = view.items.filter((i) => i.itemType === 2 && i.instanceId);
+    for (const row of rows) {
+      const id = row.instanceId!;
+      if (row.itemType === 3 && row.perks) {
+        items[id] = { ...row, appraisal: appraise(row.itemHash, new Set(row.perks.flat().map((p) => p.name)), list, manifest) };
+        grades[id] = appraiseCommunity(manifest, r?.weapons[row.itemHash], row.itemHash, row.perks);
+      } else {
+        items[id] = row;
+        // Armor that would be best in slot for a build, against everything you own.
+        if (row.itemType === 2 && row.stats && Object.keys(row.stats).length) {
+          const best = bestInSlot([...ownedArmor, row], builds, manifest.itemSets ?? {}).get(id);
+          if (best?.length) fits[id] = best.map((b) => b.build);
+        }
+      }
+    }
+    const collectibles = {
+      ...(collections.profileCollectibles?.data?.collectibles ?? {}),
+      ...(collections.characterCollectibles?.data?.[characterId]?.collectibles ?? {}),
+    };
+    const groups = vendorScreen({
+      vendors, manifest,
+      info: (h) => {
+        const d = vdefs.get(h);
+        if (!d || !d.displayProperties?.name || d.visible === false) return undefined;
+        return {
+          name: d.displayProperties.name,
+          subtitle: d.displayProperties.subtitle || undefined,
+          icon: bungieUrl(d.displayProperties.smallTransparentIcon || d.displayProperties.icon),
+          groupHash: d.groups?.[0]?.vendorGroupHash,
+          locations: (d.locations ?? []).map((l) => ddefs.get(l.destinationHash)?.displayProperties?.name || undefined),
+          categories: (d.displayCategories ?? []).map((x) => x.displayProperties?.name ?? ''),
+          failures: d.failureStrings ?? [],
+        };
+      },
+      group: (h) => { const g = gdefs.get(h); return g ? { name: g.categoryName, order: g.order } : undefined; },
+      rank: (h) => {
+        const known = manifest!.season?.progressions[h];
+        if (known) return { name: known.name, steps: known.steps.map((x) => ({ name: x.name, total: x.total })) };
+        const d = pdefs.get(h);
+        return d ? { name: d.displayProperties?.name ?? '', steps: (d.steps ?? []).map((x) => ({ name: x.stepName ?? '', total: x.progressTotal ?? 0 })) } : undefined;
+      },
+      balances: balancesFrom(snap.profile as never, characterId),
+      collectibles,
+      rowIds: new Set(Object.keys(items)),
+    });
+    const body = {
+      characterId,
+      characters: chars.map((ch) => ({ id: ch.id, className: ch.className, classType: ch.classType, emblemBackground: ch.emblemBackground })),
+      fetchedAt: new Date().toISOString(),
+      groups, items, grades, fits,
+    };
+    vendorScreens.set(characterId, { at: Date.now(), key, body });
+    return c.json(body);
+  });
+
+  // Records: titles, the triumph tree, tracked triumphs, and the ones nearly done. The record and
+  // presentation node tables are large, so they load (and trim) on first visit, not at start up.
+  const tracked = createTrackedStore(store.dataDir);
+  let recordTables: Promise<RecordTables> | undefined;
+  const recordScreens = new Map<string, { at: number; key: string; profile: DestinyProfileResponse }>();
+  /** The trimmed tables for the current manifest; a new manifest version loads new ones. */
+  const tablesFor = async (http: ReturnType<typeof createHttpClient>, retry = true): Promise<RecordTables> => {
+    if (!recordTables) recordTables = loadRecordTables(http, join(store.dataDir, 'manifest')).catch((e) => { recordTables = undefined; throw e; });
+    const t = await recordTables;
+    // Loaded under an older manifest: load once more (Bungie's live version wins either way).
+    if (retry && manifest && t.version !== manifest.version) { recordTables = undefined; return tablesFor(http, false); }
+    return t;
+  };
+  app.get('/api/records', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { view, http } = await ready(t);
+    if (!current || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const chars = [...view.characters].sort((a, b) => Date.parse(b.lastPlayed) - Date.parse(a.lastPlayed));
+    const characterId = chars.some((ch) => ch.id === c.req.query('character')) ? c.req.query('character')! : chars[0]?.id;
+    const tables = await tablesFor(http);
+    // One profile pull (all characters) serves every character for 5 minutes.
+    const key = `${current.membershipId}.${manifest.version}`;
+    let hit = recordScreens.get(current.membershipId);
+    if (!hit || hit.key !== key || c.req.query('refresh') || Date.now() - hit.at > 5 * 60_000) {
+      // Characters, PresentationNodes, Records.
+      const { Response: profile } = await getProfile(http, { membershipType: current.membershipType, destinyMembershipId: current.membershipId, components: [200, 700, 900] as never });
+      hit = { at: Date.now(), key, profile };
+      recordScreens.set(current.membershipId, hit);
+    }
+    const p = hit.profile;
+    const ch = characterId ? p.characters?.data?.[characterId] : undefined;
+    const pinned = await tracked.read();
+    const screen = recordsScreen({
+      tables, objectives: manifest.objectives,
+      profileRecords: p.profileRecords?.data as never,
+      characterRecords: characterId ? p.characterRecords?.data?.[characterId] as never : undefined,
+      profileNodes: p.profilePresentationNodes?.data?.nodes as never,
+      characterNodes: characterId ? p.characterPresentationNodes?.data?.[characterId]?.nodes as never : undefined,
+      gender: ch?.genderType === 1 ? 'Female' : 'Male',
+      tracked: pinned,
+    });
+    return c.json({
+      pinned,
+      characterId,
+      characters: chars.map((x) => ({ id: x.id, className: x.className })),
+      fetchedAt: new Date(hit.at).toISOString(),
+      ...screen,
+    });
+  });
+  /** Tracks or untracks a triumph here (the game's own tracked triumph is separate). */
+  app.post('/api/records/track', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { hash?: unknown; tracked?: unknown };
+    const hash = Number(body.hash);
+    if (!tracked.valid(hash)) return c.json({ error: 'Pick a triumph to track.' }, 400);
+    return c.json({ tracked: await tracked.set(hash, body.tracked !== false) });
+  });
+
   // Farming targets: god rolls you're missing, where they drop, and vendors selling them now.
   app.get('/api/farming', async (c) => {
     const t = await validTokens();
@@ -831,7 +1002,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     // Community grades sharpen cleanup picks; a new nightly rollup means a new view.
     const r = await community.rollup();
     const { builds } = await buildStore.get();
-    const key = `${snapVersion}.${manifest!.version}.${r?.builtAt ?? ''}.${buildStore.version}`;
+    const key = `${snapVersion}.${manifest!.version}.${r?.builtAt ?? ''}.${buildStore.version}.${deps.wishLists?.version ?? 0}`;
     if (viewCache && viewCache.key === key && viewCache.list === list && lastView) return viewCache.view;
     const items: AppraisedItem[] = summarizeProfile(snap.profile, manifest!).map((i) =>
       i.itemType === 3 && i.perks
@@ -1053,6 +1224,133 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     }, 5 * 60_000);
     t.unref();
   }
+
+  // ── Settings: wish list sources, server status, backup ─────
+  /** Wish list changes regrade everything, so the vendor pull (graded with the old list) is dropped too. */
+  const wishListsChanged = () => { vendorCache = undefined; };
+  const noLists = (c: Context) => c.json({ error: 'Wish list settings aren\'t available on this server.' }, 501);
+  app.get('/api/settings/wishlists', async (c) => (deps.wishLists ? c.json({ sources: await deps.wishLists.info() }) : noLists(c)));
+  app.post('/api/settings/wishlists', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    const b = (await c.req.json().catch(() => ({}))) as { url?: unknown; name?: unknown };
+    try {
+      const sources = await deps.wishLists.add(String(b.url ?? '').trim(), typeof b.name === 'string' ? b.name : undefined);
+      wishListsChanged();
+      return c.json({ sources });
+    } catch (e) { return c.json({ error: (e as Error).message }, 400); }
+  });
+  app.post('/api/settings/wishlists/refresh', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    const sources = await deps.wishLists.refresh();
+    wishListsChanged();
+    return c.json({ sources });
+  });
+  app.patch('/api/settings/wishlists/:id', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    const b = (await c.req.json().catch(() => ({}))) as { enabled?: unknown };
+    try {
+      const sources = await deps.wishLists.setEnabled(c.req.param('id'), !!b.enabled);
+      if (!sources) return c.json({ error: 'No such wish list.' }, 404);
+      wishListsChanged();
+      return c.json({ sources });
+    } catch (e) { return c.json({ error: (e as Error).message }, 400); }
+  });
+  app.delete('/api/settings/wishlists/:id', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    try {
+      const sources = await deps.wishLists.remove(c.req.param('id'));
+      if (!sources) return c.json({ error: 'No such wish list.' }, 404);
+      wishListsChanged();
+      return c.json({ sources });
+    } catch (e) { return c.json({ error: (e as Error).message }, 400); }
+  });
+
+  // What the server has been doing, so "did last night's crawl run?" needs no ssh.
+  app.get('/api/status', async (c) => {
+    const [crawl, digest, rollup, watchState, lists] = await Promise.all([
+      community.status(), digests.latest(), community.rollup(), watch.read(), deps.wishLists?.info(),
+    ]);
+    return c.json({
+      now: new Date().toISOString(),
+      syncedAt: current?.syncedAt ?? null,
+      manifestVersion: manifest?.version ?? null,
+      crawl: {
+        hour: deps.communityCrawlHour ?? null,
+        running: crawl.running,
+        startedAt: crawl.startedAt ?? null,
+        lastRun: crawl.lastRun ?? null,
+        rollupBuiltAt: rollup?.builtAt ?? null,
+        samples: rollup?.samples ?? 0,
+      },
+      digest: { hour: deps.digestHour ?? null, latest: digest ? { date: digest.date, builtAt: digest.builtAt } : null },
+      watch: { everyMinutes: deps.watchMinutes ?? null, entries: watchState.entries.length, checkedAt: watchState.checkedAt ?? null },
+      alerts: !!deps.push,
+      agent: !!deps.anthropic,
+      wishLists: lists ?? null,
+    });
+  });
+
+  // One file with everything you'd hate to lose: loadouts, builds, cleanup decisions, the watch
+  // list, tracked triumphs, and wish list sources. Never tokens, snapshots, or caches. The web app adds its own prefs.
+  app.get('/api/backup', async (c) => {
+    const [saved, builds, cleanup, watchState, lists, trackedRecords] = await Promise.all([
+      loadouts.list(), buildStore.get(), cleanupStore.get(), watch.read(), deps.wishLists?.sources(), tracked.read(),
+    ]);
+    c.header('Cache-Control', 'no-store');
+    return c.json({
+      app: 'triumvirate', kind: 'backup', version: 1, exportedAt: new Date().toISOString(),
+      data: {
+        loadouts: saved,
+        ...(builds.custom ? { builds: builds.builds } : {}),
+        cleanup,
+        watch: { entries: watchState.entries },
+        ...(lists ? { wishLists: lists } : {}),
+        trackedRecords,
+      },
+    });
+  });
+  /** Restores a backup. Each part is optional and replaces what's there; anything malformed is skipped. */
+  app.post('/api/backup', async (c) => {
+    const body = (await c.req.json().catch(() => undefined)) as { app?: unknown; kind?: unknown; data?: Record<string, unknown> } | undefined;
+    if (!body || body.app !== 'triumvirate' || body.kind !== 'backup' || typeof body.data !== 'object' || !body.data) {
+      return c.json({ error: 'That isn\'t a Triumvirate backup file.' }, 400);
+    }
+    const d = body.data;
+    const restored: string[] = [];
+    if (Array.isArray(d.loadouts)) {
+      const ok = (d.loadouts as SavedLoadout[]).filter((l) => l && validLoadoutId(l.id) && typeof l.name === 'string' && Array.isArray(l.items));
+      await loadouts.replace(ok);
+      restored.push(`${ok.length} loadout${ok.length === 1 ? '' : 's'}`);
+    }
+    if (Array.isArray(d.builds)) {
+      const next = await buildStore.set(d.builds as PopularBuild[]);
+      restored.push(`${next.builds.length} build${next.builds.length === 1 ? '' : 's'}`);
+    }
+    const cl = d.cleanup as Partial<CleanupState> | undefined;
+    if (cl && typeof cl === 'object' && cl.decisions && typeof cl.decisions === 'object') {
+      await cleanupStore.set({ decisions: cl.decisions, cleared: Array.isArray(cl.cleared) ? cl.cleared : [] });
+      cleanupVersion++;
+      restored.push('cleanup decisions');
+    }
+    const w = d.watch as { entries?: unknown } | undefined;
+    if (w && Array.isArray(w.entries)) {
+      const entries = (w.entries as WatchEntry[]).filter((e) => e && typeof e.id === 'string' && Number.isFinite(Number(e.itemHash)) && typeof e.name === 'string')
+        .map((e) => ({ ...e, itemHash: Number(e.itemHash), perks: cleanWantedPerks(e.perks) }));
+      await watch.update((s) => ({ state: { ...s, entries }, result: undefined }));
+      restored.push(`${entries.length} watched weapon${entries.length === 1 ? '' : 's'}`);
+    }
+    if (Array.isArray(d.trackedRecords)) {
+      const list = await tracked.replace(d.trackedRecords);
+      // An empty list still replaces what's here, but isn't worth announcing.
+      if (list.length) restored.push(`${list.length} tracked triumph${list.length === 1 ? '' : 's'}`);
+    }
+    if (Array.isArray(d.wishLists) && deps.wishLists) {
+      await deps.wishLists.restore(d.wishLists as never);
+      wishListsChanged();
+      restored.push('wish list sources');
+    }
+    return c.json({ restored });
+  });
 
   app.onError((err, c) => {
     console.error(err);

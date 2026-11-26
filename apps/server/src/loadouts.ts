@@ -45,6 +45,8 @@ export function createLoadoutStore(dataDir: string) {
       await write(list);
       return next;
     }),
+    /** Replaces every loadout at once (restoring a backup). */
+    replace: (list: SavedLoadout[]) => locked(() => write(list)),
     remove: (id: string) => locked(async () => {
       await write((await read()).filter((l) => l.id !== id));
     }),

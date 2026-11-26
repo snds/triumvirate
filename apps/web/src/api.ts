@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RollOptions, SavedLoadout, WatchEntry, WatchHit } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -325,3 +325,99 @@ export const fetchFarming = async (refresh = false): Promise<FarmingResponse> =>
 // ── Season tracker ────────────────────────────────────────────
 export type SeasonResponse = SeasonSummary & { syncedAt: string };
 export const fetchSeason = async (): Promise<SeasonResponse> => json(await fetch('/api/season'), sameOriginImages);
+// ── Settings ──────────────────────────────────────────────────
+export interface WishListSourceInfo {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  rolls: number;
+  updatedAt?: string;
+  error?: string;
+}
+export interface WishListsResponse { sources: WishListSourceInfo[]; error?: string }
+export const fetchWishLists = async (): Promise<WishListsResponse> => json(await fetch('/api/settings/wishlists'));
+/** Sends a wish list change. Never throws; a failure comes back as `error`. */
+async function wishListCall(path: string, method: string, body?: unknown): Promise<WishListsResponse> {
+  try {
+    const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const out = (await res.json().catch(() => ({}))) as WishListsResponse;
+    if (!res.ok && !out.error) out.error = `Couldn't update wish lists (${res.status})`;
+    return out;
+  } catch (err) {
+    return { sources: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+export const addWishList = (url: string) => wishListCall('/api/settings/wishlists', 'POST', { url });
+export const refreshWishLists = () => wishListCall('/api/settings/wishlists/refresh', 'POST', {});
+export const setWishListEnabled = (id: string, enabled: boolean) => wishListCall(`/api/settings/wishlists/${encodeURIComponent(id)}`, 'PATCH', { enabled });
+export const removeWishList = (id: string) => wishListCall(`/api/settings/wishlists/${encodeURIComponent(id)}`, 'DELETE');
+
+export interface ServerStatus {
+  now: string;
+  syncedAt: string | null;
+  manifestVersion: string | null;
+  crawl: {
+    hour: number | null;
+    running: boolean;
+    startedAt: string | null;
+    lastRun: { finishedAt: string; requests: number; matches: number; samples: number; error?: string } | null;
+    rollupBuiltAt: string | null;
+    samples: number;
+  };
+  digest: { hour: number | null; latest: { date: string; builtAt: string } | null };
+  watch: { everyMinutes: number | null; entries: number; checkedAt: string | null };
+  alerts: boolean;
+  agent: boolean;
+  wishLists: WishListSourceInfo[] | null;
+}
+export const fetchStatus = async (): Promise<ServerStatus> => json(await fetch('/api/status'));
+
+export interface BackupFile {
+  app: 'triumvirate';
+  kind: 'backup';
+  version: number;
+  exportedAt: string;
+  data: Record<string, unknown>;
+  /** This device's view settings (item size, roll filters...). */
+  prefs?: Record<string, unknown>;
+}
+export const fetchBackup = async (): Promise<BackupFile> => json(await fetch('/api/backup'));
+export const restoreBackup = (file: BackupFile) => act<{ restored?: string[]; error?: string }>('/api/backup', file, 'restore the backup');
+// ── Vendors ───────────────────────────────────────────────────
+export interface VendorsResponse {
+  characterId: string;
+  characters: { id: string; className: string; classType: number; emblemBackground?: string }[];
+  fetchedAt: string;
+  groups: VendorGroupView[];
+  /** Rolled weapons and armor on sale, by row id (`vendor-<vendor>-<index>`), shaped like inventory items. */
+  items: Record<string, AppraisedItem>;
+  /** Community grade per weapon row id. */
+  grades: Record<string, CommunityAppraisal>;
+  /** Builds each armor row would be best in slot for. */
+  fits: Record<string, string[]>;
+}
+/** One character's vendors; `refresh` asks Bungie again instead of the 15-minute copy. */
+export const fetchVendors = async (characterId?: string, refresh = false): Promise<VendorsResponse> => {
+  const q = new URLSearchParams();
+  if (characterId) q.set('character', characterId);
+  if (refresh) q.set('refresh', '1');
+  return json(await fetch(`/api/vendors${q.size ? `?${q}` : ''}`), sameOriginImages);
+};
+// ── Records ───────────────────────────────────────────────────
+export type RecordsResponse = RecordsScreen & {
+  characterId?: string;
+  characters: { id: string; className: string }[];
+  fetchedAt: string;
+  /** Record hashes tracked in this app. */
+  pinned: number[];
+};
+/** Titles, triumphs, tracked, and nearly done for one character; `refresh` asks Bungie again. */
+export const fetchRecords = async (characterId?: string, refresh = false): Promise<RecordsResponse> => {
+  const q = new URLSearchParams();
+  if (characterId) q.set('character', characterId);
+  if (refresh) q.set('refresh', '1');
+  return json(await fetch(`/api/records${q.size ? `?${q}` : ''}`), sameOriginImages);
+};
+/** Tracks or untracks a triumph in this app. */
+export const trackRecord = (hash: number, tracked: boolean) => act<{ tracked?: number[]; error?: string }>('/api/records/track', { hash, tracked }, 'track that triumph');
