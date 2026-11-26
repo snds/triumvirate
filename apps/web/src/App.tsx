@@ -29,8 +29,10 @@ import { HoverContext, type HoverApi } from './hover.ts';
 import { InventoryContext, type InventoryApi } from './inventory-context.ts';
 import { ItemHovercard } from './components/ItemHovercard.tsx';
 import { StoreSwitcher } from './components/StoreSwitcher.tsx';
-import { TabBar, type View } from './components/TabBar.tsx';
-import { useCompact } from './media.ts';
+import { DESKTOP_VIEWS, PRIMARY_VIEWS, QUIET_VIEWS, TabBar, type View } from './components/TabBar.tsx';
+import { Menu } from './ui/Menu.tsx';
+import { Mark } from './components/Mark.tsx';
+import { MID_QUERY, NARROW_QUERY, useCompact, useMediaQuery } from './media.ts';
 import { bootShowing, dismissBoot } from './boot.ts';
 import { StatusBanner } from './components/StatusBanner.tsx';
 
@@ -64,6 +66,8 @@ export function App() {
   }, []);
   // Phones show one store (a character or the vault) at a time; this is the one on screen.
   const compact = useCompact();
+  const midWidth = useMediaQuery(MID_QUERY);
+  const narrow = useMediaQuery(NARROW_QUERY);
   const [store, setStore] = usePref<string>('phoneStore', '');
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
   /** Instance id of the item in the quick-move sheet; looked up live so it shows moves as they land. */
@@ -472,51 +476,38 @@ export function App() {
       style={{ '--agent-width': `${clampChatWidth(chatWidth, windowWidth)}px` } as React.CSSProperties}
     >
       <header className="topbar">
-        <h1 className="brand">Triumvirate</h1>
+        {/* Narrow desktop: the mark stands in for the wordmark, so the bar stays one row. */}
+        <h1 className="brand">{narrow && !compact ? <><Mark className="brand__mark" /><span className="visually-hidden">Triumvirate</span></> : 'Triumvirate'}</h1>
         {/* On a phone the views move to the tab bar at the bottom, in thumb reach. */}
-        {!compact && <nav className="segmented" aria-label="View">
-          <button
-            className={`segmented__option${view === 'inventory' ? ' is-selected' : ''}`}
-            aria-current={view === 'inventory' ? 'page' : undefined}
-            onClick={() => setView('inventory')}
-          >
-            Inventory
-          </button>
-          <button
-            className={`segmented__option${view === 'cleanup' ? ' is-selected' : ''}`}
-            aria-current={view === 'cleanup' ? 'page' : undefined}
-            onClick={() => setView('cleanup')}
-          >
-            Cleanup <span className="muted">{inv.cleanup.length}</span>
-          </button>
-          <button
-            className={`segmented__option${view === 'rolls' ? ' is-selected' : ''}`}
-            aria-current={view === 'rolls' ? 'page' : undefined}
-            onClick={() => setView('rolls')}
-          >
-            Rolls
-          </button>
-          <button
-            className={`segmented__option${view === 'loadouts' ? ' is-selected' : ''}`}
-            aria-current={view === 'loadouts' ? 'page' : undefined}
-            onClick={() => setView('loadouts')}
-          >
-            Loadouts
-          </button>
-          <button
-            className={`segmented__option${view === 'vendors' ? ' is-selected' : ''}`}
-            aria-current={view === 'vendors' ? 'page' : undefined}
-            onClick={() => setView('vendors')}
-          >
-            Vendors
-          </button>
-          <button
-            className={`segmented__option${view === 'records' ? ' is-selected' : ''}`}
-            aria-current={view === 'records' ? 'page' : undefined}
-            onClick={() => setView('records')}
-          >
-            Records
-          </button>
+        {!compact && <nav className="segmented topbar__nav" aria-label="View">
+          {(midWidth ? PRIMARY_VIEWS : DESKTOP_VIEWS).map((v) => (
+            <button
+              key={v.id}
+              className={`segmented__option${view === v.id ? ' is-selected' : ''}`}
+              aria-current={view === v.id ? 'page' : undefined}
+              onClick={() => setView(v.id)}
+            >
+              {v.label}{v.id === 'cleanup' && <> <span className="muted">{inv.cleanup.length}</span></>}
+            </button>
+          ))}
+          {/* Mid-width: the quieter views fold into More, the same split as the phone tab bar. */}
+          {midWidth && (() => {
+            const inMore = QUIET_VIEWS.find((v) => v.id === view);
+            return (
+              <Menu
+                label="More views"
+                triggerClassName={`segmented__option topbar__more${inMore ? ' is-selected' : ''}`}
+                triggerLabel={inMore ? `More: ${inMore.label}` : 'More views'}
+                trigger={<>{inMore?.label ?? 'More'}<Icon name="chevronDown" /></>}
+                placement="bottom start"
+                items={QUIET_VIEWS.map((v) => ({
+                  id: v.id, label: v.label, selected: view === v.id,
+                  end: v.id === 'cleanup' && inv.cleanup.length > 0 ? <span className="muted">{inv.cleanup.length}</span> : undefined,
+                }))}
+                onAction={(id) => setView(id as View)}
+              />
+            );
+          })()}
         </nav>}
         {!compact && <><input
           className="search"
@@ -579,7 +570,8 @@ export function App() {
             onSettings={() => setSettingsOpen(true)}
             onSignOut={() => void signOut()}
             autoRefresh={autoRefresh}
-            compact={compact}
+            compact={narrow}
+            stale={!!loadFail}
           />
         </div>
       </header>
