@@ -1887,3 +1887,13 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .rolls__targets { margin-left: auto; }
 .rolls__title-row { display: flex; align-items: center; gap: var(--space-3); }
 .rolls__title-row .vault__title { margin: 0; }
+
+/* ── Loadout sharing ───────────────────────────────────────── */
+.share__preview { display: grid; place-items: center; aspect-ratio: 16 / 9; border-radius: var(--radius-md); background: var(--surface-raised); overflow: hidden; }
+.share__preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.share__actions { flex-wrap: wrap; }
+.share__actions .button { white-space: nowrap; }
+@media (max-width: 640px) {
+  /* The main action leads; the copy actions follow and wrap. */
+  .share__actions .button--primary { order: -1; }
+}

@@ -7,6 +7,7 @@ import {
   type ActionResult, type GameSlotLook, type Inventory, type LoadoutDraft,
 } from '../api.ts';
 import { BuildSummary } from './BuildSummary.tsx';
+import { ShareSheet } from './ShareSheet.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { LoadoutEditor } from './LoadoutEditor.tsx';
 import { OptimizerSheet } from './OptimizerSheet.tsx';
@@ -46,6 +47,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
   const [busy, setBusy] = useState<string>(); // which card is working
   const [ask, setAsk] = useState<Ask>();
   // The loadout builder: `true` for a new one, or the saved loadout being edited.
+  const [sharing, setSharing] = useState<{ loadout: SavedLoadout; items: AppraisedItem[] }>();
   const [editor, setEditor] = useState<SavedLoadout | true>();
   const [optimizer, setOptimizer] = useState(false);
   useEffect(() => {
@@ -245,6 +247,9 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
                 >
                   <Icon name="save" /> Update
                 </button>
+                <button className="icon-button" aria-label={`Share ${l.name}`} title="Share" onClick={() => setSharing({ loadout: l, items })}>
+                  <Icon name="share" />
+                </button>
                 <button className="icon-button" disabled={!!busy} aria-label={`Edit ${l.name}`} title="Edit" onClick={() => setEditor(l)}>
                   <Icon name="edit" />
                 </button>
@@ -267,6 +272,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
         })}
       </ul>
 
+      {sharing && <ShareSheet loadout={sharing.loadout} items={sharing.items} onClose={() => setSharing(undefined)} onToast={onToast} />}
       {editor && (
         <LoadoutEditor
           character={character}
