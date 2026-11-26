@@ -76,6 +76,20 @@
   --env-safe-bottom: env(safe-area-inset-bottom, 0px);
   --env-safe-left: env(safe-area-inset-left, 0px);
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  /* Motion: raw duration steps and curves. Components read the semantic motion tokens below, never these. */
+  --duration-80: 80ms;
+  --duration-120: 120ms;
+  --duration-160: 160ms;
+  --duration-200: 200ms;
+  --duration-240: 240ms;
+  --duration-320: 320ms;
+  --duration-1800: 1800ms;
+  --duration-2400: 2400ms;
+  --ease-out-cubic: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-cubic: cubic-bezier(0.4, 0, 1, 1);
+  --ease-in-out-cubic: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-quint: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --gold-banner-a22: rgb(193 175 41 / 0.22); /* --masterwork-banner at 22% */
 
   /* ── Semantic ───────────────────────────────────────── */
   --surface-page: var(--gray-950);
@@ -147,6 +161,19 @@
   --blur-glass: var(--blur-lg);
   --saturate-glass: var(--saturate-lg);
   --shadow-float: var(--shadow-float-global);
+  /* Motion, named by job. Arrivals decelerate to rest (enter), departures accelerate away (exit),
+     on-screen moves do both (move). Sheets slide on a longer, softer enter (surface).
+     fast = hover and press · normal = most state changes · slow = large surfaces.
+     rise = how far arriving content travels; stagger = the gap between siblings arriving in order. */
+  --motion-enter: var(--ease-out-cubic);
+  --motion-exit: var(--ease-in-cubic);
+  --motion-move: var(--ease-in-out-cubic);
+  --motion-surface: var(--ease-out-quint);
+  --motion-fast: var(--duration-120);
+  --motion-normal: var(--duration-200);
+  --motion-slow: var(--duration-320);
+  --motion-rise: 6px;
+  --motion-stagger: 40ms;
   /* Space between neighboring tap targets, so an overshoot doesn't hit the next one (8px floor). */
   --target-gap: var(--space-2);
 
@@ -289,9 +316,44 @@
   --item-art-height: clamp(260px, 34cqi, 360px);
   --item-art-stage: 62cqi;        /* compact dialog: the render's height above the name band (16:10) */
   --item-art-ground: var(--surface-raised);
-  --item-art-fade-in: 240ms;
+  --item-art-fade-in: var(--reveal-duration);
   --item-art-tag-bg: rgb(0 0 0 / 0.45);
   --masterwork-glow: rgb(224 197 90 / 0.28); /* --gold-300 at 28% */
+
+  /* App loader: the mark writes its V (left arm, point, right arm), holds, and lets go in the same order.
+     index.html repeats these values as fallbacks, since it paints before this file loads. */
+  --loader-mark-size: var(--size-72);
+  --loader-cycle: var(--duration-1800);
+  --loader-step: var(--duration-160);
+  --loader-lit: var(--masterwork-banner);
+  --loader-unlit: var(--gold-banner-a22);
+  --loader-label: var(--text-muted);
+
+  /* Skeletons: placeholder blocks for content that loads on its own. They wait --skeleton-wait before
+     showing (a quick load never flashes one), one light sweeps them all, and they cross-fade into the content. */
+  --skeleton-fill: var(--surface-hover);
+  --skeleton-sheen: var(--white-a06);
+  --skeleton-radius: var(--radius-sm);
+  --skeleton-line: 10px;
+  --skeleton-title: 16px;
+  --skeleton-wait: var(--duration-160);
+  --skeleton-sweep: var(--duration-1800);
+  --skeleton-exit: var(--duration-120);
+  --reveal-duration: var(--duration-240);
+  --reveal-rise: 4px;
+  /* Item tile art fades in over the tier border once its image arrives. */
+  --tile-art-fade: var(--motion-normal);
+}
+
+/* Reduced motion, as a token tier: nothing travels or staggers, the loader slows to an opacity-only pulse,
+   and skeletons hold still (app.css drops the sweep). Fades stay: they carry the change of state. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-rise: 0px;
+    --motion-stagger: 0ms;
+    --reveal-rise: 0px;
+    --loader-cycle: var(--duration-2400);
+  }
 }
 
 /*

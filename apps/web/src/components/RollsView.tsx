@@ -16,6 +16,7 @@ import { Icon } from './Icon.tsx';
 import { timeAgo } from '../inventory.ts';
 import { useCompact } from '../media.ts';
 import { FarmingSheet } from './FarmingSheet.tsx';
+import { Sk } from './Skeleton.tsx';
 
 const VERDICTS: { value: Verdict; label: string }[] = [
   { value: 'god', label: 'Wish list god roll' },
@@ -349,7 +350,7 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
           )}
           <p className="muted">
             {error ? `Community data isn't available: ${error}`
-              : !data ? 'Loading community data…'
+              : !data ? <><span className="visually-hidden">Loading community data</span><Sk kind="line" style={{ display: 'inline-block', width: 'min(28em, 80%)' }} /></>
               : data.samples === 0 ? 'No community data yet. Run a crawl to fill it in.'
               : `Grades come from ${data.samples.toLocaleString()} rolls seen in public matches${data.builtAt ? `, updated ${timeAgo(data.builtAt)}` : ''}.`}
           </p>

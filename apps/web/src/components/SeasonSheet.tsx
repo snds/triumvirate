@@ -6,6 +6,7 @@ import { fetchSeason, type SeasonResponse } from '../api.ts';
 import { timeAgo } from '../inventory.ts';
 import { Icon } from './Icon.tsx';
 import { Sheet } from './Sheet.tsx';
+import { Reveal, SkCards } from './Skeleton.tsx';
 
 const num = (n: number) => n.toLocaleString();
 
@@ -38,7 +39,7 @@ export function SeasonSheet({ onClose }: { onClose: () => void }) {
   return (
     <Sheet title={s?.season ? `Season ${s.season.number}: ${s.season.name}` : 'Season'} onClose={onClose} wide>
       {error && <p className="error">{error}</p>}
-      {!s && !error && <p className="muted">Loading…</p>}
+      <Reveal loading={!s && !error} skeleton={<SkCards count={4} />} label="Loading season progress">
       {s && (
         <>
           {s.season && daysText(s.season.daysLeft) && (
@@ -92,6 +93,7 @@ export function SeasonSheet({ onClose }: { onClose: () => void }) {
           <p className="muted season__synced">From your last sync, {timeAgo(s.syncedAt)}.</p>
         </>
       )}
+      </Reveal>
     </Sheet>
   );
 }

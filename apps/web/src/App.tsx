@@ -27,6 +27,8 @@ import { ItemHovercard } from './components/ItemHovercard.tsx';
 import { StoreSwitcher } from './components/StoreSwitcher.tsx';
 import { TabBar, type View } from './components/TabBar.tsx';
 import { useCompact } from './media.ts';
+import { bootShowing, dismissBoot } from './boot.ts';
+import { Mark } from './components/Mark.tsx';
 
 type State =
   | { status: 'loading' }
@@ -132,6 +134,17 @@ export function App() {
   }, []);
 
   useEffect(() => { void load(false); }, [load]);
+  // First load settled: the index.html loader exits and the app rises in behind it (once per launch).
+  const [entering, setEntering] = useState(false);
+  const booted = useRef(false);
+  useEffect(() => {
+    if (state.status === 'loading' || booted.current) return;
+    booted.current = true;
+    if (!bootShowing()) return;
+    setEntering(true);
+    dismissBoot();
+    setTimeout(() => setEntering(false), 1200);
+  }, [state.status]);
   // Quiet auto refresh: only while the tab is visible and nothing is being dragged or moved.
   // A failure is skipped silently; the next tick (or the button) tries again.
   const [autoRefresh, setAutoRefresh] = usePref<number>('autoRefresh', 0);
@@ -345,10 +358,12 @@ export function App() {
     [state, query, kind],
   );
 
-  if (state.status === 'loading') return <main className="center">Loading your Guardians…</main>;
+  // The index.html loader covers the screen until the first load settles.
+  if (state.status === 'loading') return null;
   if (state.status === 'signed-out') {
     return (
       <main className="center">
+        <Mark className="center__mark" />
         <h1 className="brand">Triumvirate</h1>
         <a className="button button--primary" href="/auth/login">Sign in with Bungie</a>
       </main>
@@ -395,7 +410,7 @@ export function App() {
     <DragActionsContext.Provider value={drag.actions}>
     <DragContext.Provider value={drag.state}>
     <div
-      className={`app${agentOpen ? ' app--chat' : ''}${compact ? ' app--compact' : ''}`}
+      className={`app${agentOpen ? ' app--chat' : ''}${compact ? ' app--compact' : ''}${entering ? ' app--entering' : ''}`}
       style={{ '--agent-width': `${clampChatWidth(chatWidth, windowWidth)}px` } as React.CSSProperties}
     >
       <header className="topbar">

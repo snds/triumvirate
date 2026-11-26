@@ -103,7 +103,7 @@ export const ItemTile = memo(function ItemTile({
       onPointerEnter={hover ? (e) => { if (e.pointerType === 'mouse') hover.enter(item, e.currentTarget.getBoundingClientRect()); } : undefined}
       onPointerLeave={(e) => { press.stop(); hover?.leave(); e.currentTarget.style.removeProperty('--mx'); e.currentTarget.style.removeProperty('--my'); }}
     >
-      {item.icon && <img className="tile__icon" src={item.icon} alt="" decoding="async" draggable={false} />}
+      {item.icon && <img className="tile__icon" src={item.icon} alt="" decoding="async" draggable={false} ref={artReady} onLoad={artLoaded} />}
       {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" decoding="async" draggable={false} />}
       {item.masterworked && <span className="tile__holofoil" aria-hidden />}
       <TierDiamonds item={item} className="tile__tier" />
@@ -123,3 +123,15 @@ export const ItemTile = memo(function ItemTile({
     </button>
   );
 });
+
+/*
+ * Tile art fades in over the tier border once its image arrives. An image the browser already has
+ * (a re-render, a store switch, a filter) shows at once: fading hundreds of cached tiles would be noise.
+ */
+function artReady(img: HTMLImageElement | null) {
+  if (img?.complete && img.naturalWidth > 0) img.dataset.art = 'cached';
+}
+function artLoaded(e: React.SyntheticEvent<HTMLImageElement>) {
+  const img = e.currentTarget;
+  if (!img.dataset.art) img.dataset.art = 'fresh';
+}
