@@ -186,8 +186,11 @@ export interface ItemExtra {
   socketEntries?: [number, number][];
   /** Armor: the set it belongs to, for set bonuses. */
   itemSetHash?: number;
-  /** Weapons and weapon ornaments: Bungie's 1920×1080 studio render, as a bungie.net path. */
+  /** Weapons, armor, and their ornaments: Bungie's 1920×1080 studio render, as a bungie.net path. */
   screenshot?: string;
+  /** Armor: its ornament socket as [socket index, plug set hash (0 if none), default plug]. Weapons
+   *  keep every socket in `socketEntries`; armor keeps only this one, to stay small. */
+  ornamentSocket?: [number, number, number];
 }
 
 export interface ObjectiveExtra {
@@ -210,6 +213,15 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       if (d.flavorText) x.flavorText = d.flavorText;
       if (d.breakerTypeHash) x.breakerTypeHash = d.breakerTypeHash;
       if (d.equippingBlock?.equipableItemSetHash) x.itemSetHash = d.equippingBlock.equipableItemSetHash;
+      if (d.itemType === 2) {
+        if (d.screenshot) x.screenshot = d.screenshot;
+        const entries = d.sockets?.socketEntries ?? [];
+        const at = entries.findIndex((e) => /skins/.test(full[e.singleInitialItemHash ?? 0]?.plug?.plugCategoryIdentifier ?? ''));
+        if (at >= 0) {
+          const e = entries[at]!;
+          x.ornamentSocket = [at, e.reusablePlugSetHash ?? e.randomizedPlugSetHash ?? 0, e.singleInitialItemHash ?? 0];
+        }
+      }
       if (d.itemType === 3) {
         if (d.equippingBlock?.ammoType) x.ammoType = d.equippingBlock.ammoType;
         if (d.screenshot) x.screenshot = d.screenshot;
@@ -222,8 +234,8 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       }
     }
     if (d.plug?.plugCategoryIdentifier) x.plugCategory = d.plug.plugCategoryIdentifier;
-    // Weapon ornaments carry their own render; armor ornaments' renders aren't used, so skip them.
-    if (d.screenshot && /skins/.test(x.plugCategory ?? '') && !/^armor_skins/.test(x.plugCategory ?? '')) x.screenshot = d.screenshot;
+    // Ornaments carry their own render, shown in the item dialog's header and strip.
+    if (d.screenshot && /skins/.test(x.plugCategory ?? '')) x.screenshot = d.screenshot;
     const inv = (d.investmentStats ?? []).filter((st) => !st.isConditionallyActive && st.value !== 0);
     if (inv.length) x.investment = inv.map((st) => [st.statTypeHash, st.value]);
     if (Object.keys(x).length) out[hash] = x;
@@ -255,7 +267,7 @@ const TABLES = {
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 5;
+const SLIM_VERSION = 6;
 
 /**
  * Opens the live manifest: its version, and a loader that downloads a table once and keeps it on

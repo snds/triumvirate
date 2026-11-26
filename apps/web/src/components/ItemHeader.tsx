@@ -26,7 +26,7 @@ export function ItemHeader({ item, size, preview, children }: {
   const artState = shot && art?.src === shot ? art.state : 'loading';
   const hasArt = !!shot && artState !== 'failed';
   return (
-    <header className={`item-header item-header--${size} tier-${tier}${item.masterworked ? ' is-masterworked' : ''}${hasArt ? ' has-art' : ''}${hasArt && artState === 'loaded' ? ' is-art-loaded' : ''}`}>
+    <header className={`item-header item-header--${size} tier-${tier}${item.itemType === 2 ? ' is-armor' : ''}${item.masterworked ? ' is-masterworked' : ''}${hasArt ? ' has-art' : ''}${hasArt && artState === 'loaded' ? ' is-art-loaded' : ''}`}>
       {hasArt && (
         <>
           <img

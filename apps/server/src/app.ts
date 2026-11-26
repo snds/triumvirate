@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, suggestBuilds, weaponOrnaments, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, suggestBuilds, itemOrnaments, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -369,8 +369,8 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const { snap, view } = await ready(t);
     const id = c.req.param('instanceId');
     const item = view.items.find((i) => i.instanceId === id);
-    if (!item || item.itemType !== 3 || !manifest) return c.json({ socketIndex: -1, options: [] });
-    return c.json(weaponOrnaments(snap.profile, manifest, id, item.itemHash) ?? { socketIndex: -1, options: [] });
+    if (!item || (item.itemType !== 3 && item.itemType !== 2) || !manifest) return c.json({ socketIndex: -1, options: [] });
+    return c.json(itemOrnaments(snap.profile, manifest, id, item.itemHash) ?? { socketIndex: -1, options: [] });
   });
 
   // Swaps a weapon's perks to other options it already has (Bungie's free plug insert), then re-syncs.
@@ -383,12 +383,12 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const out = await queued(async () => {
       const { snap, view, http } = await ready(t);
       const item = view.items.find((i) => i.instanceId === instanceId);
-      if (!item?.perks) return { status: 404 as const, body: { error: 'That weapon isn\'t there anymore. Refresh and try again.' } };
+      if (!item) return { status: 404 as const, body: { error: 'That item isn\'t there anymore. Refresh and try again.' } };
       // Only options this copy already has: never anything it can't roll.
       // Or an ornament you've unlocked for it (free to apply, like in game).
-      const orn = manifest ? weaponOrnaments(snap.profile, manifest, instanceId, item.itemHash) : undefined;
+      const orn = manifest ? itemOrnaments(snap.profile, manifest, instanceId, item.itemHash) : undefined;
       const allowed = (p: { socketIndex: number; plugHash: number }) =>
-        item.perks!.some((col) => col.some((o) => o.socketIndex === p.socketIndex && o.hash === p.plugHash))
+        (item.perks ?? []).some((col) => col.some((o) => o.socketIndex === p.socketIndex && o.hash === p.plugHash))
         || (orn?.socketIndex === p.socketIndex && orn.options.some((o) => o.hash === p.plugHash && o.unlocked));
       if (!plugs.every(allowed)) return { status: 400 as const, body: { error: 'Those perks aren\'t options on this copy.' } };
       // Bungie wants a character even for vault items; any of yours works.

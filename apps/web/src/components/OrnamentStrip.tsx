@@ -1,4 +1,4 @@
-// The item dialog's ornament strip: every look this weapon can wear, as a row of tiles. Picking one
+// The item dialog's ornament strip: every look this weapon or armor piece can wear, as a row of tiles. Picking one
 // previews its studio render in the header (nothing changes in game); an unlocked one can then be
 // applied, free, like in game. Locked ones still preview, so you can see what you're missing.
 import { useEffect, useState } from 'react';
@@ -21,7 +21,7 @@ export function OrnamentStrip({ item, preview, onPreview }: {
 
   useEffect(() => {
     setData(undefined); setNotice(undefined); onPreview(undefined);
-    if (!id || item.itemType !== 3) return;
+    if (!id || (item.itemType !== 3 && item.itemType !== 2)) return;
     let live = true;
     fetchOrnaments(id).then((d) => live && setData(d)).catch(() => { /* no strip when it can't load */ });
     return () => { live = false; };

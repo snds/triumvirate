@@ -468,6 +468,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
     const inst = item.itemInstanceId ? instances[item.itemInstanceId] : undefined;
     const id = item.itemInstanceId;
     const isWeapon = def?.itemType === WEAPON;
+    const isArmor = def?.itemType === ARMOR;
     const extras = id && isWeapon ? weaponExtras(id, item.itemHash) : undefined;
     const progress = id && isWeapon ? weaponProgress(id) : undefined;
     const crafted = (item.state & STATE_CRAFTED) !== 0;
@@ -523,7 +524,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
         ornament: { name: ornament.displayProperties.name, icon: bungieUrl(ornament.displayProperties.icon) },
         baseIcon: bungieUrl(def?.displayProperties.icon),
       } : {}),
-      ...(isWeapon && (ornament ? manifest.extras?.[styleHash!]?.screenshot : manifest.extras?.[item.itemHash]?.screenshot)
+      ...((isWeapon || isArmor) && (ornament ? manifest.extras?.[styleHash!]?.screenshot : manifest.extras?.[item.itemHash]?.screenshot)
         ? { screenshot: bungieUrl(ornament ? manifest.extras![styleHash!]!.screenshot : manifest.extras![item.itemHash]!.screenshot) }
         : {}),
       ...(manifest.extras?.[item.itemHash]?.ammoType ? { ammo: AMMO_NAMES[manifest.extras[item.itemHash]!.ammoType!] } : {}),

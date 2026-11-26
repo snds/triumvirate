@@ -86,7 +86,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
             <div className="item-dialog__roll">
               <div className="item-dialog__main">
                 <ItemFacts item={item} copies={copies.length} />
-                {isWeapon && item.instanceId && <OrnamentStrip item={item} preview={preview} onPreview={setPreview} />}
+                {(isWeapon || item.itemType === 2) && item.instanceId && <OrnamentStrip item={item} preview={preview} onPreview={setPreview} />}
                 {a && (
                   <section className={`verdict verdict--${a.verdict}`}>
                     <VerdictLine item={item} />

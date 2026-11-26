@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { weaponOrnaments } from './ornaments.ts';
+import { itemOrnaments, weaponOrnaments } from './ornaments.ts';
 
 // Shapes from the live manifest: Ace of Spades' socket 6 starts on "Default Ornament"
 // (exotic_all_skins) and draws from reusable plug set 1161538881.
@@ -39,4 +39,29 @@ test('ornaments: default first, unlocked from the account plug set, applied mark
 test('no ornament socket, no strip', () => {
   const m = { ...(manifest as object), extras: { 5: { socketEntries: [[0, 0]] } } } as never;
   assert.equal(weaponOrnaments({} as never, m, 'x', 5), undefined);
+});
+
+test('armor: the ornament socket comes from ornamentSocket, universal ornaments included', () => {
+  const m = {
+    items: {
+      1: { displayProperties: { name: 'Flowing Vest', icon: '/vest.jpg' } },
+      300: { displayProperties: { name: 'Default Ornament', icon: '/d.jpg' } },
+      301: { displayProperties: { name: 'Iron Truage Vest', icon: '/it.jpg' } },
+      302: { displayProperties: { name: 'Shader', icon: '/s.jpg' } },
+    },
+    extras: {
+      1: { screenshot: '/vest-shot.jpg', ornamentSocket: [4, 642154071, 300] },
+      300: { plugCategory: 'armor_skins_empty' },
+      301: { plugCategory: 'armor_skins_warlock_chest', screenshot: '/it-shot.jpg' },
+      302: { plugCategory: 'shader' },
+    },
+    plugSets: { 642154071: [300, 301, 302] },
+  } as never;
+  const profile = { profilePlugSets: { data: { plugs: { 642154071: [{ plugItemHash: 301, canInsert: true, enabled: true }] } } } } as never;
+  const o = itemOrnaments(profile, m, 'vest', 1)!;
+  assert.equal(o.socketIndex, 4);
+  assert.deepEqual(o.options.map((x) => [x.name, x.unlocked, !!x.applied, x.screenshot]), [
+    ['Default', true, true, 'https://www.bungie.net/vest-shot.jpg'],
+    ['Iron Truage Vest', true, false, 'https://www.bungie.net/it-shot.jpg'],
+  ]);
 });

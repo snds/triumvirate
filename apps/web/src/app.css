@@ -1145,6 +1145,8 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   opacity: 0; transition: opacity var(--item-art-fade-in) var(--motion-enter);
 }
 .item-header.is-art-loaded .item-header__backdrop { opacity: 1; }
+/* Armor renders stand a figure in frame; aim higher so helmets and shoulders keep their tops. */
+.item-header.is-armor .item-header__backdrop { object-position: 70% 25%; }
 .item-header__scrim {
   position: absolute; inset: 0; z-index: -2; pointer-events: none;
   background:
