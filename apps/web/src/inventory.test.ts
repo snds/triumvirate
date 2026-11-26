@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ItemRow } from '@triumvirate/core';
-import { groupBySlot, matches, timeAgo } from './inventory.ts';
+import { groupBySlot, matches, rowOf, SLOT_ORDER, timeAgo } from './inventory.ts';
 
 const item = (o: Partial<ItemRow>): ItemRow => ({
   location: 'Vault', owner: 'vault', name: 'X', type: '', bucket: '', equipped: false, itemHash: 1,
@@ -47,4 +47,15 @@ test('recently moved items lead their slot, newest first', () => {
     item({ name: 'Newest', bucket: 'Kinetic Weapons', power: 1, instanceId: '3' }),
   ], false, { 2: 100, 3: 200 });
   assert.deepEqual(groups[0]?.items.map((i) => i.name), ['Newest', 'Moved', 'High']);
+});
+
+test('every slot has its own grid row, in game order, so columns line up', () => {
+  const rows = SLOT_ORDER.map(rowOf);
+  assert.deepEqual(rows, [...rows].sort((a, b) => a - b));
+  assert.equal(new Set(rows).size, SLOT_ORDER.length);
+  assert.ok(rowOf('header') < rowOf('Kinetic Weapons'));
+  assert.ok(rowOf('Ghost') < rowOf('Other'));
+  assert.ok(rowOf('Other') < rowOf('postmaster'));
+  // Unknown buckets share the Other row, the same as groupBySlot does.
+  assert.equal(rowOf('Emotes'), rowOf('Other'));
 });

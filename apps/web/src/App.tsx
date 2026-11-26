@@ -15,7 +15,7 @@ import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
-import { SLOT_ORDER } from './inventory.ts';
+import { INVENTORY_ROWS, SLOT_ORDER } from './inventory.ts';
 import { clampChatWidth, CHAT_WIDTH, usePref } from './prefs.ts';
 import { HoverContext, type HoverApi } from './hover.ts';
 import { InventoryContext, type InventoryApi } from './inventory-context.ts';
@@ -450,7 +450,7 @@ export function App() {
           )}
           <div
             className={`inventory${isCollapsed ? ' inventory--collapsed' : ''}`}
-            style={{ '--character-count': shown.length } as React.CSSProperties}
+            style={{ '--character-count': shown.length, '--inventory-rows': INVENTORY_ROWS.length } as React.CSSProperties}
             {...(compact ? { role: 'tabpanel', id: 'store-panel' } : {})}
           >
             {shown.map((c) => (
