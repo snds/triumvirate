@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments, BuildSuggestion, ThisWeek, ActivityMode } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit, WeaponOrnaments, BuildSuggestion, ThisWeek, ActivityMode, Cosmetic } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -476,6 +476,9 @@ export type RecordsResponse = RecordsScreen & {
   exotics?: ExoticGap[];
 };
 /** Titles, triumphs, tracked, and nearly done for one character; `refresh` asks Bungie again. */
+/** The Cosmetics tab: ghosts, ships, sparrows, and shaders from collections, owned or not. */
+export const fetchCosmetics = async (refresh = false): Promise<{ items: Cosmetic[]; fetchedAt: string }> =>
+  json(await fetch(`/api/cosmetics${refresh ? '?refresh=1' : ''}`), sameOriginImages);
 export const fetchRecords = async (characterId?: string, refresh = false): Promise<RecordsResponse> => {
   const q = new URLSearchParams();
   if (characterId) q.set('character', characterId);

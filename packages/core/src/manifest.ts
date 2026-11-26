@@ -222,7 +222,7 @@ export interface ItemExtra {
   socketEntries?: [number, number][];
   /** Armor: the set it belongs to, for set bonuses. */
   itemSetHash?: number;
-  /** Weapons, armor, and their ornaments: Bungie's 1920×1080 studio render, as a bungie.net path. */
+  /** Weapons, armor, their ornaments, and ghosts, ships, and sparrows: Bungie's 1920×1080 studio render, as a bungie.net path. */
   screenshot?: string;
   /**
    * Subclass parts whose own description is blank (most aspects and fragments): the text from
@@ -255,11 +255,19 @@ export function fillPartDescriptions(extras: Record<string, ItemExtra>, perks: R
   return extras;
 }
 
+/** ItemType: Ship 21, Vehicle (sparrow) 22, Ghost 24. */
+const COSMETIC_TYPES = new Set([21, 22, 24]);
+
 /** Keeps only what ItemExtra needs, for gear and for plugs. */
 export function slimItems(full: Record<string, DestinyInventoryItemDefinition>): Record<string, ItemExtra> {
   const out: Record<string, ItemExtra> = {};
   for (const [hash, d] of Object.entries(full)) {
     const gear = d.itemType === 2 || d.itemType === 3;
+    // Ghost shells, ships, and sparrows: only their studio render, for the Cosmetics tab.
+    if (COSMETIC_TYPES.has(d.itemType)) {
+      if (d.screenshot) out[hash] = { screenshot: d.screenshot };
+      continue;
+    }
     if (!gear && !d.plug) continue;
     const x: ItemExtra = {};
     if (gear) {
@@ -331,7 +339,7 @@ const TABLES = {
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 10;
+const SLIM_VERSION = 11;
 
 /**
  * Opens the live manifest: its version, and a loader that downloads a table once and keeps it on

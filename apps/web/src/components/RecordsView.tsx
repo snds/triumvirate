@@ -8,10 +8,11 @@ import { timeAgo } from '../inventory.ts';
 import { usePref } from '../prefs.ts';
 import { CharacterPicker } from './CharacterPicker.tsx';
 import { Tab as TabButton, TabList, TabPanel, Tabs } from '../ui/Tabs.tsx';
+import { CosmeticsTab } from './CosmeticsTab.tsx';
 import { Icon } from './Icon.tsx';
 import { Reveal, Sk } from './Skeleton.tsx';
 
-type Tab = 'titles' | 'triumphs' | 'nearly' | 'tracked' | 'catalysts' | 'patterns' | 'exotics';
+type Tab = 'titles' | 'triumphs' | 'nearly' | 'tracked' | 'catalysts' | 'patterns' | 'exotics' | 'cosmetics';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'titles', label: 'Titles' },
   { id: 'triumphs', label: 'Triumphs' },
@@ -20,6 +21,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'catalysts', label: 'Catalysts' },
   { id: 'patterns', label: 'Patterns' },
   { id: 'exotics', label: 'Exotics' },
+  { id: 'cosmetics', label: 'Cosmetics' },
 ];
 const CLASS_NAMES: Record<number, string> = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
 
@@ -159,6 +161,7 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
           />
         )}
         {data && tab === 'exotics' && <Exotics gaps={data.exotics ?? []} query={query} />}
+        {data && tab === 'cosmetics' && <CosmeticsTab query={query} />}
         {data && tab === 'nearly' && (
           <>
             <p className="muted records__hint">Triumphs at least three-quarters done, closest first.</p>

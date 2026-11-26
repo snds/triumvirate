@@ -469,6 +469,9 @@
   --loadout-mark-size: var(--size-36);
   --loadout-title-min: 9rem;
   --week-card-ratio: 16 / 9;
+  --cosmetic-tile-min: 104px;
+  --cosmetic-panel-width: 360px;
+  --cosmetic-detail-tile: 160px;
   --mode-head-height: var(--size-44);
   --mode-head-glyph: 22px;
   --mode-banner-opacity: 0.45;

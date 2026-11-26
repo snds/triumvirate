@@ -27,3 +27,4 @@ export type { LoadoutStyles } from './manifest.ts';
 export type { ArmorSet } from './manifest.ts';
 export type * from './this-week.ts';
 export type { ActivityMode } from './manifest.ts';
+export * from './cosmetics.ts'; // pure logic; manifest import is type-only

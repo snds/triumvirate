@@ -8,6 +8,8 @@ export const COMPACT_QUERY = '(max-width: 640px)';
 export const MID_QUERY = '(min-width: 641px) and (max-width: 1439px)';
 /** Narrow desktop: the profile button shows the avatar alone (name and sync time move into its menu). */
 export const NARROW_QUERY = '(max-width: 1180px)';
+/** Wide enough for a list with a detail panel beside it (Cosmetics); narrower opens detail in a sheet. */
+export const SIDE_PANEL_QUERY = '(min-width: 960px)';
 /** No hover (touch screens): tips that say "point at" say "tap" instead. */
 export const TOUCH_QUERY = '(hover: none)';
 

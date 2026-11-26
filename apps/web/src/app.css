@@ -2864,3 +2864,49 @@ li.title-card { cursor: default; }
 .identity__legend li { display: flex; align-items: center; gap: var(--space-1); }
 .identity__dot { width: 8px; height: 8px; border-radius: var(--radius-circle); flex: none; }
 .store-switcher__crest { position: absolute; right: var(--space-1-5); top: 50%; translate: 0 -50%; width: 28px; height: 28px; object-fit: contain; pointer-events: none; }
+
+/* Records › Cosmetics: tile grid, with the selected item's render in a panel beside it (wide) or a sheet (phone). */
+.cosmetics { display: grid; gap: var(--space-4); align-items: start; }
+.cosmetics.has-panel { grid-template-columns: minmax(0, 1fr) var(--cosmetic-panel-width); }
+.cosmetics__main { display: grid; gap: var(--space-3); min-width: 0; }
+.cosmetics__filters { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.cosmetics__filters .segmented { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.cosmetic-grid { display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(var(--cosmetic-tile-min), 1fr)); margin: 0; padding: 0; list-style: none; }
+.cosmetic {
+  --cosmetic-tier: var(--tier-common);
+  display: grid; gap: var(--space-1); width: 100%; padding: 0; background: none; border: 0; color: var(--text-primary); text-align: start; cursor: pointer; font: inherit;
+}
+.cosmetic.tier-exotic { --cosmetic-tier: var(--tier-exotic); }
+.cosmetic.tier-legendary { --cosmetic-tier: var(--tier-legendary); }
+.cosmetic.tier-rare { --cosmetic-tier: var(--tier-rare); }
+.cosmetic.tier-uncommon { --cosmetic-tier: var(--tier-uncommon); }
+.cosmetic__art {
+  position: relative; display: block; aspect-ratio: 1; overflow: hidden; border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--cosmetic-tier) 30%, var(--surface-panel)); border: 1px solid color-mix(in srgb, var(--cosmetic-tier) 60%, transparent);
+}
+.cosmetic__art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Missing: the art is there to want, but quieter than what you own. */
+.cosmetic.is-missing .cosmetic__art img { filter: grayscale(0.7) brightness(0.65); }
+.cosmetic.is-missing .cosmetic__name { color: var(--text-secondary); }
+.cosmetic__owned { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: var(--size-18); height: var(--size-18); border-radius: var(--radius-circle); background: var(--success); color: var(--surface-page); --icon-size: 14px; }
+.cosmetic__name { font-size: var(--font-size-12); line-height: 1.3; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.cosmetic[aria-pressed='true'] .cosmetic__art { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cosmetic:focus-visible .cosmetic__art { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cosmetic--ghost { aspect-ratio: 1; position: relative; }
+.cosmetic--ghost .sk { position: absolute; inset: 0; height: auto; }
+.cosmetics__more { display: flex; align-items: center; justify-content: center; gap: var(--space-3); margin: 0; font-size: var(--font-size-13); }
+.cosmetic-panel {
+  position: sticky; top: var(--space-4); display: grid; padding: var(--space-3); overflow: hidden;
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+}
+.cosmetic-panel__close { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 1; background: var(--surface-glass); }
+.cosmetic-detail { display: grid; gap: var(--space-2); }
+.cosmetic-detail__art { margin: calc(var(--space-3) * -1) calc(var(--space-3) * -1) 0; display: grid; place-items: center; background: var(--surface-panel); aspect-ratio: 16 / 9; }
+.cosmetic-detail__art.has-render { aspect-ratio: auto; }
+.cosmetic-detail__art.has-render img { width: 100%; height: auto; display: block; }
+.cosmetic-detail__tile { width: var(--cosmetic-detail-tile); height: var(--cosmetic-detail-tile); border-radius: var(--radius-sm); }
+.cosmetic-sheet .cosmetic-detail__art { margin-inline: calc(var(--space-4) * -1); margin-top: 0; }
+.cosmetic-detail__name { margin: var(--space-1) 0 0; font-size: var(--font-size-18); }
+.cosmetic-detail__state { display: flex; align-items: center; gap: var(--space-1); margin: 0; font-size: var(--font-size-13); color: var(--text-secondary); }
+.cosmetic-detail__state.is-owned { color: var(--success); }
+.cosmetic-detail__source { margin: 0; font-size: var(--font-size-13); color: var(--text-secondary); line-height: 1.45; }

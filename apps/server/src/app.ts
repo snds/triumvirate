@@ -9,7 +9,7 @@ import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getPro
 import Anthropic from '@anthropic-ai/sdk';
 import {
   applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, suggestBuilds, itemOrnaments, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
-  refreshTokens, buildSubclassIndex, withSubclassArt, thisWeek, weekHashes, weekModifierHashes, type EventCardDef, type ThisWeek, type WeekDefs, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
+  refreshTokens, buildSubclassIndex, withSubclassArt, cosmetics, thisWeek, weekHashes, weekModifierHashes, type EventCardDef, type ThisWeek, type WeekDefs, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
   type SavedLoadout, type CleanupState, type WatchEntry,
@@ -717,6 +717,28 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       ...screen,
     });
   });
+  /**
+   * Cosmetics tab: ghosts, ships, sparrows, and shaders from collections. Shares the Records
+   * screen's 5-minute profile pull; about 2,000 rows, so the web app asks only when the tab opens.
+   */
+  app.get('/api/cosmetics', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { http } = await ready(t);
+    if (!current || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const key = `${current.membershipId}.${manifest.version}`;
+    let hit = recordScreens.get(current.membershipId);
+    if (!hit || hit.key !== key || c.req.query('refresh') || Date.now() - hit.at > 5 * 60_000) {
+      const { Response: profile } = await getProfile(http, { membershipType: current.membershipType, destinyMembershipId: current.membershipId, components: [200, 700, 800, 900] as never });
+      hit = { at: Date.now(), key, profile };
+      recordScreens.set(current.membershipId, hit);
+    }
+    const p = hit.profile;
+    // Cosmetics are account-wide, but a few sit in character collections; merge every character's.
+    const collectibles = Object.assign({}, ...Object.values(p.characterCollectibles?.data ?? {}).map((x) => x.collectibles ?? {}), p.profileCollectibles?.data?.collectibles ?? {});
+    return c.json({ items: cosmetics(manifest, collectibles), fetchedAt: new Date(hit.at).toISOString() });
+  });
+
   /** Tracks or untracks a triumph here (the game's own tracked triumph is separate). */
   app.post('/api/records/track', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { hash?: unknown; tracked?: unknown };
