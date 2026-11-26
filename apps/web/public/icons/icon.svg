@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- Placeholder mark: three tier diamonds, two over one, so the cluster reads as the "V" in triumVirate. Full-bleed background so it also works as a maskable icon; the mark stays inside the central safe circle. -->
+  <!-- Placeholder mark: three tier diamonds, two over one, so the cluster reads as the "V" in triumVirate. Full-bleed background so it also works as a maskable icon; the mark stays inside the central safe circle. Nudged 6 units below geometric center: two diamonds on top make the cluster top-heavy, so this optically centers it. -->
   <rect width="512" height="512" fill="#12151a"/>
   <g fill="#c1af29">
-    <path d="M174 145 L244 215 L174 285 L104 215 Z"/>
-    <path d="M338 145 L408 215 L338 285 L268 215 Z"/>
-    <path d="M256 227 L326 297 L256 367 L186 297 Z"/>
+    <path d="M174 151 L244 221 L174 291 L104 221 Z"/>
+    <path d="M338 151 L408 221 L338 291 L268 221 Z"/>
+    <path d="M256 233 L326 303 L256 373 L186 303 Z"/>
   </g>
 </svg>
