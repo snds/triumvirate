@@ -509,6 +509,20 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   // is reused for 15 minutes (or until ?refresh).
   const defs = createDefsCache(store.dataDir);
   const vendorScreens = new Map<string, { at: number; key: string; body: unknown }>();
+  // One lore entry, for the item dialog's Lore tab. Fetched from Bungie once per manifest, then cached:
+  // the whole lore table is megabytes and the app reads one entry at a time.
+  app.get('/api/lore/:hash', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const hash = Number(c.req.param('hash'));
+    if (!Number.isFinite(hash) || hash <= 0) return c.json({ error: 'No such lore entry.' }, 400);
+    const { http } = await ready(t);
+    if (!manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const d = await defs.get<{ displayProperties?: { name?: string; description?: string }; subtitle?: string }>(http, manifest.version, 'DestinyLoreDefinition', hash);
+    if (!d?.displayProperties?.description) return c.json({ error: 'Bungie has no lore for this one.' }, 404);
+    return c.json({ name: d.displayProperties.name ?? '', subtitle: d.subtitle || undefined, text: d.displayProperties.description });
+  });
+
   app.get('/api/vendors', async (c) => {
     const t = await validTokens();
     if (!t) return c.json({ signedIn: false }, 401);

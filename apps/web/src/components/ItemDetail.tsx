@@ -3,6 +3,7 @@ import type { AppraisedItem, OrnamentOption, PerkOption, RollOptions } from '@tr
 import { fetchRolls } from '../api.ts';
 import { ItemHeader } from './ItemHeader.tsx';
 import { OrnamentStrip } from './OrnamentStrip.tsx';
+import { LoreTab } from './LoreTab.tsx';
 import { Icon } from './Icon.tsx';
 import { ItemFacts, PerkCell, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 import { ItemTile } from './ItemTile.tsx';
@@ -25,7 +26,7 @@ interface Props {
   chatOpen?: boolean;
 }
 
-type Tab = 'roll' | 'all' | 'details';
+type Tab = 'roll' | 'all' | 'lore' | 'details';
 
 /**
  * Item dialog: a large header (shared with the hovercard), actions, then tabs. "This roll" shows
@@ -49,6 +50,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'roll', label: 'This roll' },
     ...(isWeapon ? [{ id: 'all' as const, label: 'All rolls' }] : []),
+    ...(item.loreHash ? [{ id: 'lore' as const, label: 'Lore' }] : []),
     { id: 'details', label: 'Details' },
   ];
   return (
@@ -134,6 +136,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
             </div>
           )}
           {tab === 'all' && <AllRolls item={item} />}
+          {tab === 'lore' && item.loreHash && <LoreTab loreHash={item.loreHash} flavorText={item.flavorText} />}
           {tab === 'details' && <Details item={item} />}
         </TabPanel>
         </Tabs>

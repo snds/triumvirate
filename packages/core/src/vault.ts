@@ -80,6 +80,8 @@ export interface ItemRow {
   craftedLevel?: number;
   killTracker?: { label: string; count: number };
   flavorText?: string;
+  /** Its lore entry, when it has one (the item dialog's Lore tab reads it on demand). */
+  loreHash?: number;
   /** Weapons: which ammo it uses. */
   ammo?: AmmoType;
   /** Champion stun this weapon has built in: Anti-Barrier, Overload, or Unstoppable. */
@@ -520,6 +522,7 @@ export function summarizeProfile(profile: DestinyProfileResponse, manifest: Mani
       ...(progress?.craftedLevel !== undefined ? { craftedLevel: progress.craftedLevel } : {}),
       ...(progress?.killTracker ? { killTracker: progress.killTracker } : {}),
       ...(manifest.extras?.[item.itemHash]?.flavorText ? { flavorText: manifest.extras[item.itemHash]!.flavorText } : {}),
+      ...(manifest.extras?.[item.itemHash]?.loreHash ? { loreHash: manifest.extras[item.itemHash]!.loreHash } : {}),
       ...(ornament ? {
         ornament: { name: ornament.displayProperties.name, icon: bungieUrl(ornament.displayProperties.icon) },
         baseIcon: bungieUrl(def?.displayProperties.icon),

@@ -176,6 +176,8 @@ export interface ItemExtra {
   /** Socket category hash and the socket indexes in it. */
   socketCategories?: [number, number[]][];
   flavorText?: string;
+  /** Gear: its DestinyLoreDefinition, read on demand for the item dialog's Lore tab. */
+  loreHash?: number;
   /** Built-in champion stun (exotics and some legendaries). */
   breakerTypeHash?: number;
   /** Weapons: 1 Primary, 2 Special, 3 Heavy. */
@@ -211,6 +213,7 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       const cats = d.sockets?.socketCategories;
       if (cats?.length) x.socketCategories = cats.map((c) => [c.socketCategoryHash, c.socketIndexes]);
       if (d.flavorText) x.flavorText = d.flavorText;
+      if (d.loreHash) x.loreHash = d.loreHash;
       if (d.breakerTypeHash) x.breakerTypeHash = d.breakerTypeHash;
       if (d.equippingBlock?.equipableItemSetHash) x.itemSetHash = d.equippingBlock.equipableItemSetHash;
       if (d.itemType === 2) {
@@ -267,7 +270,7 @@ const TABLES = {
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 6;
+const SLIM_VERSION = 7;
 
 /**
  * Opens the live manifest: its version, and a loader that downloads a table once and keeps it on
