@@ -183,6 +183,14 @@
   --sheet-width-optimizer: 1120px;
   /* Digest: the dot on the Today button when there's one you haven't opened. */
   --digest-new: var(--masterwork);
+  /* Switch (on/off settings like the morning alert): iOS proportions; the tap area is --control-size tall. */
+  --switch-width: 48px;
+  --switch-height: 28px;
+  --switch-thumb: 22px;
+  --switch-track-off: var(--border-subtle);
+  --switch-track-on: var(--accent);
+  --switch-thumb-color: var(--text-primary);
+  --switch-thumb-on: var(--switch-thumb-color);
   --perk-enhanced: var(--gold-400);
   --perk-active-fill: var(--blue-500);
   --perk-active-border: var(--gray-100);

@@ -54,6 +54,7 @@ const GLYPHS = {
   import: 'download',
   warning: 'warning',
   today: 'today',
+  alertsOff: 'notifications_off',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

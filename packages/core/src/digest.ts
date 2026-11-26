@@ -147,3 +147,36 @@ export function digestFacts(d: Digest): string {
     `Vault: ${d.vault.used} of ${d.vault.capacity}. Cleanup suggestions: ${d.cleanup.count} (${d.cleanup.high} high confidence).`,
   ].filter(Boolean).join('\n');
 }
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** Cuts text to about `max` characters at a sentence (or word) end, so a lock screen shows whole thoughts. */
+export function clip(text: string, max: number): string {
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const stop = Math.max(cut.lastIndexOf('. '), cut.lastIndexOf('! '), cut.lastIndexOf('? '));
+  if (stop > max / 3) return cut.slice(0, stop + 1);
+  return `${cut.slice(0, cut.lastIndexOf(' ') > 0 ? cut.lastIndexOf(' ') : max).replace(/[,;:]$/, '')}…`;
+}
+
+/**
+ * The morning alert: a title that names the best news, and a short body.
+ * Lock screens show about two lines, so the body is the lede (when the assistant wrote one) or the counts.
+ */
+export function digestNotice(d: Pick<Digest, 'firstRun' | 'lede' | 'drops' | 'vendors' | 'vault' | 'cleanup' | 'seen'>): { title: string; body: string } {
+  if (d.firstRun) {
+    return { title: 'Your first digest is ready', body: `It took stock of ${plural(d.seen.length, 'item')}. New drops show up from tomorrow on.` };
+  }
+  const best = d.drops.weapons[0];
+  const title = best?.verdict === 'god' ? `New god roll: ${best.name}`
+    : best?.grade === 'S' ? `New S-grade ${best.type}: ${best.name}`
+    : d.vendors[0] ? `Worth buying today: ${d.vendors[0].name}`
+    : 'Your daily digest';
+  const counts = [
+    d.drops.total ? `${plural(d.drops.total, 'new item')}` : 'No new items',
+    d.vendors.length ? plural(d.vendors.length, 'vendor pick') : '',
+    `vault ${d.vault.used}/${d.vault.capacity}`,
+  ].filter(Boolean).join(' · ');
+  return { title: clip(title, 60), body: d.lede ? clip(d.lede, 170) : counts };
+}

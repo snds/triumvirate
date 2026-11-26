@@ -96,3 +96,14 @@ Once a day the server syncs your inventory and writes a digest: new weapons and 
 
 - Build it each morning: set `DIGEST_HOUR=7` in `.env` (after a 3 AM crawl, so grades are fresh).
 - Files live in `.data/digests/`, one per day; the last 30 are kept.
+
+### Morning alert on your phone
+
+When the scheduled digest is built, the server can send a notification to your phone (Web Push). Tapping it opens the digest.
+
+- Turn it on from the **Morning alert** switch at the bottom of the digest, on each device you want alerts on. **Send a test** checks it right away.
+- On iPhone (iOS 16.4 or later) it only works in the app added to the Home Screen, not in a Safari tab.
+- Only the scheduled build sends one; tapping **Build today** doesn't, since you're already looking at it.
+- Keys: the server makes a VAPID key pair the first time and keeps it in `.data/vapid.json`. To set your own, put `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `.env` (`npx web-push generate-vapid-keys`). Changing keys turns alerts off on every device until you switch them on again.
+- `VAPID_SUBJECT` is the contact address push services see; it defaults to `mailto:` plus the first address in `ALLOWED_EMAILS`.
+- Devices are listed in `.data/push.json`. One that's been removed is dropped the next time an alert is sent.

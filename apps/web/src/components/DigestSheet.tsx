@@ -5,6 +5,7 @@ import { fetchDigest, runDigest, type DigestResponse } from '../api.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { Sheet } from './Sheet.tsx';
+import { alertState, clearDigestAlerts, disableAlerts, enableAlerts, sendTestAlert, type AlertState } from '../push.ts';
 
 const longDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -21,7 +22,7 @@ export function DigestSheet({ items, onSelect, onClose, onSeen }: {
   const [error, setError] = useState('');
   const [building, setBuilding] = useState(false);
   const load = (date?: string) => fetchDigest(date).then(setData, (e: Error) => setError(e.message));
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); void clearDigestAlerts(); }, []);
   useEffect(() => { if (data?.digest) onSeen(data.digest.date); }, [data?.digest?.date]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const build = async () => {
@@ -85,6 +86,7 @@ export function DigestSheet({ items, onSelect, onClose, onSeen }: {
           <Section title="Worth buying" icon="vendor" list={d.vendors} byId={byId} onSelect={onSelect} empty="Nothing at vendors graded A or better, or on your wish list." />
         </article>
       )}
+      {data && <MorningAlert />}
     </Sheet>
   );
 }
@@ -116,6 +118,67 @@ function Section({ title, icon, list, byId, onSelect, empty }: {
             );
           })}
         </ul>
+      )}
+    </section>
+  );
+}
+
+const hourLabel = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString(undefined, { hour: 'numeric' });
+
+/** The on/off switch for a phone alert when the morning digest is ready, with what this device needs first. */
+function MorningAlert() {
+  const [state, setState] = useState<AlertState>({ kind: 'loading' });
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  useEffect(() => { alertState().then(setState, () => setState({ kind: 'server-off' })); }, []);
+
+  const run = async (fn: () => Promise<AlertState>) => {
+    setBusy(true);
+    setNote('');
+    try { setState(await fn()); } catch (e) { setNote(e instanceof Error ? e.message : String(e)); }
+    setBusy(false);
+  };
+  const test = async () => {
+    if (state.kind !== 'on') return;
+    setBusy(true);
+    setNote((await sendTestAlert(state.endpoint)) ?? 'Sent. It can take a few seconds to arrive.');
+    setBusy(false);
+  };
+
+  const on = state.kind === 'on';
+  const canToggle = state.kind === 'on' || state.kind === 'off';
+  const schedule = canToggle && state.digestHour === null ? ' The server isn\'t building one each morning yet (DIGEST_HOUR is unset).' : '';
+  const text = {
+    loading: 'Checking this device…',
+    install: 'On iPhone, alerts only work in the Home Screen app. In Safari, tap Share, then Add to Home Screen, and open it from there.',
+    unsupported: state.kind === 'unsupported' ? state.reason : '',
+    'server-off': 'Alerts are off on the server.',
+    denied: 'Notifications are blocked for Triumvirate. Turn them on in Settings > Notifications > Triumvirate, then reopen the app.',
+    off: `Get a notification on this device when the digest is ready${canToggle && state.digestHour !== null ? `, around ${hourLabel(state.digestHour)}` : ''}.${schedule}`,
+    on: `On for this device${canToggle && state.digestHour !== null ? `, around ${hourLabel(state.digestHour)} each morning` : ''}.${schedule}`,
+  }[state.kind];
+
+  return (
+    <section className="alert-setting" aria-labelledby="alert-setting-title">
+      <Icon name={on ? 'activity' : 'alertsOff'} className="alert-setting__icon" />
+      <div className="alert-setting__text">
+        <h4 className="alert-setting__title" id="alert-setting-title">Morning alert</h4>
+        <p className="alert-setting__desc">{text}</p>
+        {note && <p className="alert-setting__note" role="status">{note}</p>}
+        {on && <button className="button button--quiet alert-setting__test" disabled={busy} onClick={() => void test()}>Send a test</button>}
+      </div>
+      {canToggle && (
+        <button
+          role="switch"
+          aria-checked={on}
+          aria-labelledby="alert-setting-title"
+          className="switch"
+          disabled={busy}
+          // Straight from the tap: iPhones only show the permission prompt for a direct user action.
+          onClick={() => void run(() => (state.kind === 'off' ? enableAlerts(state.publicKey) : disableAlerts()))}
+        >
+          <span className="switch__track"><span className="switch__thumb" /></span>
+        </button>
       )}
     </section>
   );

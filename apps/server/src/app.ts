@@ -10,8 +10,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import {
   applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
-  type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, type Digest,
+  type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
 } from '@triumvirate/core';
+import type { Push } from './push.ts';
 import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
 import { stream } from 'hono/streaming';
@@ -50,6 +51,8 @@ export interface AppDeps {
   communityCrawlHour?: number;
   /** Local hour (0-23) to build the daily digest; off when unset (it can still be built on demand). */
   digestHour?: number;
+  /** Web Push for the morning alert; alerts are off when absent. */
+  push?: Push;
 }
 
 export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
@@ -732,13 +735,57 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     try { return c.json({ digest: publicDigest(await runDigest()), dates: await digests.dates() }); }
     catch (e) { return c.json({ error: e instanceof Error ? e.message : String(e) }, 409); }
   });
+  // ── Morning alert (Web Push) ───────────────────────────────
+  // Only the scheduled build alerts: when you tap "Build today" you're already looking at it.
+  async function notifyDigest(d: Digest) {
+    if (!deps.push) return;
+    const r = await deps.push.notify({ ...digestNotice(d), tag: 'digest', url: '/?open=digest' });
+    if (r.sent || r.removed || r.failed) console.log(`Digest alert: sent ${r.sent}, removed ${r.removed}, failed ${r.failed}.`);
+  }
+  app.get('/api/push', async (c) => {
+    if (!deps.push) return c.json({ enabled: false });
+    const endpoint = c.req.query('endpoint');
+    return c.json({
+      enabled: true,
+      publicKey: await deps.push.publicKey(),
+      subscribed: endpoint ? await deps.push.has(endpoint) : false,
+      devices: await deps.push.count(),
+      digestHour: deps.digestHour ?? null,
+    });
+  });
+  app.post('/api/push/subscribe', async (c) => {
+    if (!deps.push) return c.json({ error: 'Alerts are off on this server.' }, 404);
+    const body = (await c.req.json().catch(() => ({}))) as { subscription?: unknown; device?: unknown };
+    if (!deps.push.validSubscription(body.subscription)) return c.json({ error: 'That isn\'t a push subscription.' }, 400);
+    await deps.push.add(body.subscription, typeof body.device === 'string' ? body.device : undefined);
+    return c.json({ ok: true });
+  });
+  app.post('/api/push/unsubscribe', async (c) => {
+    if (!deps.push) return c.json({ ok: true });
+    const { endpoint } = (await c.req.json().catch(() => ({}))) as { endpoint?: unknown };
+    if (typeof endpoint !== 'string') return c.json({ error: 'Missing endpoint.' }, 400);
+    await deps.push.remove(endpoint);
+    return c.json({ ok: true });
+  });
+  /** Sends a sample alert to this device only, built from the latest digest when there is one. */
+  app.post('/api/push/test', async (c) => {
+    if (!deps.push) return c.json({ error: 'Alerts are off on this server.' }, 404);
+    const { endpoint } = (await c.req.json().catch(() => ({}))) as { endpoint?: unknown };
+    if (typeof endpoint !== 'string' || !(await deps.push.has(endpoint))) return c.json({ error: 'Turn alerts on for this device first.' }, 400);
+    const d = await digests.latest();
+    const msg = d ? digestNotice(d) : { title: 'Alerts are on', body: 'You\'ll get one here each morning when the digest is ready.' };
+    const r = await deps.push.notify({ ...msg, tag: 'digest', url: '/?open=digest' }, endpoint);
+    if (!r.sent) return c.json({ error: r.removed ? 'This device stopped accepting alerts. Turn them off and on again.' : 'The push service didn\'t take it. Try again in a minute.' }, 502);
+    return c.json({ ok: true });
+  });
+
   if (deps.digestHour !== undefined) {
     const hour = deps.digestHour;
     const t = setInterval(() => {
       const now = new Date();
       if (now.getHours() !== hour || digestRun) return;
       void digests.get(localDate(now)).then((done) => {
-        if (!done) runDigest().catch((e) => console.error('Daily digest failed:', e));
+        if (!done) runDigest().then(notifyDigest).catch((e) => console.error('Daily digest failed:', e));
       });
     }, 5 * 60_000);
     t.unref();

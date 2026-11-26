@@ -53,6 +53,21 @@ export function App() {
   const [digestOpen, setDigestOpen] = useState(false);
   const [latestDigest, setLatestDigest] = useState('');
   const [seenDigest, setSeenDigest] = usePref('digestSeen', '');
+  // Tapping the morning alert opens the digest: as ?open=digest on a fresh launch, or as a
+  // message from the service worker when the app was already open in the background.
+  useEffect(() => {
+    const url = new URL(location.href);
+    if (url.searchParams.get('open') === 'digest') {
+      setDigestOpen(true);
+      url.searchParams.delete('open');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    }
+    const onMessage = (e: MessageEvent<{ type?: string; view?: string }>) => {
+      if (e.data?.type === 'open' && e.data.view === 'digest') setDigestOpen(true);
+    };
+    navigator.serviceWorker?.addEventListener('message', onMessage);
+    return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
+  }, []);
   const syncedAt = state.status === 'ready' ? state.inv.syncedAt : '';
   useEffect(() => {
     if (!syncedAt) return;

@@ -14,6 +14,10 @@
     "@triumvirate/core": "workspace:*",
     "bungie-api-ts": "^5.10.0",
     "hono": "^4.13.21",
-    "jose": "^6.2.18"
+    "jose": "^6.2.18",
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@types/web-push": "^3.6.4"
   }
 }
