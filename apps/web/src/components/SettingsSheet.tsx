@@ -10,7 +10,7 @@ import { AUTO_REFRESH, TILE_SCALES, allPrefs, restorePrefs, usePref } from '../p
 import { timeAgo } from '../inventory.ts';
 import { GRADE_ORDER } from '../rolls-view.ts';
 import { chime, DEFAULT_ROLL_SETTINGS, type RollSettings } from './RollsView.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 import { Icon, type IconName } from './Icon.tsx';
 
 type Section = 'display' | 'rolls' | 'wishlists' | 'data' | 'status';

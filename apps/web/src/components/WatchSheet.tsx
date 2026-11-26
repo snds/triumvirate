@@ -6,7 +6,7 @@ import { checkWatch, fetchRolls, fetchWatch, removeWatch, saveWatch, type WatchR
 import { timeAgo } from '../inventory.ts';
 import { Icon } from './Icon.tsx';
 import { ItemTile } from './ItemTile.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards, SkPerks } from './Skeleton.tsx';
 
 /** "Kill Clip Enhanced" and "Kill Clip" are the same choice. */

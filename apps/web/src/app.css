@@ -928,6 +928,9 @@ body.is-dragging-item .tile { pointer-events: none; }
   box-shadow: var(--shadow-dialog);
   overflow: hidden;
 }
+/* React Aria's Modal wrapper: layout only, so the dialog stays the scrim's grid item. */
+.dialog-frame, .sheet-frame { display: contents; }
+.dialog:focus { outline: none; }
 .item-dialog__bar {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2);
   padding: var(--space-2) var(--space-4);

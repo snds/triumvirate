@@ -12,7 +12,7 @@ import { ItemTile } from './ItemTile.tsx';
 import { LoadoutEditor } from './LoadoutEditor.tsx';
 import { OptimizerSheet } from './OptimizerSheet.tsx';
 import { Icon } from './Icon.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 
 interface Props {
   inv: Inventory;

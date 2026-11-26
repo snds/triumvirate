@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { shareClassName, dimLoadoutLink, loadoutShareText, type AppraisedItem, type SavedLoadout } from '@triumvirate/core/browser';
 import { Icon } from './Icon.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 
 type Shareable = Pick<SavedLoadout, 'name' | 'classType' | 'notes' | 'subclass' | 'artifact'>;
 

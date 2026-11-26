@@ -4,7 +4,7 @@ import type { LoadoutDraft } from '../api.ts';
 import { BuildSummary } from './BuildSummary.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 
 /** Slots in the game's loadout order, with the names the game uses. */
 const SLOTS: { bucket: number; label: string }[] = [

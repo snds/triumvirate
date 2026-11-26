@@ -752,6 +752,7 @@ export function App() {
           onClose={closeDetail}
           copies={copiesOf(selected)}
           onSelect={setSelected}
+          chatOpen={agentOpen}
           onAsk={(item) => { setAbout((a) => ({ id: (a?.id ?? 0) + 1, item })); setAgentOpen(true); }}
         />
       )}

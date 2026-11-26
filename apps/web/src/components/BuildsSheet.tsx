@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ACTIVITY_LABEL, ARMOR_STATS, BUILD_ACTIVITIES, type AppraisedItem, type ArmorSet, type ArmorStat, type BuildActivity, type PopularBuild } from '@triumvirate/core/browser';
 import { fetchBuilds, saveBuilds } from '../api.ts';
 import { Icon, type IconName } from './Icon.tsx';
-import { Sheet } from './Sheet.tsx';
+import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards } from './Skeleton.tsx';
 
 const CLASSES = ['Titan', 'Hunter', 'Warlock'] as const;
