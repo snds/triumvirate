@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import type { AppraisedItem, PerkOption, RollOptions } from '@triumvirate/core/browser';
+import type { AppraisedItem, OrnamentOption, PerkOption, RollOptions } from '@triumvirate/core/browser';
 import { fetchRolls } from '../api.ts';
 import { ItemHeader } from './ItemHeader.tsx';
+import { OrnamentStrip } from './OrnamentStrip.tsx';
 import { Icon } from './Icon.tsx';
 import { ItemFacts, PerkCell, PerkGrid, StatBars, VerdictLine } from './ItemParts.tsx';
 import { ItemTile } from './ItemTile.tsx';
@@ -34,6 +35,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
   const closeRef = useRef<HTMLButtonElement>(null);
   const isWeapon = item.itemType === 3;
   const [tab, setTab] = useState<Tab>('roll');
+  const [preview, setPreview] = useState<OrnamentOption>();
   // A different item resets to its own roll; switching copies keeps the tab you were on.
   const lastHash = useRef(item.itemHash);
   useEffect(() => {
@@ -50,7 +52,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
   ];
   return (
     <ItemDialog label={item.name} onClose={onClose} modal={!chatOpen}>
-        <ItemHeader item={item} size="dialog">
+        <ItemHeader item={item} size="dialog" preview={preview}>
           <button ref={closeRef} className="icon-button item-header__close" onClick={onClose} aria-label="Close" title="Close">
             <Icon name="close" />
           </button>
@@ -94,6 +96,7 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
             <div className="item-dialog__roll">
               <div className="item-dialog__main">
                 <ItemFacts item={item} copies={copies.length} />
+                {isWeapon && item.instanceId && <OrnamentStrip item={item} preview={preview} onPreview={setPreview} />}
                 {a && (
                   <section className={`verdict verdict--${a.verdict}`}>
                     <VerdictLine item={item} />

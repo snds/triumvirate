@@ -9,9 +9,11 @@ import { TierDiamonds } from './ItemParts.tsx';
  * art with tier diamonds, name, rarity and type, then power with element, champion stun, and ammo. Tier color fills it;
  * masterworked items get the gold banner.
  */
-export function ItemHeader({ item, size, children }: {
+export function ItemHeader({ item, size, preview, children }: {
   item: AppraisedItem;
   size: 'card' | 'dialog';
+  /** An ornament previewed from the dialog's strip: its render and name stand in for the applied look. */
+  preview?: { name: string; screenshot?: string; isDefault?: boolean };
   /** Extra content for the dialog, such as the close button. */
   children?: React.ReactNode;
 }) {
@@ -20,7 +22,7 @@ export function ItemHeader({ item, size, children }: {
   // loaded; if it fails (a few old weapons 404), the header falls back to the icon layout.
   const [art, setArt] = useState<{ src: string; state: 'loading' | 'loaded' | 'failed' }>();
   // (api.ts already points bungie.net URLs at the app's image proxy.)
-  const shot = size === 'dialog' ? item.screenshot : undefined;
+  const shot = size === 'dialog' ? (preview ? preview.screenshot : item.screenshot) : undefined;
   const artState = shot && art?.src === shot ? art.state : 'loading';
   const hasArt = !!shot && artState !== 'failed';
   return (
@@ -36,7 +38,9 @@ export function ItemHeader({ item, size, children }: {
             onError={() => setArt({ src: shot, state: 'failed' })}
           />
           <span className="item-header__scrim" aria-hidden />
-          {item.ornament && <span className="item-header__tag">{item.ornament.name}</span>}
+          {preview
+            ? <span className="item-header__tag is-preview">{preview.isDefault ? 'Default look' : preview.name}</span>
+            : item.ornament && <span className="item-header__tag">{item.ornament.name}</span>}
         </>
       )}
       {/* The art, dressed like the inventory tile: watermark, masterwork shimmer, and the

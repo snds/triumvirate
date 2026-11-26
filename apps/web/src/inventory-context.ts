@@ -32,6 +32,8 @@ export interface InventoryApi {
   itemSets?: Record<string, ArmorSet>;
   /** Every item you own, unfiltered by search, for max power. */
   allItems: AppraisedItem[];
+  /** Replaces one item after a change made in game (a perk or ornament swap). */
+  patch?: (item: AppraisedItem) => void;
 }
 
 export const InventoryContext = createContext<InventoryApi>({

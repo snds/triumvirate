@@ -10,6 +10,7 @@ export * from './season.ts';
 export * from './subclass.ts';
 export * from './transfer.ts';
 export * from './loadouts.ts';
+export * from './ornaments.ts';
 export * from './postmaster.ts';
 export * from './power.ts';
 export * from './optimizer.ts';
