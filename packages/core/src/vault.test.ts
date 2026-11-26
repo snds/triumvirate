@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
 import { equippedSubclass, summarizeAccount, summarizeCharacters, summarizeProfile, VAULT_BUCKET } from './vault.ts';
 import { needsRefresh, type Tokens } from './bungie.ts';
-import type { ManifestTables } from './manifest.ts';
+import { slimItems, type ManifestTables } from './manifest.ts';
 
 const manifest = {
   version: 'test',
@@ -249,6 +249,36 @@ test('an ornament in the ornament socket counts when Bungie leaves overrideStyle
   const [row] = summarizeProfile(p, m);
   assert.equal(row?.ornament?.name, 'Timelost Finish');
   assert.equal(row?.icon, 'https://www.bungie.net/orn.png');
+});
+
+test('a weapon carries its large render, or its ornament\'s; none when the ornament has no render', () => {
+  const m = {
+    ...manifest,
+    items: {
+      ...manifest.items,
+      1: { displayProperties: { name: 'Witherhoard', icon: '/base.png' }, itemType: 3, itemTypeDisplayName: 'Grenade Launcher', inventory: { bucketTypeHash: 10 } },
+      7: { displayProperties: { name: 'Drowned in Strife', icon: '/orn.png' } },
+      9: { displayProperties: { name: 'Bare Ornament', icon: '/bare.png' } },
+    },
+    extras: { 1: { screenshot: '/shots/1.jpg' }, 7: { plugCategory: 'exotic_skins', screenshot: '/shots/7.jpg' }, 9: { plugCategory: 'exotic_skins' } },
+  } as unknown as ManifestTables;
+  const p = (style?: number) => ({
+    profileInventory: { data: { items: [{ itemHash: 1, bucketHash: VAULT_BUCKET, itemInstanceId: 'a', state: 0, overrideStyleItemHash: style }] } },
+  }) as unknown as DestinyProfileResponse;
+  assert.equal(summarizeProfile(p(), m)[0]?.screenshot, 'https://www.bungie.net/shots/1.jpg');
+  assert.equal(summarizeProfile(p(7), m)[0]?.screenshot, 'https://www.bungie.net/shots/7.jpg');
+  assert.equal(summarizeProfile(p(9), m)[0]?.screenshot, undefined);
+});
+
+test('slimItems keeps weapon and weapon-ornament renders, not armor ornament ones', () => {
+  const x = slimItems({
+    1: { itemType: 3, screenshot: '/s/1.jpg', equippingBlock: { ammoType: 2 } },
+    2: { itemType: 19, screenshot: '/s/2.jpg', plug: { plugCategoryIdentifier: 'v400.new_bow0_skins' } },
+    3: { itemType: 19, screenshot: '/s/3.jpg', plug: { plugCategoryIdentifier: 'armor_skins_titan_head' } },
+  } as never);
+  assert.equal(x[1]?.screenshot, '/s/1.jpg');
+  assert.equal(x[2]?.screenshot, '/s/2.jpg');
+  assert.equal(x[3]?.screenshot, undefined);
 });
 
 test('reads a weapon\'s champion stun from the instance or the definition', () => {

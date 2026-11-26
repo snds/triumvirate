@@ -185,6 +185,8 @@ export interface ItemExtra {
   socketEntries?: [number, number][];
   /** Armor: the set it belongs to, for set bonuses. */
   itemSetHash?: number;
+  /** Weapons and weapon ornaments: Bungie's 1920×1080 studio render, as a bungie.net path. */
+  screenshot?: string;
 }
 
 export interface ObjectiveExtra {
@@ -209,6 +211,7 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       if (d.equippingBlock?.equipableItemSetHash) x.itemSetHash = d.equippingBlock.equipableItemSetHash;
       if (d.itemType === 3) {
         if (d.equippingBlock?.ammoType) x.ammoType = d.equippingBlock.ammoType;
+        if (d.screenshot) x.screenshot = d.screenshot;
         const base = Object.values(d.stats?.stats ?? {}).filter((st) => st.value !== 0);
         if (base.length) x.baseStats = base.map((st) => [st.statHash, st.value]);
         const entries = d.sockets?.socketEntries ?? [];
@@ -218,6 +221,8 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       }
     }
     if (d.plug?.plugCategoryIdentifier) x.plugCategory = d.plug.plugCategoryIdentifier;
+    // Weapon ornaments carry their own render; armor ornaments' renders aren't used, so skip them.
+    if (d.screenshot && /skins/.test(x.plugCategory ?? '') && !/^armor_skins/.test(x.plugCategory ?? '')) x.screenshot = d.screenshot;
     const inv = (d.investmentStats ?? []).filter((st) => !st.isConditionallyActive && st.value !== 0);
     if (inv.length) x.investment = inv.map((st) => [st.statTypeHash, st.value]);
     if (Object.keys(x).length) out[hash] = x;
@@ -249,7 +254,7 @@ const TABLES = {
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 4;
+const SLIM_VERSION = 5;
 
 /**
  * Returns the manifest tables, or undefined when `currentVersion` is already the
