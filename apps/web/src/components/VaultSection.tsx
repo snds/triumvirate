@@ -4,6 +4,7 @@ import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { useDropZone } from '../drag.ts';
 import { useInventory } from '../inventory-context.ts';
+import { MaterialsCard } from './CharacterCards.tsx';
 
 interface Props {
   items: AppraisedItem[];
@@ -51,6 +52,7 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
             </span>
           )}
         </span>
+        {account?.materials && <MaterialsCard materials={account.materials} />}
         {account && account.currencies.length > 0 && (
           <ul className="currencies" aria-label="Currencies">
             {account.currencies.map((c) => (

@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -737,21 +737,26 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
           }
           return;
         }
-        const base = { itemReferenceHash: step.itemHash, stackSize: 1, itemId: step.instanceId, membershipType: snap.membershipType };
+        // Stacks (materials) have no instance: Bungie takes item id 0 and the stack size.
+        const base = { itemReferenceHash: step.itemHash, stackSize: step.stackSize ?? 1, itemId: step.instanceId || '0', membershipType: snap.membershipType };
         if (step.kind === 'pull') await pullFromPostmaster(http, { ...base, characterId: step.characterId });
         else await transferItem(http, { ...base, characterId: step.characterId, transferToVault: step.kind === 'toVault' });
-        applyStep(snap.profile, step.instanceId, step, manifest!);
+        if (step.instanceId) applyStep(snap.profile, step.instanceId, step, manifest!);
+        else applyPullStack(snap.profile, step.characterId, step.itemHash, manifest!.items[step.itemHash]?.inventory?.bucketTypeHash);
       };
+      let done = 0;
       for (const step of steps) {
         try { await run(step); } catch (err) { error = friendlyMoveError(err); break; }
         if (error) break;
+        done++;
         await pause(120);
       }
       await store.saveSnapshot(snap);
       const next = await buildView(snap);
       const changed = next.items.filter((i) => i.instanceId && before.get(i.instanceId) !== placeKey(i));
       if (!error && steps.length === 0 && skipped.length) error = skipped[0]!.reason;
-      return { status: error ? 409 as const : 200 as const, body: { error, skipped, items: changed, account: next.account } };
+      // `steps` and `done` let a caller say what finished, e.g. "pulled 5, sent 2 to the vault".
+      return { status: error ? 409 as const : 200 as const, body: { error, skipped, items: changed, account: next.account, steps, done } };
     });
   }
 
@@ -771,6 +776,22 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       return planEquip(ids, characterId, view.items, view.characters, account);
     });
     return c.json(out.body, out.status);
+  });
+
+  // Collects a character's postmaster: pulls everything, sending spares to the vault when a slot is full.
+  app.post('/api/postmaster/collect', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { characterId } = (await c.req.json().catch(() => ({}))) as { characterId?: string };
+    if (!characterId) return c.json({ error: 'Say which character.' }, 400);
+    const out = await runPlan(t, (view, account) => planCollectPostmaster(characterId, view.items, view.characters, account));
+    const { steps, done, ...rest } = out.body;
+    const finished = steps.slice(0, done);
+    return c.json({
+      ...rest,
+      pulled: finished.filter((s) => s.kind === 'pull').length,
+      toVault: finished.filter((s) => s.kind === 'toVault').length,
+    }, out.status);
   });
 
   // Locks or unlocks an item in game.

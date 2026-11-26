@@ -196,6 +196,14 @@
   --avatar-size: 32px;
   --drawer-width: 440px;
   --hovercard-width: 360px;
+  /* Info cards (power, set bonus, materials): hover cards with a mouse, sheets on touch. */
+  --info-card-surface: var(--surface-panel);
+  --info-card-section: var(--surface-raised);
+  --info-card-shadow: var(--shadow-overlay);
+  /* Postmaster engram row: one cell per slot; empty slots are an outline. */
+  --engram-size: var(--size-36);
+  --engram-empty: var(--border-subtle);
+  --set-badge-size: var(--size-28);
   --chat-fab-size: 56px;
   --stat-bar: var(--gray-300);
   /* Subclass accents for build cards */
