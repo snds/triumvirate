@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -294,42 +294,47 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const body = (await c.req.json().catch(() => ({}))) as { instanceId?: string; plugs?: { socketIndex: number; plugHash: number }[] };
     const { instanceId, plugs } = body;
     if (!instanceId || !Array.isArray(plugs) || plugs.length === 0) return c.json({ error: 'Say which weapon and which perks.' }, 400);
-    const run = moveQueue.then(async () => {
-      if (!current || !lastView) {
-        setCurrent((await store.latestSnapshot()) ?? (await sync(t)));
-        if (!manifest) await sync(t);
-        await buildView(current!);
-      }
-      const item = lastView!.items.find((i) => i.instanceId === instanceId);
+    const out = await queued(async () => {
+      const { snap, view, http } = await ready(t);
+      const item = view.items.find((i) => i.instanceId === instanceId);
       if (!item?.perks) return { status: 404 as const, body: { error: 'That weapon isn\'t there anymore. Refresh and try again.' } };
       // Only options this copy already has: never anything it can't roll.
       const allowed = (p: { socketIndex: number; plugHash: number }) =>
         item.perks!.some((col) => col.some((o) => o.socketIndex === p.socketIndex && o.hash === p.plugHash));
       if (!plugs.every(allowed)) return { status: 400 as const, body: { error: 'Those perks aren\'t options on this copy.' } };
       // Bungie wants a character even for vault items; any of yours works.
-      const characterId = item.owner !== 'vault' ? item.owner : lastView!.characters[0]?.id;
+      const characterId = item.owner !== 'vault' ? item.owner : view.characters[0]?.id;
       if (!characterId) return { status: 400 as const, body: { error: 'No character found to act through.' } };
-      const http = createHttpClient(cfg.apiKey, t.accessToken);
       let error: string | undefined;
+      let applied = 0;
       for (const p of plugs) {
+        if (applied) await pause(120);
         try {
           await insertSocketPlugFree(http, {
             plug: { socketIndex: p.socketIndex, socketArrayType: 0, plugItemHash: p.plugHash },
-            itemId: instanceId, characterId, membershipType: current!.membershipType,
+            itemId: instanceId, characterId, membershipType: snap.membershipType,
           } as never);
         } catch (err) {
-          error = friendlyMoveError(err);
+          console.error(`[perks] Swap on ${instanceId} socket ${p.socketIndex} failed:`, err);
+          error = friendlyPerkError(err);
           break;
         }
-        await new Promise((f) => setTimeout(f, 120));
+        // Record what Bungie accepted. Re-syncing here used to bring back the OLD perks, because Bungie's
+        // profile endpoint lags behind writes, so the swap looked like it did nothing.
+        applyPlug(snap.profile, instanceId, p.socketIndex, p.plugHash);
+        applied++;
       }
-      // Pull the real state back from Bungie, so the app shows what actually stuck.
-      const snap = await sync(t);
-      const view = await buildView(snap);
-      return { status: error ? 409 as const : 200 as const, body: { error, item: view.items.find((i) => i.instanceId === instanceId) } };
+      if (applied) {
+        snapVersion++;
+        await store.saveSnapshot(snap);
+      }
+      const next = applied ? await buildView(snap) : view;
+      const body = { applied, total: plugs.length, error, item: next.items.find((i) => i.instanceId === instanceId) };
+      if (!error) return { status: 200 as const, body };
+      // Say which part stuck when a multi-perk change stops partway.
+      if (applied) body.error = `${applied} of ${plugs.length} perks changed, then: ${error}`;
+      return { status: 409 as const, body };
     });
-    moveQueue = run.catch(() => {});
-    const out = await run;
     return c.json(out.body, out.status);
   });
 
@@ -1031,6 +1036,16 @@ export function friendlyMoveError(err: unknown): string {
   if (code === 1656) return 'That item is equipped, so it can\'t do that right now.';
   if (code === 31 || code === 36) return 'Bungie asked us to slow down. Wait a moment and try again.';
   return msg;
+}
+
+/** Bungie's errors for a perk swap, worded for people; unknown codes keep Bungie's own message. */
+export function friendlyPerkError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const m = /Bungie API error (\d+): ([\s\S]*)/.exec(msg);
+  const code = Number(m?.[1]);
+  if (code === 2108 || code === 31 || code === 36 || code === 1623) return friendlyMoveError(err);
+  if (!m) return `The perk change didn't go through: ${msg}`;
+  return `Bungie refused the perk change: ${m[2]!.trim() || 'no reason given'} (error ${code}).`;
 }
 
 interface View {

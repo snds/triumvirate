@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
-import { applyEquip, applyLock, checkEquip, cleanLoadout, equippedAsLoadout, loadoutStatus, planEquip, summarizeGameLoadouts } from './loadouts.ts';
+import { applyEquip, applyLock, applyPlug, checkEquip, cleanLoadout, equippedAsLoadout, loadoutStatus, planEquip, summarizeGameLoadouts } from './loadouts.ts';
 import { SUBCLASS_BUCKET } from './vault.ts';
 
 const KINETIC = 1498876634;
@@ -94,6 +94,15 @@ test('applyEquip swaps equipment and inventory; applyLock flips the state bit', 
   assert.equal(p.profileInventory!.data!.items[0]!.state & 1, 1);
   assert.equal(applyLock(p, '2', false), true);
   assert.equal(p.characterEquipment!.data!.w!.items[0]!.state & 1, 0);
+});
+
+test('applyPlug records a perk swap in the sockets component', () => {
+  const p = { itemComponents: { sockets: { data: { '3': { sockets: [{ plugHash: 10, isEnabled: true, isVisible: true }, { plugHash: 20, isEnabled: true, isVisible: true }] } } } } } as unknown as DestinyProfileResponse;
+  assert.equal(applyPlug(p, '3', 1, 21), true);
+  assert.equal(p.itemComponents!.sockets!.data!['3']!.sockets[1]!.plugHash, 21);
+  assert.equal(p.itemComponents!.sockets!.data!['3']!.sockets[0]!.plugHash, 10);
+  assert.equal(applyPlug(p, '3', 5, 1), false);
+  assert.equal(applyPlug(p, '9', 0, 1), false);
 });
 
 test('summarizeGameLoadouts names slots and spots empty ones', () => {
