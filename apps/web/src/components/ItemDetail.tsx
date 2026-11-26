@@ -282,7 +282,7 @@ function MoveButtons({ item }: { item: AppraisedItem }) {
  * Equip on a character: one button per character that can wear it. The likeliest one (the
  * character holding it, else the one you played last) is the primary button.
  */
-function EquipButtons({ item }: { item: AppraisedItem }) {
+export function EquipButtons({ item }: { item: AppraisedItem }) {
   const inv = useInventory();
   if (!item.instanceId) return null;
   const busy = inv.moving.has(item.instanceId);
@@ -315,7 +315,7 @@ function EquipButtons({ item }: { item: AppraisedItem }) {
 }
 
 /** Lock toggle, as in game: a locked item can't be dismantled. */
-function LockButton({ item }: { item: AppraisedItem }) {
+export function LockButton({ item }: { item: AppraisedItem }) {
   const inv = useInventory();
   // Only weapons and armor (and ghosts) lock.
   if (!item.instanceId || (item.itemType !== 2 && item.itemType !== 3 && item.bucket !== 'Ghost')) return null;
