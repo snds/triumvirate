@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -553,8 +553,8 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const key = `${current.membershipId}.${manifest.version}`;
     let hit = recordScreens.get(current.membershipId);
     if (!hit || hit.key !== key || c.req.query('refresh') || Date.now() - hit.at > 5 * 60_000) {
-      // Characters, PresentationNodes, Records.
-      const { Response: profile } = await getProfile(http, { membershipType: current.membershipType, destinyMembershipId: current.membershipId, components: [200, 700, 900] as never });
+      // Characters, PresentationNodes, Records, Collectibles.
+      const { Response: profile } = await getProfile(http, { membershipType: current.membershipType, destinyMembershipId: current.membershipId, components: [200, 700, 800, 900] as never });
       hit = { at: Date.now(), key, profile };
       recordScreens.set(current.membershipId, hit);
     }
@@ -570,8 +570,13 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       gender: ch?.genderType === 1 ? 'Female' : 'Male',
       tracked: pinned,
     });
+    const collectibles = {
+      ...(p.profileCollectibles?.data?.collectibles ?? {}),
+      ...(characterId ? p.characterCollectibles?.data?.[characterId]?.collectibles ?? {} : {}),
+    };
     return c.json({
       pinned,
+      exotics: exoticGaps(manifest, collectibles),
       characterId,
       characters: chars.map((x) => ({ id: x.id, className: x.className })),
       fetchedAt: new Date(hit.at).toISOString(),

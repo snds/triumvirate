@@ -167,6 +167,8 @@ export interface RecordsScreen {
   titles: TitleView[];
   triumphs: NodeView[];
   legacy: NodeView[];
+  /** Exotic catalysts, by weapon type. */
+  catalysts: NodeView[];
   /** Hashes of the game's tracked triumph and the ones you track here, as views. */
   tracked: RecordView[];
   /** Incomplete triumphs at least `nearlyAt` done, most done first. */
@@ -309,6 +311,8 @@ export function recordsScreen(input: RecordsInput): RecordsScreen {
 
   const triumphs = children(pr.recordCategoriesRootNodeHash);
   const legacy = children(tables.roots.legacyTriumphs);
+  // Catalysts come last, so a record also listed elsewhere keeps that path.
+  const catalysts = children(tables.roots.catalysts);
   const titles = [...sealsFrom(pr.recordSealsRootNodeHash, false), ...sealsFrom(tables.roots.legacySeals, true)];
 
   // Everything visible, once, for the tracked and nearly-done lists.
@@ -324,7 +328,7 @@ export function recordsScreen(input: RecordsInput): RecordsScreen {
 
   return {
     score: { active: pr.activeScore ?? pr.score ?? 0, legacy: pr.legacyScore ?? 0, lifetime: pr.lifetimeScore ?? 0 },
-    titles, triumphs, legacy, tracked, nearly,
+    titles, triumphs, legacy, catalysts, tracked, nearly,
   };
 }
 
@@ -355,4 +359,52 @@ export function filterNodes(nodes: NodeView[], f: RecordFilters): NodeView[] {
     return { ...n, ...(nodes.length ? { nodes } : { nodes: undefined }), ...(records.length ? { records } : { records: undefined }) };
   };
   return nodes.map((n) => walk(n, false)).filter((x): x is NodeView => !!x);
+}
+
+// ── Exotic collection gaps ───────────────────────────────────
+
+export interface ExoticGap {
+  itemHash: number;
+  name: string;
+  icon?: string;
+  /** "Hand Cannon", "Helmet"... */
+  type?: string;
+  /** 3 weapon, 2 armor. */
+  itemType: number;
+  /** 0 Titan, 1 Hunter, 2 Warlock, 3 any. */
+  classType: number;
+  /** Where it comes from ("Exotic engrams", "Complete the Vow of the Disciple raid"). */
+  source?: string;
+}
+
+/** DestinyCollectibleState flags. */
+const COLLECTIBLE = { NotAcquired: 1, Invisible: 4 } as const;
+
+/**
+ * Exotic weapons and armor in your collections that you haven't picked up yet. Items the game
+ * hides from collections (retired, not yet released) are left out, and each collectible counts once.
+ */
+export function exoticGaps(
+  manifest: Pick<ManifestTables, 'items' | 'sources'>,
+  collectibles: Record<string, { state: number }>,
+): ExoticGap[] {
+  const seen = new Set<number>();
+  const out: ExoticGap[] = [];
+  for (const [key, def] of Object.entries(manifest.items)) {
+    const hash = Number(key);
+    const ch = def.collectibleHash;
+    if (!ch || seen.has(ch) || (def.itemType !== 3 && def.itemType !== 2)) continue;
+    if (def.inventory?.tierTypeName !== 'Exotic' || !def.displayProperties?.name) continue;
+    const c = collectibles[ch];
+    if (!c || (c.state & COLLECTIBLE.Invisible) || !(c.state & COLLECTIBLE.NotAcquired)) continue;
+    seen.add(ch);
+    out.push({
+      itemHash: hash, name: def.displayProperties.name,
+      ...(def.displayProperties.icon ? { icon: `https://www.bungie.net${def.displayProperties.icon}` } : {}),
+      ...(def.itemTypeDisplayName ? { type: def.itemTypeDisplayName } : {}),
+      itemType: def.itemType, classType: def.classType ?? 3,
+      ...(manifest.sources?.[hash] ? { source: manifest.sources[hash] } : {}),
+    });
+  }
+  return out.sort((a, b) => a.itemType - b.itemType || a.classType - b.classType || a.name.localeCompare(b.name));
 }

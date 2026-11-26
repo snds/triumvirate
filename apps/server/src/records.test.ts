@@ -22,6 +22,9 @@ function fakeBungie() {
     if (url.includes('/Destiny2/Manifest/') && !url.includes('/m/')) {
       return ok({ version: 'v1', jsonWorldComponentContentPaths: { en: Object.fromEntries(TABLES.map((t) => [t, `/m/${t}.json`])) } });
     }
+    if (url.includes('/m/DestinyInventoryItemLiteDefinition')) {
+      return new Response(JSON.stringify({ 5: { hash: 5, collectibleHash: 55, itemType: 3, classType: 3, itemTypeDisplayName: 'Hand Cannon', displayProperties: { name: 'Ace of Spades', icon: '/a.png' }, inventory: { tierTypeName: 'Exotic', bucketTypeHash: 1498876634 } } }));
+    }
     if (url.includes('/m/DestinyObjectiveDefinition')) return new Response(JSON.stringify({ 7: { progressDescription: 'Opponents defeated', uiStyle: 0 } }));
     if (url.includes('/m/DestinyRecordDefinition')) {
       return new Response(JSON.stringify({
@@ -39,7 +42,7 @@ function fakeBungie() {
       }));
     }
     if (url.includes('/m/')) return new Response('{}');
-    if (url.includes('/Profile/42/') && url.includes('components=200%2C700%2C900')) {
+    if (url.includes('/Profile/42/') && url.includes('components=200%2C700%2C800%2C900')) {
       return ok({
         characters: { data: { c1: { characterId: 'c1', genderType: 1 } } },
         profileRecords: { data: {
@@ -47,6 +50,7 @@ function fakeBungie() {
           records: { 900: { state: 4, objectives: [] }, 101: { state: 4, objectives: [obj(7, 0, 1)] }, 201: { state: 4, objectives: [obj(7, 90, 100)] } },
         } },
         profilePresentationNodes: { data: { nodes: { 11: { state: 0, progressValue: 0, completionValue: 1 } } } },
+        profileCollectibles: { data: { collectibles: { 55: { state: 1 } } } },
       });
     }
     if (url.includes('/Profile/42/')) {
@@ -86,6 +90,7 @@ test('records: titles, triumphs, nearly done, and tracking that survives a backu
     assert.equal(body.triumphs[0].name, 'Crucible');
     assert.equal(body.nearly[0].name, 'Almost there');
     assert.equal(body.nearly[0].objectives[0].description, 'Opponents defeated');
+    assert.deepEqual(body.exotics.map((g: { name: string }) => g.name), ['Ace of Spades']);
     // Only the trimmed copies are kept on disk.
     const files = await readdir(join(dir, 'manifest', 'v1'));
     assert.ok(files.some((f) => f.startsWith('DestinyRecordDefinition.slim')));
@@ -96,7 +101,7 @@ test('records: titles, triumphs, nearly done, and tracking that survives a backu
     assert.deepEqual(tr.tracked, [201]);
     const again = await (await app.request('/api/records')).json();
     assert.deepEqual(again.tracked.map((r: { name: string }) => r.name), ['Almost there']);
-    assert.equal(calls.filter((u) => u.includes('components=200%2C700%2C900')).length, 1, 'profile reused within 5 minutes');
+    assert.equal(calls.filter((u) => u.includes('components=200%2C700%2C800%2C900')).length, 1, 'profile reused within 5 minutes');
 
     const backup = await (await app.request('/api/backup')).json();
     assert.deepEqual(backup.data.trackedRecords, [201]);

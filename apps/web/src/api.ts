@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RecordsScreen, ExoticGap, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -404,6 +404,8 @@ export type RecordsResponse = RecordsScreen & {
   fetchedAt: string;
   /** Record hashes tracked in this app. */
   pinned: number[];
+  /** Exotics in your collections you haven't picked up. Optional so an older server still renders. */
+  exotics?: ExoticGap[];
 };
 /** Titles, triumphs, tracked, and nearly done for one character; `refresh` asks Bungie again. */
 export const fetchRecords = async (characterId?: string, refresh = false): Promise<RecordsResponse> => {
