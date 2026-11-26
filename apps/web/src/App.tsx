@@ -11,6 +11,7 @@ import { QuickMoveSheet } from './components/QuickMoveSheet.tsx';
 import { CleanupView } from './components/CleanupView.tsx';
 import { RollsView } from './components/RollsView.tsx';
 import { LoadoutsView } from './components/LoadoutsView.tsx';
+import { VendorsView } from './components/VendorsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
@@ -447,6 +448,13 @@ export function App() {
           >
             Loadouts
           </button>
+          <button
+            className={`segmented__option${view === 'vendors' ? ' is-selected' : ''}`}
+            aria-current={view === 'vendors' ? 'page' : undefined}
+            onClick={() => setView('vendors')}
+          >
+            Vendors
+          </button>
         </nav>}
         {!compact && <><input
           className="search"
@@ -562,6 +570,16 @@ export function App() {
             onReload={() => load(false)}
             onToast={(text) => setToast({ id: Date.now(), text })}
           />
+        ) : view === 'vendors' ? (
+          <VendorsView
+            characters={inv.characters}
+            characterId={inv.characters.some((c) => c.id === store) ? store : inv.characters[0]?.id ?? ''}
+            onCharacter={setStore}
+            compact={compact}
+            query={query}
+            kind={kind}
+            onSelect={setSelected}
+          />
         ) : view === 'rolls' ? (
           <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} onWatchList={() => setWatchOpen(true)} />
         ) : (
@@ -604,6 +622,7 @@ export function App() {
         <TabBar
           view={view}
           onView={(v) => { setView(v); setAgentOpen(false); }}
+          onSettings={() => setSettingsOpen(true)}
           cleanupCount={inv.cleanup.length}
           chatOpen={agentOpen}
           onChat={() => setAgentOpen((o) => !o)}

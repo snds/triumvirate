@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Hono, type Context } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
+import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
@@ -13,8 +13,10 @@ import {
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
   type SavedLoadout, type CleanupState, type WatchEntry,
+  vendorScreen, balancesFrom, bestInSlot,
 } from '@triumvirate/core';
 import type { WishListCache } from './wishlist-cache.ts';
+import { createDefsCache } from './defs-cache.ts';
 import type { Push } from './push.ts';
 import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
@@ -419,6 +421,112 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     if (!current || !lastView || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
     return c.json(await vendorOffers(t, !!c.req.query('refresh')));
   });
+  // ── Vendors screen ─────────────────────────────────────────
+  // Everything one character's vendors sell, grouped like the game does, with costs, ownership,
+  // ranks, weapon grades, and armor that beats what you have for a build. One pull per character
+  // is reused for 15 minutes (or until ?refresh).
+  const defs = createDefsCache(store.dataDir);
+  const vendorScreens = new Map<string, { at: number; key: string; body: unknown }>();
+  app.get('/api/vendors', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { snap, view, http } = await ready(t);
+    if (!current || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const chars = [...view.characters].sort((a, b) => Date.parse(b.lastPlayed) - Date.parse(a.lastPlayed));
+    const characterId = chars.some((ch) => ch.id === c.req.query('character')) ? c.req.query('character')! : chars[0]?.id;
+    if (!characterId) return c.json({ error: 'No characters on this account.' }, 409);
+    const key = `${current.membershipId}.${manifest.version}.${deps.wishLists?.version ?? 0}.${buildStore.version}.${snapVersion}`;
+    const hit = vendorScreens.get(characterId);
+    if (hit && hit.key === key && !c.req.query('refresh') && Date.now() - hit.at < 15 * 60_000) return c.json(hit.body);
+
+    const mv = manifest.version;
+    const [{ Response: vendors }, { Response: collections }] = await Promise.all([
+      getVendors(http, {
+        membershipType: current.membershipType, destinyMembershipId: current.membershipId, characterId,
+        // Vendors, VendorCategories, VendorSales, ItemInstances, ItemStats, ItemSockets, ItemReusablePlugs.
+        components: [400, 401, 402, 300, 304, 305, 310] as never,
+        filter: 0 as never,
+      }),
+      // Collectibles: which cosmetics and gear you already own.
+      getProfile(http, { membershipType: current.membershipType, destinyMembershipId: current.membershipId, components: [800] as never }),
+    ]);
+    const vendorHashes = Object.keys(vendors.vendors?.data ?? {}).map(Number);
+    const vdefs = await defs.many<DestinyVendorDefinition>(http, mv, 'DestinyVendorDefinition', vendorHashes);
+    const groupHashes = [
+      ...(vendors.vendorGroups?.data?.groups ?? []).map((g) => g.vendorGroupHash),
+      ...[...vdefs.values()].map((d) => d.groups?.[0]?.vendorGroupHash).filter((h): h is number => !!h),
+    ];
+    const destHashes = [...vdefs.values()].flatMap((d) => (d.locations ?? []).map((l) => l.destinationHash)).filter(Boolean);
+    const progHashes = Object.values(vendors.vendors?.data ?? {}).map((v) => v.progression?.progressionHash).filter((h): h is number => !!h && !manifest!.season?.progressions[h]);
+    const [gdefs, ddefs, pdefs] = await Promise.all([
+      defs.many<DestinyVendorGroupDefinition>(http, mv, 'DestinyVendorGroupDefinition', groupHashes),
+      defs.many<DestinyDestinationDefinition>(http, mv, 'DestinyDestinationDefinition', destHashes),
+      defs.many<DestinyProgressionDefinition>(http, mv, 'DestinyProgressionDefinition', progHashes),
+    ]);
+
+    // Rolled weapons and armor, read like inventory rows so they can be graded.
+    const rows = vendorWeapons([{ characterId, vendors }], manifest, (h) => vdefs.get(h)?.displayProperties.name || 'Vendor', { armor: true, dedupe: false });
+    const list = await deps.wishList();
+    const r = await community.rollup();
+    const items: Record<string, AppraisedItem> = {};
+    const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
+    const fits: Record<string, string[]> = {};
+    const { builds } = await buildStore.get();
+    const ownedArmor = view.items.filter((i) => i.itemType === 2 && i.instanceId);
+    for (const row of rows) {
+      const id = row.instanceId!;
+      if (row.itemType === 3 && row.perks) {
+        items[id] = { ...row, appraisal: appraise(row.itemHash, new Set(row.perks.flat().map((p) => p.name)), list, manifest) };
+        grades[id] = appraiseCommunity(manifest, r?.weapons[row.itemHash], row.itemHash, row.perks);
+      } else {
+        items[id] = row;
+        // Armor that would be best in slot for a build, against everything you own.
+        if (row.itemType === 2 && row.stats && Object.keys(row.stats).length) {
+          const best = bestInSlot([...ownedArmor, row], builds, manifest.itemSets ?? {}).get(id);
+          if (best?.length) fits[id] = best.map((b) => b.build);
+        }
+      }
+    }
+    const collectibles = {
+      ...(collections.profileCollectibles?.data?.collectibles ?? {}),
+      ...(collections.characterCollectibles?.data?.[characterId]?.collectibles ?? {}),
+    };
+    const groups = vendorScreen({
+      vendors, manifest,
+      info: (h) => {
+        const d = vdefs.get(h);
+        if (!d || !d.displayProperties?.name || d.visible === false) return undefined;
+        return {
+          name: d.displayProperties.name,
+          subtitle: d.displayProperties.subtitle || undefined,
+          icon: bungieUrl(d.displayProperties.smallTransparentIcon || d.displayProperties.icon),
+          groupHash: d.groups?.[0]?.vendorGroupHash,
+          locations: (d.locations ?? []).map((l) => ddefs.get(l.destinationHash)?.displayProperties?.name || undefined),
+          categories: (d.displayCategories ?? []).map((x) => x.displayProperties?.name ?? ''),
+          failures: d.failureStrings ?? [],
+        };
+      },
+      group: (h) => { const g = gdefs.get(h); return g ? { name: g.categoryName, order: g.order } : undefined; },
+      rank: (h) => {
+        const known = manifest!.season?.progressions[h];
+        if (known) return { name: known.name, steps: known.steps.map((x) => ({ name: x.name, total: x.total })) };
+        const d = pdefs.get(h);
+        return d ? { name: d.displayProperties?.name ?? '', steps: (d.steps ?? []).map((x) => ({ name: x.stepName ?? '', total: x.progressTotal ?? 0 })) } : undefined;
+      },
+      balances: balancesFrom(snap.profile as never, characterId),
+      collectibles,
+      rowIds: new Set(Object.keys(items)),
+    });
+    const body = {
+      characterId,
+      characters: chars.map((ch) => ({ id: ch.id, className: ch.className, classType: ch.classType, emblemBackground: ch.emblemBackground })),
+      fetchedAt: new Date().toISOString(),
+      groups, items, grades, fits,
+    };
+    vendorScreens.set(characterId, { at: Date.now(), key, body });
+    return c.json(body);
+  });
+
   // Farming targets: god rolls you're missing, where they drop, and vendors selling them now.
   app.get('/api/farming', async (c) => {
     const t = await validTokens();

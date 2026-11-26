@@ -128,10 +128,10 @@ export const ItemTile = memo(function ItemTile({
  * Tile art fades in over the tier border once its image arrives. An image the browser already has
  * (a re-render, a store switch, a filter) shows at once: fading hundreds of cached tiles would be noise.
  */
-function artReady(img: HTMLImageElement | null) {
+export function artReady(img: HTMLImageElement | null) {
   if (img?.complete && img.naturalWidth > 0) img.dataset.art = 'cached';
 }
-function artLoaded(e: React.SyntheticEvent<HTMLImageElement>) {
+export function artLoaded(e: React.SyntheticEvent<HTMLImageElement>) {
   const img = e.currentTarget;
   if (!img.dataset.art) img.dataset.art = 'fresh';
 }

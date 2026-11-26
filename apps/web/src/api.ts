@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RollOptions, SavedLoadout, WatchEntry, WatchHit } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorKeep, ArmorSet, PopularBuild, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RollOptions, SavedLoadout, VendorGroupView, WatchEntry, WatchHit } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -377,3 +377,23 @@ export interface BackupFile {
 }
 export const fetchBackup = async (): Promise<BackupFile> => json(await fetch('/api/backup'));
 export const restoreBackup = (file: BackupFile) => act<{ restored?: string[]; error?: string }>('/api/backup', file, 'restore the backup');
+// ── Vendors ───────────────────────────────────────────────────
+export interface VendorsResponse {
+  characterId: string;
+  characters: { id: string; className: string; classType: number; emblemBackground?: string }[];
+  fetchedAt: string;
+  groups: VendorGroupView[];
+  /** Rolled weapons and armor on sale, by row id (`vendor-<vendor>-<index>`), shaped like inventory items. */
+  items: Record<string, AppraisedItem>;
+  /** Community grade per weapon row id. */
+  grades: Record<string, CommunityAppraisal>;
+  /** Builds each armor row would be best in slot for. */
+  fits: Record<string, string[]>;
+}
+/** One character's vendors; `refresh` asks Bungie again instead of the 15-minute copy. */
+export const fetchVendors = async (characterId?: string, refresh = false): Promise<VendorsResponse> => {
+  const q = new URLSearchParams();
+  if (characterId) q.set('character', characterId);
+  if (refresh) q.set('refresh', '1');
+  return json(await fetch(`/api/vendors${q.size ? `?${q}` : ''}`), sameOriginImages);
+};
