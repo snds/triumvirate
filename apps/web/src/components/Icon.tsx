@@ -22,6 +22,7 @@ const GLYPHS = {
   delete: 'delete',
   back: 'arrow_back',
   crafted: 'construction',
+  deepsight: 'visibility',
   tracker: 'my_location',
   copies: 'filter_none',
   enhanced: 'keyboard_double_arrow_up',

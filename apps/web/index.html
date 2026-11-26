@@ -26,12 +26,12 @@
         display: grid; place-content: center; justify-items: center; gap: 20px;
         background: var(--surface-page, #0b0d10);
         font: 13px/1.4 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
-        color: var(--loader-label, #5d6673); letter-spacing: 0.02em;
+        color: var(--loader-label, #6c737e); letter-spacing: 0.02em;
       }
       .boot__mark { width: var(--loader-mark-size, 72px); height: var(--loader-mark-size, 72px); overflow: visible; }
       .boot__slot { fill: none; stroke: var(--loader-unlit, rgb(193 175 41 / 0.22)); stroke-width: 6; }
       .boot__lit {
-        fill: var(--loader-lit, #c1af29); opacity: 0; transform-box: fill-box; transform-origin: center;
+        fill: var(--loader-lit, #ceae33); opacity: 0; transform-box: fill-box; transform-origin: center;
         animation: boot-write var(--loader-cycle, 1800ms) infinite both;
         animation-delay: calc(var(--n) * var(--loader-step, 160ms));
       }

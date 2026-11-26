@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -481,10 +481,15 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     ];
     const destHashes = [...vdefs.values()].flatMap((d) => (d.locations ?? []).map((l) => l.destinationHash)).filter(Boolean);
     const progHashes = Object.values(vendors.vendors?.data ?? {}).map((v) => v.progression?.progressionHash).filter((h): h is number => !!h && !manifest!.season?.progressions[h]);
-    const [gdefs, ddefs, pdefs] = await Promise.all([
+    // Placeholder sales (no item type) may be links to a vendor sub-page; only their full item
+    // definitions say which (preview.previewVendorHash), so fetch just those few.
+    const placeholderHashes = Object.values(vendors.sales?.data ?? {}).flatMap((s) => Object.values(s.saleItems ?? {}))
+      .map((s) => s.itemHash).filter((h) => { const d = manifest!.items[h]; return d && d.itemType === 0 && !d.itemTypeDisplayName; });
+    const [gdefs, ddefs, pdefs, idefs] = await Promise.all([
       defs.many<DestinyVendorGroupDefinition>(http, mv, 'DestinyVendorGroupDefinition', groupHashes),
       defs.many<DestinyDestinationDefinition>(http, mv, 'DestinyDestinationDefinition', destHashes),
       defs.many<DestinyProgressionDefinition>(http, mv, 'DestinyProgressionDefinition', progHashes),
+      defs.many<{ preview?: { previewVendorHash?: number } }>(http, mv, 'DestinyInventoryItemDefinition', placeholderHashes),
     ]);
 
     // Rolled weapons and armor, read like inventory rows so they can be graded.
@@ -526,6 +531,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
           groupHash: d.groups?.[0]?.vendorGroupHash,
           locations: (d.locations ?? []).map((l) => ddefs.get(l.destinationHash)?.displayProperties?.name || undefined),
           categories: (d.displayCategories ?? []).map((x) => x.displayProperties?.name ?? ''),
+          hiddenCategories: (d.displayCategories ?? []).flatMap((x, i) => (hiddenVendorCategory(x) ? [i] : [])),
           failures: d.failureStrings ?? [],
         };
       },
@@ -539,6 +545,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       balances: balancesFrom(snap.profile as never, characterId),
       collectibles,
       rowIds: new Set(Object.keys(items)),
+      links: (h) => idefs.get(h)?.preview?.previewVendorHash || undefined,
     });
     const body = {
       characterId,
@@ -592,6 +599,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       gender: ch?.genderType === 1 ? 'Female' : 'Male',
       tracked: pinned,
     });
+    markDeepsight(screen.patterns, view.items);
     const collectibles = {
       ...(p.profileCollectibles?.data?.collectibles ?? {}),
       ...(characterId ? p.characterCollectibles?.data?.[characterId]?.collectibles ?? {} : {}),
