@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -22,6 +22,7 @@ import { createCommunity } from './community.ts';
 import { createLoadoutStore, validLoadoutId } from './loadouts.ts';
 import { createDigestStore, localDate, validDigestDate } from './digests.ts';
 import { createCleanupStore } from './cleanup-store.ts';
+import { createBuildStore } from './builds-store.ts';
 import { createWatchStore } from './watch-store.ts';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
@@ -627,6 +628,20 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   // The API can't dismantle, so a "dismantle" decision queues the item; Pull brings the queue onto a
   // character, where the game lets you shard it. "Keep" locks it in game so it never comes back.
   const cleanupStore = createCleanupStore(store.dataDir);
+  const buildStore = createBuildStore(store.dataDir);
+  // Popular builds: armor that's best in slot for one stays out of the cleanup picks.
+  app.get('/api/builds', async (c) => {
+    const { builds, custom } = await buildStore.get();
+    return c.json({ builds, custom });
+  });
+  app.put('/api/builds', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { builds?: unknown; reset?: boolean };
+    if (!body.reset && !Array.isArray(body.builds)) return c.json({ error: 'Send the builds list, or reset.' }, 400);
+    const saved = await buildStore.set(body.reset ? null : cleanBuilds(body.builds) as PopularBuild[]);
+    return c.json(saved);
+  });
   let cleanupVersion = 0;
   /** Saved decisions, reconciled with what's in the inventory now (gone = dismantled). */
   async function cleanupNow(items: AppraisedItem[]) {
@@ -646,6 +661,8 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       cleared: state.cleared.slice(0, 20),
       clearedWeek: clearedSince(state, 7),
       community: r ? { builtAt: r.builtAt, samples: r.samples } : undefined,
+      keeps: view.keeps,
+      builds: (await buildStore.get()).builds.filter((b) => !b.off).length,
     };
   }
   app.get('/api/cleanup', async (c) => {
@@ -792,7 +809,8 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const list = await deps.wishList();
     // Community grades sharpen cleanup picks; a new nightly rollup means a new view.
     const r = await community.rollup();
-    const key = `${snapVersion}.${manifest!.version}.${r?.builtAt ?? ''}`;
+    const { builds } = await buildStore.get();
+    const key = `${snapVersion}.${manifest!.version}.${r?.builtAt ?? ''}.${buildStore.version}`;
     if (viewCache && viewCache.key === key && viewCache.list === list && lastView) return viewCache.view;
     const items: AppraisedItem[] = summarizeProfile(snap.profile, manifest!).map((i) =>
       i.itemType === 3 && i.perks
@@ -803,7 +821,10 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const account = summarizeAccount(snap.profile, manifest!);
     const grades: GradeLookup = {};
     if (r) for (const i of items) if (i.itemType === 3 && i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest!, r.weapons[i.itemHash], i.itemHash, i.perks);
-    const cleanup = cleanupCandidates(items, grades);
+    // Armor picks respect armor sets and the popular builds list (see builds.ts).
+    const sets = manifest!.itemSets ?? {};
+    const cleanup = cleanupCandidates(items, grades, { builds, sets });
+    const keeps = armorKeeps(items, { builds, sets });
     const hashById = new Map(items.filter((i) => i.instanceId).map((i) => [i.instanceId!, i.itemHash]));
     const gameLoadouts = summarizeGameLoadouts(snap.profile, manifest!, (id) => hashById.get(id));
     // Only the armor sets this account owns pieces of; the full list is mostly other people's gear.
@@ -815,7 +836,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       subclassFor = manifest!.version;
     }
     lastView = { displayName: snap.displayName, characters, items, cleanup, subclass, itemSets };
-    const view = { characters, account, items, cleanup, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets };
+    const view = { characters, account, items, cleanup, keeps, gameLoadouts, loadoutStyles: manifest!.loadoutStyles, itemSets };
     viewCache = { key, list, view };
     return view;
   }
@@ -1053,6 +1074,8 @@ interface View {
   account: ReturnType<typeof summarizeAccount>;
   items: AppraisedItem[];
   cleanup: ReturnType<typeof cleanupCandidates>;
+  /** Armor kept on purpose because of sets and builds, with why. */
+  keeps: ReturnType<typeof armorKeeps>;
   gameLoadouts: ReturnType<typeof summarizeGameLoadouts>;
   loadoutStyles: ManifestTables['loadoutStyles'];
   itemSets: NonNullable<ManifestTables['itemSets']>;
