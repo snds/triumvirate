@@ -37,31 +37,14 @@ export function SeasonSheet({ onClose }: { onClose: () => void }) {
   const s = data;
 
   return (
-    <Sheet title={s?.season ? `Season ${s.season.number}: ${s.season.name}` : 'Season'} onClose={onClose} wide>
+    <Sheet title="Season" onClose={onClose} wide>
       {error && <p className="error">{error}</p>}
       <Reveal loading={!s && !error} skeleton={<SkCards count={4} />} label="Loading season progress">
       {s && (
         <>
-          {s.season && daysText(s.season.daysLeft) && (
-            <p className="season__ends"><Icon name="timer" /> {daysText(s.season.daysLeft)}</p>
-          )}
+          <SeasonHero s={s} />
           <div className="season__cards">
-            {s.pass ? (
-              <section className="season-card">
-                <header className="season-card__head">
-                  <Art src={s.pass.icon} className="season-card__icon" />
-                  <div>
-                    <p className="season-card__label">Season pass · {s.pass.name}</p>
-                    <p className="season-card__big">Rank {s.pass.rank}</p>
-                  </div>
-                </header>
-                <Meter progress={s.pass.progress} next={s.pass.next} label="Season pass rank progress" />
-                <p className="season-card__note">
-                  {num(s.pass.progress)} of {num(s.pass.next)} XP to rank {s.pass.rank + 1}
-                  {daysText(s.pass.daysLeft) && s.pass.daysLeft !== s.season?.daysLeft ? ` · Pass ${daysText(s.pass.daysLeft)!.toLowerCase()}` : ''}
-                </p>
-              </section>
-            ) : <section className="season-card"><p className="muted">Season pass rank shows up after your next sync.</p></section>}
+            {!s.pass && <section className="season-card"><p className="muted">Season pass rank shows up after your next sync.</p></section>}
             {s.artifact && (
               <section className="season-card">
                 <header className="season-card__head">
@@ -95,6 +78,45 @@ export function SeasonSheet({ onClose }: { onClose: () => void }) {
       )}
       </Reveal>
     </Sheet>
+  );
+}
+
+/**
+ * The season's key art with its mark, name, and time left at the top (the art's soft, transparent
+ * top edge leaves room), and the pass rank and XP bar on the scrim at the bottom. Older seasons have
+ * no art: the same layout on a plain panel, led by the mark.
+ */
+function SeasonHero({ s }: { s: SeasonResponse }) {
+  const [broken, setBroken] = useState(false);
+  const art = s.season?.art && !broken ? s.season.art : undefined;
+  if (!s.season && !s.pass) return null;
+  return (
+    <section className={`season-hero${art ? ' has-art' : ''}`} aria-label="Season and pass">
+      {art && <img className="season-hero__art" src={art} alt="" onError={() => setBroken(true)} />}
+      {s.season && (
+        <div className="season-hero__top">
+          <Art src={s.season.icon} className="season-hero__mark" />
+          <div>
+            <p className="season-hero__label">Season {s.season.number}</p>
+            <h3 className="season-hero__name">{s.season.name}</h3>
+            {daysText(s.season.daysLeft) && <p className="season-hero__ends"><Icon name="timer" /> {daysText(s.season.daysLeft)}</p>}
+          </div>
+        </div>
+      )}
+      {s.pass && (
+        <div className="season-hero__pass">
+          <div className="season-hero__rank">
+            <span className="season-hero__label">{s.pass.name}</span>
+            <span className="season-hero__big">Rank {s.pass.rank}</span>
+          </div>
+          <Meter progress={s.pass.progress} next={s.pass.next} label="Season pass rank progress" />
+          <p className="season-hero__note">
+            {num(s.pass.progress)} of {num(s.pass.next)} XP to rank {s.pass.rank + 1}
+            {daysText(s.pass.daysLeft) && s.pass.daysLeft !== s.season?.daysLeft ? ` · Pass ${daysText(s.pass.daysLeft)!.toLowerCase()}` : ''}
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

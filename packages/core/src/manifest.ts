@@ -58,7 +58,7 @@ export interface ProgressionInfo {
   steps: { name: string; total: number; icon?: string }[];
 }
 export interface SeasonTables {
-  seasons: Record<string, { name: string; number: number; startDate?: string; endDate?: string; passes: { hash: number; start?: string; end?: string }[]; icon?: string }>;
+  seasons: Record<string, { name: string; number: number; startDate?: string; endDate?: string; passes: { hash: number; start?: string; end?: string }[]; icon?: string; art?: string }>;
   passes: Record<string, { name: string; icon?: string; reward: number; prestige?: number }>;
   artifacts: Record<string, { name: string; icon?: string }>;
   /** Only the ranks and season pass progressions; the full table is mostly faction trivia. */
@@ -82,6 +82,8 @@ export function slimSeason(
       name: s.displayProperties?.name ?? '', number: s.seasonNumber ?? 0, startDate: s.startDate, endDate: s.endDate,
       passes: (s.seasonPassList ?? []).map((x: any) => ({ hash: x.seasonPassHash, start: x.seasonPassStartDate, end: x.seasonPassEndDate })),
       icon: url(s.displayProperties?.icon),
+      // Key art (720×405, soft transparent edges made to sit on a dark ground). Older seasons have none.
+      ...(s.backgroundImagePath ? { art: url(s.backgroundImagePath) } : {}),
     };
   }
   const keep = new Set<number>();
@@ -270,7 +272,7 @@ const TABLES = {
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 7;
+const SLIM_VERSION = 8;
 
 /**
  * Opens the live manifest: its version, and a loader that downloads a table once and keeps it on

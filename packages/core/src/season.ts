@@ -20,7 +20,7 @@ export interface RankRow {
 }
 
 export interface SeasonSummary {
-  season?: { name: string; number: number; endsAt?: string; daysLeft?: number; icon?: string };
+  season?: { name: string; number: number; endsAt?: string; daysLeft?: number; icon?: string; art?: string };
   pass?: { name: string; icon?: string; rank: number; progress: number; next: number; endsAt?: string; daysLeft?: number };
   artifact?: {
     name: string; icon?: string; powerBonus: number; points: number; pointsUsed?: number;
@@ -72,7 +72,7 @@ export function seasonSummary(profile: DestinyProfileResponse, manifest: Pick<Ma
   const season = t.seasons[data.currentSeasonHash ?? -1];
   if (season) {
     const endsAt = realDate(season.endDate);
-    out.season = { name: season.name, number: season.number, ...(endsAt ? { endsAt, daysLeft: daysUntil(endsAt, now) } : {}), ...(season.icon ? { icon: season.icon } : {}) };
+    out.season = { name: season.name, number: season.number, ...(endsAt ? { endsAt, daysLeft: daysUntil(endsAt, now) } : {}), ...(season.icon ? { icon: season.icon } : {}), ...(season.art ? { art: season.art } : {}) };
   }
 
   const pass = t.passes[data.currentSeasonPassHash ?? -1];

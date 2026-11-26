@@ -2061,6 +2061,33 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 
 
 /* ── Season tracker ────────────────────────────────────────── */
+/* Season hero: key art on the darkest ground (its edges are feathered to transparent, so they melt
+   into it). Mark and name sit in the art's empty top; pass rank and XP sit on the bottom scrim. */
+.season-hero {
+  container: season-hero / inline-size;
+  position: relative; isolation: isolate; overflow: hidden;
+  display: grid; align-content: space-between; gap: var(--space-4);
+  min-height: 160px; padding: var(--space-4); border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+.season-hero.has-art { aspect-ratio: var(--season-art-ratio); background: var(--surface-page); }
+.season-hero__art { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; object-fit: cover; object-position: 50% 70%; }
+.season-hero.has-art::after { content: ''; position: absolute; inset: 0; z-index: -1; background: var(--art-scrim); }
+.season-hero__top { display: flex; align-items: center; gap: var(--space-3); }
+.season-hero__mark { width: 56px; height: 56px; flex: none; object-fit: contain; }
+.season-hero__label { margin: 0; font-size: var(--font-size-12); color: var(--text-secondary); }
+.season-hero__name { margin: 0; font-size: var(--font-size-24); line-height: var(--leading-tight); }
+.season-hero__ends { display: flex; align-items: center; gap: var(--space-1); margin: var(--space-0-5) 0 0; color: var(--text-secondary); font-size: var(--font-size-13); }
+.season-hero__ends .icon { font-size: var(--font-size-16); }
+.season-hero__pass { display: grid; gap: var(--space-2); max-width: 520px; }
+.season-hero__rank { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.season-hero__big { font-size: var(--font-size-28); font-weight: var(--font-weight-bold); line-height: var(--leading-tight); }
+.season-hero__note { margin: 0; font-size: var(--font-size-12); color: var(--text-secondary); }
+.season-hero.has-art :is(.season-hero__name, .season-hero__big) { text-shadow: 0 1px 8px rgb(0 0 0 / 0.6); }
+@container season-hero (max-width: 480px) {
+  .season-hero__name { font-size: var(--font-size-20); }
+  .season-hero__mark { width: 44px; height: 44px; }
+}
 .season__ends { display: flex; align-items: center; gap: var(--space-1); margin: 0; color: var(--text-secondary); font-size: var(--font-size-13); }
 .season__ends .icon { font-size: var(--font-size-16); }
 .season__cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: var(--space-3); }
