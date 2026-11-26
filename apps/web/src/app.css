@@ -91,8 +91,10 @@ html, body, #root { height: 100%; overflow: clip; }
   height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  /* Top bar, status banner (an empty row unless one shows), then the scrolling content. */
+  grid-template-rows: auto auto minmax(0, 1fr);
 }
+.app > .main { grid-row: 3; }
 .app > .topbar { grid-column: 1 / -1; }
 .main { position: relative; overflow: auto; padding-bottom: calc(var(--chat-fab-size) + 2 * var(--space-4)); } /* positioned, so visually hidden text stays inside it */
 
@@ -2550,3 +2552,45 @@ li.title-card { cursor: default; }
 .exotic__name { font-size: 14px; font-weight: 600; }
 .exotic__type { font-size: 12px; color: var(--text-secondary); }
 .exotic__source { font-size: 12px; color: var(--text-muted); }
+
+/* ── App states: sign-in, can't-load screens, and the stale/offline banner ──
+   One tone token per state; the banner and screen icon tint from it. Info falls back until the
+   Radix status scales land. */
+.status-screen { padding: var(--space-6) calc(var(--page-gutter) + var(--safe-right)) var(--space-6) calc(var(--page-gutter) + var(--safe-left)); text-align: center; gap: var(--space-3); }
+.status-screen--warning, .status-banner--warning { --status-tone: var(--warning); }
+.status-screen--info, .status-banner--info { --status-tone: var(--info, var(--element-arc)); }
+.status-screen--accent { --status-tone: var(--accent); }
+.status-screen--danger, .status-banner--danger { --status-tone: var(--danger); }
+.status-screen--muted, .status-banner--muted { --status-tone: var(--text-secondary); }
+.status-screen__icon {
+  width: var(--size-52); height: var(--size-52); border-radius: 50%; display: grid; place-items: center;
+  color: var(--status-tone); background: color-mix(in srgb, var(--status-tone) 14%, transparent);
+}
+.status-screen__icon .icon { font-size: 26px; }
+.status-screen__title { margin: 0; font-size: 20px; font-weight: 700; text-wrap: balance; }
+.status-screen__text { margin: 0; max-width: 40ch; color: var(--text-secondary); text-wrap: pretty; }
+.status-screen__fine, .status-screen__count { margin: 0; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.status-screen__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); }
+.status-screen__details { max-width: min(480px, 100%); font-size: 12px; color: var(--text-muted); }
+.status-screen__details code { display: block; margin-top: var(--space-1); padding: var(--space-2); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--text-secondary); text-align: left; white-space: pre-wrap; word-break: break-word; }
+.button--ghost { background: none; border-color: transparent; color: var(--text-secondary); }
+.button--ghost:hover { background: var(--surface-hover); color: var(--text-primary); }
+
+.status-banner {
+  grid-row: 2; grid-column: 1 / -1;
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) calc(var(--page-gutter) + var(--safe-right)) var(--space-2) calc(var(--page-gutter) + var(--safe-left));
+  font-size: 13px; color: var(--text-primary);
+  background: color-mix(in srgb, var(--status-tone) 12%, var(--surface-panel));
+  border-bottom: 1px solid color-mix(in srgb, var(--status-tone) 40%, transparent);
+  animation: rise-in var(--motion-normal) var(--motion-enter);
+}
+.status-banner > .icon { color: var(--status-tone); font-size: 18px; flex: none; }
+.status-banner__text { flex: 1; min-width: 0; }
+.status-banner__text b { font-weight: 600; }
+.status-banner__action {
+  flex: none; min-height: var(--control-size, 32px); padding: 0 var(--space-2); border: 0; border-radius: var(--radius-sm);
+  background: none; color: var(--text-primary); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.status-banner__action:hover { background: var(--surface-hover); }
+@media (prefers-reduced-motion: reduce) { .status-banner { animation: none; } }

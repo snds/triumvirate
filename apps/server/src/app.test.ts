@@ -30,7 +30,24 @@ test('callback rejects a mismatched state', async () => {
   const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
   await app.request('/auth/login');
   const res = await app.request('/auth/callback?code=abc&state=wrong');
-  assert.equal(res.status, 400);
+  // Back to the app, whose sign-in screen explains it and offers the button again.
+  assert.equal(res.status, 302);
+  assert.equal(res.headers.get('location'), '/?signin=retry');
+});
+
+test('callback sends a cancelled Bungie sign-in back to the app', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  await app.request('/auth/login');
+  const res = await app.request('/auth/callback?error=access_denied');
+  assert.equal(res.headers.get('location'), '/?signin=retry');
+});
+
+test('inventory says a sign-in ran out', async () => {
+  const store = createStore(await mkdtemp(join(tmpdir(), 'tri-')));
+  await store.writeTokens({ accessToken: 'a', refreshToken: 'r', accessExpiresAt: 0, refreshExpiresAt: Date.now() - 1000, bungieMembershipId: '1' });
+  const res = await createApp(cfg, store, deps).request('/api/inventory');
+  assert.equal(res.status, 401);
+  assert.deepEqual(await res.json(), { signedIn: false, reason: 'expired' });
 });
 
 test('agent explains how to turn it on when there is no API key', async () => {

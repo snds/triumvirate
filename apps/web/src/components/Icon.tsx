@@ -82,6 +82,8 @@ const GLYPHS = {
   title: 'workspace_premium',
   pin: 'keep',
   gilded: 'auto_awesome',
+  maintenance: 'build',
+  cloudOff: 'cloud_off',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

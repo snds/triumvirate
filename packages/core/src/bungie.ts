@@ -29,6 +29,26 @@ export function authorizeUrl(cfg: BungieConfig, state: string): string {
   return u.toString();
 }
 
+/**
+ * A failed Bungie call. The message keeps the "Bungie API error N: …" shape that callers match on.
+ * `code` is Bungie's ErrorCode (5 = SystemDisabled, i.e. maintenance); `status` is the HTTP status.
+ */
+export class BungieError extends Error {
+  constructor(readonly code: number, message: string, readonly status = 0) {
+    super(`Bungie API error ${code}: ${message}`);
+    this.name = 'BungieError';
+  }
+}
+
+/** True when Bungie itself is down: maintenance (SystemDisabled) or a 5xx with no data. */
+export const bungieIsDown = (err: unknown) => {
+  const code = err instanceof BungieError ? err.code : Number(/Bungie API error (\d+)/.exec(String((err as Error)?.message ?? err))?.[1]);
+  return code === 5 || (err instanceof BungieError && err.status >= 500);
+};
+
+/** A refresh token Bungie no longer accepts (expired or revoked). Not a network or maintenance failure. */
+export class TokenRejected extends Error {}
+
 /** Confidential-client token call; `grant` is either an auth code or a refresh token. */
 async function tokenRequest(cfg: BungieConfig, grant: Record<string, string>): Promise<Tokens> {
   const res = await fetch(TOKEN_URL, {
@@ -40,7 +60,12 @@ async function tokenRequest(cfg: BungieConfig, grant: Record<string, string>): P
     },
     body: new URLSearchParams(grant),
   });
-  if (!res.ok) throw new Error(`Bungie token request failed: ${res.status} ${await res.text()}`);
+  if (!res.ok) {
+    const text = await res.text();
+    // 400/401 is Bungie saying no to the grant itself; anything else is Bungie being unwell.
+    if (res.status === 400 || res.status === 401) throw new TokenRejected(`Bungie token request failed: ${res.status} ${text}`);
+    throw new BungieError(5, `token request failed (${res.status})`, res.status);
+  }
   const j = (await res.json()) as {
     access_token: string;
     expires_in: number;
@@ -86,8 +111,12 @@ export function createHttpClient(apiKey: string, accessToken?: string): HttpClie
       },
       body: config.body ? JSON.stringify(config.body) : undefined,
     });
-    const json = (await res.json()) as { ErrorCode: number; Message: string };
-    if (json.ErrorCode !== 1) throw new Error(`Bungie API error ${json.ErrorCode}: ${json.Message}`);
+    // During maintenance or an outage Bungie answers with an HTML page instead of its JSON wrapper.
+    let json: { ErrorCode: number; Message: string };
+    try { json = (await res.json()) as typeof json; } catch {
+      throw new BungieError(res.status >= 500 ? 5 : 0, `Bungie answered ${res.status} without data`, res.status);
+    }
+    if (json.ErrorCode !== 1) throw new BungieError(json.ErrorCode, json.Message, res.status);
     return json as T;
   };
 }

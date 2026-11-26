@@ -4,11 +4,14 @@
 //    The last good page is only a fallback when there's no connection at all.
 // 2. Built files (/assets/*, named by content hash) and Bungie art never change, so they're served
 //    from the cache once seen.
-// 3. Everything else (your inventory, the chat, sign-in) is never cached here.
+// 3. Your inventory always comes from the network too; the last good copy is kept only so the
+//    installed app can open with no connection. That copy is marked, so the app says it's offline.
+// 4. Everything else (the chat, sign-in, actions) is never cached here.
 const PAGES = 'pages-v1';
 const ASSETS = 'assets-v1';
 const ART = 'art-v1';
-const KEEP = [PAGES, ASSETS, ART];
+const DATA = 'data-v1';
+const KEEP = [PAGES, ASSETS, ART, DATA];
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {
@@ -51,12 +54,28 @@ async function page(request) {
   }
 }
 
+/** Network first; with no connection at all, the last inventory this device loaded, marked as saved. */
+async function inventory(request) {
+  try {
+    const res = await fetch(request);
+    if (cacheable(res) && res.status === 200) (await caches.open(DATA)).put('/api/inventory', res.clone());
+    return res;
+  } catch (err) {
+    const saved = await (await caches.open(DATA)).match('/api/inventory');
+    if (!saved) throw err;
+    const headers = new Headers(saved.headers);
+    headers.set('x-triumvirate-saved', '1');
+    return new Response(saved.body, { status: 200, headers });
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
   if (request.mode === 'navigate' && !/^\/(api|auth)\//.test(url.pathname)) event.respondWith(page(request));
+  else if (url.pathname === '/api/inventory') event.respondWith(inventory(request));
   else if (url.pathname.startsWith('/assets/')) event.respondWith(cacheFirst(request, ASSETS, 80));
   else if (url.pathname.startsWith('/api/bungie-img/')) event.respondWith(cacheFirst(request, ART, 2000));
 });
