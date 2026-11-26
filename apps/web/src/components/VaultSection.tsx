@@ -1,5 +1,5 @@
 import type { AccountSummary, AppraisedItem } from '@triumvirate/core/browser';
-import { groupBySlot } from '../inventory.ts';
+import { groupBySlot, rowOf } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { useDropZone } from '../drag.ts';
@@ -31,7 +31,7 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
   return (
     <section className={`column vault${drop.className}`} aria-label="Vault" {...drop.props}>
       {drop.note && <p className="drop-note" role="status">{drop.note}</p>}
-      <header className="vault__header">
+      <header className="vault__header" style={{ gridRow: rowOf('header') }}>
         {onToggleCollapsed && <button
           className="icon-button"
           onClick={onToggleCollapsed}
@@ -62,23 +62,27 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
           </ul>
         )}
       </header>
-      <div className="vault__body">
-      {className && (
-        <div className="vault__filters">
-          <button
-            className={`chip${classOnly ? ' is-selected' : ''}`}
-            aria-pressed={classOnly}
-            onClick={onToggleClassOnly}
-            title={classOnly ? `Showing armor ${className}s can wear. Click to show every class.` : `Showing every class. Click to show only ${className} armor.`}
-          >
-            {classOnly && <Icon name="check" />}{className} gear only
-          </button>
+      {/* No wrapper around the rest: each part sits in the shared row grid so slots line up with the characters'. */}
+      {(className || postmasterNotes.length > 0 || groups.length === 0) && (
+        <div className="vault__top" style={{ gridRow: rowOf('top') }}>
+          {className && (
+            <div className="vault__filters">
+              <button
+                className={`chip${classOnly ? ' is-selected' : ''}`}
+                aria-pressed={classOnly}
+                onClick={onToggleClassOnly}
+                title={classOnly ? `Showing armor ${className}s can wear. Click to show every class.` : `Showing every class. Click to show only ${className} armor.`}
+              >
+                {classOnly && <Icon name="check" />}{className} gear only
+              </button>
+            </div>
+          )}
+          {postmasterNotes.length > 0 && <p className="postmaster__note">Postmaster: {postmasterNotes.join(', ')}</p>}
+          {groups.length === 0 && <p className="empty">Nothing in the vault matches.</p>}
         </div>
       )}
-      {postmasterNotes.length > 0 && <p className="postmaster__note">Postmaster: {postmasterNotes.join(', ')}</p>}
-      {groups.length === 0 && <p className="empty">Nothing in the vault matches.</p>}
       {groups.map((g) => (
-        <div className="vault__group" key={g.slot}>
+        <div className="vault__group" key={g.slot} style={{ gridRow: rowOf(g.slot) }}>
           <h3 className="vault__slot">
             {g.slot} <span className="vault__count">{g.items.length}</span>
           </h3>
@@ -87,7 +91,6 @@ export function VaultSection({ items, account, collapsed, onToggleCollapsed, pos
           </div>
         </div>
       ))}
-      </div>
     </section>
   );
 }

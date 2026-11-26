@@ -1,5 +1,5 @@
 import { useHover } from '../hover.ts';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import { useDragActions } from '../drag.ts';
 import { useInventory } from '../inventory-context.ts';
 import { Icon } from './Icon.tsx';
@@ -26,13 +26,49 @@ function tilt(e: React.PointerEvent<HTMLElement>) {
   e.currentTarget.style.setProperty('--my', (((e.clientY - r.top) / r.height) * 2 - 1).toFixed(2));
 }
 
+/** How long a finger rests on a tile before the quick-move sheet opens. */
+const LONG_PRESS_MS = 450;
+/** A finger that travels further than this is scrolling, not pressing. */
+const LONG_PRESS_SLOP = 8;
+
+/**
+ * Long-press for touch: drag is mouse-only, so holding a tile opens the quick-move sheet instead.
+ * The tap that ends a long-press is swallowed, so it doesn't also open the item panel.
+ */
+function useLongPress(fire: () => void) {
+  const timer = useRef(0);
+  const start = useRef({ x: 0, y: 0 });
+  const fired = useRef(false);
+  const stop = () => { clearTimeout(timer.current); timer.current = 0; };
+  return {
+    fired,
+    down: (e: React.PointerEvent) => {
+      fired.current = false;
+      if (e.pointerType !== 'touch') return;
+      start.current = { x: e.clientX, y: e.clientY };
+      stop();
+      timer.current = window.setTimeout(() => {
+        timer.current = 0;
+        fired.current = true;
+        navigator.vibrate?.(10);
+        fire();
+      }, LONG_PRESS_MS);
+    },
+    move: (e: React.PointerEvent) => {
+      if (timer.current && Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > LONG_PRESS_SLOP) stop();
+    },
+    stop,
+  };
+}
+
 // Memoized: a vault can hold over a thousand tiles, and drags re-render the columns around them.
 export const ItemTile = memo(function ItemTile({
   item, size = 'md', onSelect,
 }: { item: AppraisedItem; size?: 'md' | 'lg'; onSelect?: (i: AppraisedItem) => void }) {
   const hover = useHover();
   const drag = useDragActions();
-  const { moving } = useInventory();
+  const { moving, quick } = useInventory();
+  const press = useLongPress(() => quick(item));
   const isMoving = !!item.instanceId && moving.has(item.instanceId);
   const draggable = !!item.movable && !item.equipped && !isMoving;
   const verdict = item.appraisal?.verdict;
@@ -46,12 +82,16 @@ export const ItemTile = memo(function ItemTile({
       aria-busy={isMoving || undefined}
       data-movable={draggable || undefined}
       data-instance={item.instanceId}
-      onPointerDown={draggable ? (e) => drag.press(e, item) : undefined}
-      onPointerMove={hover ? (e) => { if (e.pointerType === 'mouse') tilt(e); } : undefined}
-      onClick={onSelect ? () => { hover?.leave(); onSelect(item); } : undefined}
+      onPointerDown={(e) => { press.down(e); if (draggable) drag.press(e, item); }}
+      onPointerMove={(e) => { press.move(e); if (hover && e.pointerType === 'mouse') tilt(e); }}
+      onPointerUp={press.stop}
+      onPointerCancel={press.stop}
+      // Right-click (and Android's own long-press) opens the same sheet, instead of the browser menu.
+      onContextMenu={onSelect ? (e) => { e.preventDefault(); press.stop(); hover?.leave(); quick(item); } : undefined}
+      onClick={onSelect ? () => { if (press.fired.current) { press.fired.current = false; return; } hover?.leave(); onSelect(item); } : undefined}
       // Hovercards are for a mouse; a tap on a phone goes straight to the item dialog.
       onPointerEnter={hover ? (e) => { if (e.pointerType === 'mouse') hover.enter(item, e.currentTarget.getBoundingClientRect()); } : undefined}
-      onPointerLeave={(e) => { hover?.leave(); e.currentTarget.style.removeProperty('--mx'); e.currentTarget.style.removeProperty('--my'); }}
+      onPointerLeave={(e) => { press.stop(); hover?.leave(); e.currentTarget.style.removeProperty('--mx'); e.currentTarget.style.removeProperty('--my'); }}
     >
       {item.icon && <img className="tile__icon" src={item.icon} alt="" decoding="async" draggable={false} />}
       {item.watermark && <img className="tile__watermark" src={item.watermark} alt="" decoding="async" draggable={false} />}

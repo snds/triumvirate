@@ -7,6 +7,7 @@ import { DragActionsContext, DragContext, useItemDrag } from './drag.ts';
 import { CharacterColumn } from './components/CharacterColumn.tsx';
 import { VaultSection } from './components/VaultSection.tsx';
 import { ItemDetail } from './components/ItemDetail.tsx';
+import { QuickMoveSheet } from './components/QuickMoveSheet.tsx';
 import { CleanupView } from './components/CleanupView.tsx';
 import { RollsView } from './components/RollsView.tsx';
 import { LoadoutsView } from './components/LoadoutsView.tsx';
@@ -15,7 +16,7 @@ import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
-import { SLOT_ORDER } from './inventory.ts';
+import { INVENTORY_ROWS, SLOT_ORDER } from './inventory.ts';
 import { clampChatWidth, CHAT_WIDTH, usePref } from './prefs.ts';
 import { HoverContext, type HoverApi } from './hover.ts';
 import { InventoryContext, type InventoryApi } from './inventory-context.ts';
@@ -46,6 +47,8 @@ export function App() {
   const compact = useCompact();
   const [store, setStore] = usePref<string>('phoneStore', '');
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
+  /** Instance id of the item in the quick-move sheet; looked up live so it shows moves as they land. */
+  const [quickId, setQuickId] = useState<string>();
   // Always starts closed; the chat button shows when a conversation is going.
   const [agentOpen, setAgentOpen] = useState(false);
   const [chatStatus, setChatStatus] = useState<ChatStatus>({ active: false, busy: false, unread: 0 });
@@ -283,6 +286,7 @@ export function App() {
       checkEquip: (item, characterId) => (inv ? checkEquip(item, characterId, inv.characters) : { ok: false, reason: 'Not loaded' }),
       equip: (item, characterId) => void equip(item, characterId),
       setLocked: (item, locked) => void lock(item, locked),
+      quick: (item) => { if (item.instanceId) setQuickId(item.instanceId); },
     };
   }, [state, moving, move, recentMoves, equip, lock]);
   // Dropping re-checks the move, so a drop on a red column does nothing.
@@ -450,7 +454,7 @@ export function App() {
           )}
           <div
             className={`inventory${isCollapsed ? ' inventory--collapsed' : ''}`}
-            style={{ '--character-count': shown.length } as React.CSSProperties}
+            style={{ '--character-count': shown.length, '--inventory-rows': INVENTORY_ROWS.length } as React.CSSProperties}
             {...(compact ? { role: 'tabpanel', id: 'store-panel' } : {})}
           >
             {shown.map((c) => (
@@ -548,6 +552,9 @@ export function App() {
           onSelect={setSelected}
           onAsk={(item) => { setAbout((a) => ({ id: (a?.id ?? 0) + 1, item })); setAgentOpen(true); }}
         />
+      )}
+      {quickId && inventoryApi.byId.get(quickId) && (
+        <QuickMoveSheet item={inventoryApi.byId.get(quickId)!} onClose={() => setQuickId(undefined)} onDetails={setSelected} />
       )}
       {hovered && !selected && !dragging && !compact && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
       {drag.ghost}

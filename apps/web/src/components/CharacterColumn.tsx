@@ -1,5 +1,5 @@
 import { POSTMASTER_CAPACITY, type AppraisedItem, type CharacterRow } from '@triumvirate/core/browser';
-import { groupBySlot, isPostmaster } from '../inventory.ts';
+import { groupBySlot, rowOf } from '../inventory.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { useDropZone } from '../drag.ts';
@@ -23,7 +23,7 @@ export function CharacterColumn({ character, items, postmaster, onSelect }: Prop
   return (
     <section className={`column${drop.className}`} aria-label={`${character.className} gear`} {...drop.props}>
       {drop.note && <p className="drop-note" role="status">{drop.note}</p>}
-      <header className="character">
+      <header className="character" style={{ gridRow: rowOf('header') }}>
         <div
           className="character__banner"
           style={character.emblemBackground ? { backgroundImage: `url(${character.emblemBackground})` } : undefined}
@@ -49,7 +49,7 @@ export function CharacterColumn({ character, items, postmaster, onSelect }: Prop
         const equipped = g.items.find((i) => i.equipped);
         const carried = g.items.filter((i) => !i.equipped);
         return (
-          <div className="slot" key={g.slot}>
+          <div className="slot" key={g.slot} style={{ gridRow: rowOf(g.slot) }}>
             <div className="slot__equipped">{equipped && <ItemTile item={equipped} size="lg" onSelect={onSelect} />}</div>
             <div className="slot__carried">
               {carried.map((i, n) => <ItemTile key={i.instanceId ?? `${i.itemHash}-${n}`} item={i} onSelect={onSelect} />)}
@@ -57,7 +57,7 @@ export function CharacterColumn({ character, items, postmaster, onSelect }: Prop
           </div>
         );
       })}
-      <div className={`postmaster${pmLevel ? ` postmaster--${pmLevel}` : ''}`}>
+      <div className={`postmaster${pmLevel ? ` postmaster--${pmLevel}` : ''}`} style={{ gridRow: rowOf('postmaster') }}>
         <h3 className="postmaster__title">
           Postmaster <span className="vault__count">{postmaster.length}/{POSTMASTER_CAPACITY}</span>
           {pmLevel === 'full' && <span className="postmaster__note">Full. New drops will be lost.</span>}
