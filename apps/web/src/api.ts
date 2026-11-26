@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, Grade, LoadoutStyles, RollOptions, SavedLoadout, WatchEntry, WatchHit } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -225,6 +225,25 @@ export const fetchDigest = async (date?: string): Promise<DigestResponse> =>
   json(await fetch(`/api/digest${date ? `?date=${encodeURIComponent(date)}` : ''}`), sameOriginImages);
 /** Builds today's digest now (syncs from Bungie first, so it takes a few seconds). */
 export const runDigest = () => act<DigestResponse>('/api/digest/run', {}, 'build the digest');
+
+export interface WatchResponse {
+  entries: WatchEntry[];
+  hits: WatchHit[];
+  checkedAt: string | null;
+  /** Minutes between automatic checks; null when the server doesn't check on its own. */
+  everyMinutes: number | null;
+  /** Whether the server can send phone alerts at all. */
+  alerts: boolean;
+  /** New hits from a check. */
+  fresh?: number;
+  error?: string;
+}
+export const fetchWatch = async (): Promise<WatchResponse> => json(await fetch('/api/watch'), sameOriginImages);
+export const saveWatch = (w: { itemHash: number; perks: string[][]; minGrade?: Grade }) => act<WatchResponse>('/api/watch', w, 'save the watch');
+export const removeWatch = async (id: string): Promise<WatchResponse> =>
+  json(await fetch(`/api/watch/${encodeURIComponent(id)}`, { method: 'DELETE' }), sameOriginImages);
+/** Checks vendors and drops now (syncs from Bungie first). */
+export const checkWatch = () => act<WatchResponse>('/api/watch/check', {}, 'check your watch list');
 export const listLoadouts = async (): Promise<SavedLoadout[]> => json(await fetch('/api/loadouts'), sameOriginImages);
 export const createLoadout = async (l: LoadoutDraft): Promise<SavedLoadout> => json(await fetch('/api/loadouts', {
   method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(l),

@@ -68,6 +68,8 @@ const GLYPHS = {
   link: 'link',
   copy: 'content_copy',
   image: 'image',
+  watch: 'notification_add',
+  watching: 'notifications_active',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

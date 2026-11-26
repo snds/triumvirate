@@ -112,3 +112,13 @@ When the scheduled digest is built, the server can send a notification to your p
 - Keys: the server makes a VAPID key pair the first time and keeps it in `.data/vapid.json`. To set your own, put `VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY` in `.env` (`npx web-push generate-vapid-keys`). Changing keys turns alerts off on every device until you switch them on again.
 - `VAPID_SUBJECT` is the contact address push services see; it defaults to `mailto:` plus the first address in `ALLOWED_EMAILS`.
 - Devices are listed in `.data/push.json`. One that's been removed is dropped the next time an alert is sent.
+
+## Watch list
+
+Tell the app which weapon rolls you're hunting and it tells you when one turns up: a vendor selling it, or a copy that dropped for you.
+
+- Open any weapon, tap **Watch**, and pick the perks you want (one or more per column; any of them counts). Leave a column empty to take whatever it rolls. You can also ask for an A or S grade only.
+- The server checks every hour while you have watches (`WATCH_MINUTES` in `.env`; `0` turns it off). Each new match sends one alert to the devices that have the **Morning alert** switch on. Tapping it opens the watch list.
+- Copies you already owned when you added the watch don't alert, but the list still shows them.
+- See and edit everything under **Rolls → Watch list**. **Check now** runs a check right away.
+- The list lives in `.data/watch.json`.

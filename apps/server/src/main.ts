@@ -38,6 +38,8 @@ const app = createApp(
     digestHour: process.env.DIGEST_HOUR ? Number(process.env.DIGEST_HOUR) : undefined,
     // The morning alert on your phone when the digest is ready (Settings in the digest sheet).
     push,
+    // How often to check the watch list (vendors and new drops), in minutes. 0 turns it off.
+    watchMinutes: process.env.WATCH_MINUTES === undefined ? 60 : Number(process.env.WATCH_MINUTES) || undefined,
   },
 );
 const port = Number(process.env.API_PORT ?? 5444);

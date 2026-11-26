@@ -11,6 +11,7 @@ import {
   applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
+  applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
 } from '@triumvirate/core';
 import type { Push } from './push.ts';
 import type { Store, Snapshot } from './store.ts';
@@ -21,6 +22,7 @@ import { createCommunity } from './community.ts';
 import { createLoadoutStore, validLoadoutId } from './loadouts.ts';
 import { createDigestStore, localDate, validDigestDate } from './digests.ts';
 import { createCleanupStore } from './cleanup-store.ts';
+import { createWatchStore } from './watch-store.ts';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
@@ -55,6 +57,8 @@ export interface AppDeps {
   digestHour?: number;
   /** Web Push for the morning alert; alerts are off when absent. */
   push?: Push;
+  /** Minutes between watch list checks (vendors and drops); off when unset. */
+  watchMinutes?: number;
 }
 
 export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
@@ -905,6 +909,91 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     if (!r.sent) return c.json({ error: r.removed ? 'This device stopped accepting alerts. Turn them off and on again.' : 'The push service didn\'t take it. Try again in a minute.' }, 502);
     return c.json({ ok: true });
   });
+
+  // ── Watch list ─────────────────────────────────────────────
+  // Weapons you want a certain roll of. A check looks at vendors and at what you own, and alerts
+  // once for each new match: a vendor selling it, or a copy that dropped since you added the watch.
+  const watch = createWatchStore(store.dataDir);
+  let watchRun: Promise<{ state: WatchState; fresh: number }> | undefined;
+  const publicWatch = (s: WatchState) => ({ entries: s.entries, hits: s.hits, checkedAt: s.checkedAt ?? null, everyMinutes: deps.watchMinutes ?? null, alerts: !!deps.push });
+  function runWatch(): Promise<{ state: WatchState; fresh: number }> {
+    watchRun ??= (async () => {
+      const t = await validTokens();
+      if (!t) throw new Error('Sign in again to check your watch list.');
+      const entries = (await watch.read()).entries;
+      const snap = await queued(() => sync(t));
+      setCurrent(snap);
+      const view = await buildView(snap);
+      const watched = new Set(entries.map((e) => e.itemHash));
+      const r = await community.rollup();
+      const owned = view.items.filter((i) => watched.has(i.itemHash) && i.instanceId);
+      const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
+      for (const i of owned) if (i.perks) grades[i.instanceId!] = appraiseCommunity(manifest!, r?.weapons[i.itemHash], i.itemHash, i.perks);
+      // A vendor hiccup still lets drops count.
+      const vendors = entries.length ? await vendorOffers(t, true).catch((e) => { console.error('Watch vendors failed:', e); return undefined; }) : undefined;
+      const { state, fresh } = await watch.update((s) => {
+        const hits = findWatchHits(s.entries, { vendors, owned: { items: owned, grades }, now: new Date() });
+        const out = applyWatchCheck(s, hits);
+        return { state: out.state, result: out };
+      });
+      const notice = watchNotice(fresh);
+      if (notice && deps.push) {
+        const sent = await deps.push.notify({ ...notice, tag: 'watch', url: '/?open=watch' });
+        console.log(`Watch alert (${fresh.length} new): sent ${sent.sent}, removed ${sent.removed}, failed ${sent.failed}.`);
+      }
+      return { state, fresh: fresh.length };
+    })().finally(() => { watchRun = undefined; });
+    return watchRun;
+  }
+  app.get('/api/watch', async (c) => c.json(publicWatch(await watch.read())));
+  /** Adds a watch, or replaces the one for the same weapon. Body: { itemHash, perks: string[][], minGrade? }. */
+  app.post('/api/watch', async (c) => {
+    const body = (await c.req.json().catch(() => ({}))) as { itemHash?: unknown; perks?: unknown; minGrade?: unknown };
+    const itemHash = Number(body.itemHash);
+    if (!manifest) return c.json({ error: 'Item data is still loading. Try again in a moment.' }, 503);
+    const def = manifest?.items[itemHash];
+    if (!def || def.itemType !== 3) return c.json({ error: 'That isn\'t a weapon.' }, 400);
+    const minGrade = GRADES.includes(body.minGrade as Grade) ? (body.minGrade as Grade) : undefined;
+    const perks = cleanWantedPerks(body.perks);
+    const state = await watch.update((s) => {
+      const old = s.entries.find((e) => e.itemHash === itemHash);
+      const base = old ? forgetWatch(s, old.id) : s;
+      const entry = {
+        id: old?.id ?? `w${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+        itemHash, name: def.displayProperties.name, icon: bungieUrl(def.displayProperties.icon), type: def.itemTypeDisplayName,
+        perks, ...(minGrade ? { minGrade } : {}), createdAt: old?.createdAt ?? new Date().toISOString(),
+      };
+      const entries = old ? base.entries.map((e) => (e.id === old.id ? entry : e)) : [...base.entries, entry];
+      const next = { ...base, entries };
+      return { state: next, result: next };
+    });
+    return c.json(publicWatch(state));
+  });
+  app.delete('/api/watch/:id', async (c) => {
+    const id = c.req.param('id');
+    const state = await watch.update((s) => {
+      const next = { ...forgetWatch(s, id), entries: s.entries.filter((e) => e.id !== id) };
+      return { state: next, result: next };
+    });
+    return c.json(publicWatch(state));
+  });
+  app.post('/api/watch/check', async (c) => {
+    try {
+      const { state, fresh } = await runWatch();
+      return c.json({ ...publicWatch(state), fresh });
+    } catch (e) { return c.json({ error: e instanceof Error ? e.message : String(e) }, 409); }
+  });
+  if (deps.watchMinutes) {
+    const every = Math.max(15, deps.watchMinutes) * 60_000;
+    const t = setInterval(() => {
+      void watch.read().then((s) => {
+        if (!s.entries.length || watchRun || digestRun) return;
+        if (s.checkedAt && Date.now() - Date.parse(s.checkedAt) < every - 60_000) return;
+        runWatch().catch((e) => console.error('Watch check failed:', e instanceof Error ? e.message : e));
+      });
+    }, 5 * 60_000);
+    t.unref();
+  }
 
   if (deps.digestHour !== undefined) {
     const hour = deps.digestHour;

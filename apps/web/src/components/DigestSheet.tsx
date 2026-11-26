@@ -154,7 +154,7 @@ function MorningAlert() {
     unsupported: state.kind === 'unsupported' ? state.reason : '',
     'server-off': 'Alerts are off on the server.',
     denied: 'Notifications are blocked for Triumvirate. Turn them on in Settings > Notifications > Triumvirate, then reopen the app.',
-    off: `Get a notification on this device when the digest is ready${canToggle && state.digestHour !== null ? `, around ${hourLabel(state.digestHour)}` : ''}.${schedule}`,
+    off: `Get a notification on this device when the digest is ready${canToggle && state.digestHour !== null ? `, around ${hourLabel(state.digestHour)}` : ''}, and when a roll on your watch list turns up.${schedule}`,
     on: `On for this device${canToggle && state.digestHour !== null ? `, around ${hourLabel(state.digestHour)} each morning` : ''}.${schedule}`,
   }[state.kind];
 

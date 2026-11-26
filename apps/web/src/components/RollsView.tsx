@@ -49,8 +49,10 @@ interface RollSettings {
 }
 const DEFAULT_SETTINGS: RollSettings = { groupBy: 'type', sortBy: 'grade', followCharacter: true, streamMin: 'A', soundDrops: false, soundVendors: false };
 
-export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }: {
+export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, onWatchList }: {
   items: AppraisedItem[];
+  /** Opens the watch list. */
+  onWatchList: () => void;
   /** Called after perks change in game, so the app reloads the inventory. */
   onChanged: () => void;
   /** Refetch grades whenever the inventory changes. */
@@ -321,6 +323,9 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
             <h2 className="vault__title">Roll appraiser <span className="vault__count">{shown.length} of {weapons.length}</span></h2>
             <button className="button rolls__targets" onClick={() => setFarming(true)} aria-haspopup="dialog">
               <Icon name="target" /> Farming targets
+            </button>
+            <button className="button rolls__watch" onClick={onWatchList} aria-haspopup="dialog">
+              <Icon name="watching" /> Watch list
             </button>
           </div>
           {farming && <FarmingSheet onClose={() => setFarming(false)} />}

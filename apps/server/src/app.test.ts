@@ -112,3 +112,14 @@ test('digest: none yet, and building needs a sign-in', async () => {
   assert.equal(run.status, 409);
   assert.match((await run.json()).error, /Sign in/);
 });
+
+test('watch list: empty to start, adding needs item data, checking needs a sign-in', async () => {
+  const app = createApp(cfg, createStore(await mkdtemp(join(tmpdir(), 'tri-'))), deps);
+  assert.deepEqual(await (await app.request('/api/watch')).json(), { entries: [], hits: [], checkedAt: null, everyMinutes: null, alerts: false });
+  const add = await app.request('/api/watch', { method: 'POST', body: JSON.stringify({ itemHash: 1, perks: [] }) });
+  assert.equal(add.status, 503);
+  const check = await app.request('/api/watch/check', { method: 'POST' });
+  assert.equal(check.status, 409);
+  assert.match((await check.json()).error, /Sign in/);
+  assert.deepEqual((await (await app.request('/api/watch/nope', { method: 'DELETE' })).json()).entries, []);
+});
