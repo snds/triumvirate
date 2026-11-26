@@ -39,6 +39,7 @@ const COMPONENTS = [
   103, // ProfileCurrencies (glimmer, bright dust, silver)
   102, // ProfileInventories (vault)
   200, // Characters
+  1400, // SocialCommendations (commendation totals for the profile card)
   202, // CharacterProgressions (trimmed to the seasonal artifact before saving)
   201, // CharacterInventories
   205, // CharacterEquipment

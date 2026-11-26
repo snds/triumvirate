@@ -565,6 +565,7 @@ export function App() {
             autoRefresh={autoRefresh}
             compact={narrow}
             stale={!!loadFail}
+            guardian={inv.account?.guardian}
           />
         </div>
       </header>
@@ -588,7 +589,7 @@ export function App() {
           ) : <div
             className={`inventory${isCollapsed ? ' inventory--collapsed' : ''}`}
             style={{ '--character-count': shown.length, '--inventory-rows': INVENTORY_ROWS.length } as React.CSSProperties}
-            {...(compact ? { role: 'tabpanel', id: 'store-panel' } : {})}
+            {...(compact ? { id: 'store-panel' } : {})}
           >
             {shown.map((c) => (
                 <CharacterColumn
@@ -596,6 +597,7 @@ export function App() {
                   character={c}
                   items={visible.filter((i) => i.owner === c.id && !isPostmaster(i))}
                   postmaster={inv.items.filter((i) => i.owner === c.id && isPostmaster(i))}
+                  rank={inv.account?.guardian?.rank}
                   onSelect={setSelected}
                 />
             ))}
