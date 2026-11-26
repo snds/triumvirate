@@ -62,6 +62,10 @@ const GLYPHS = {
   checkCircle: 'check_circle',
   target: 'target',
   sale: 'sell',
+  share: 'ios_share',
+  link: 'link',
+  copy: 'content_copy',
+  image: 'image',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;
