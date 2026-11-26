@@ -104,8 +104,9 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
         )}
       </header>
 
-      <article className="loadout-card loadout-card--current">
+      <article className={`loadout-card loadout-card--current${elementClass(character.subclass)}`}>
         <div className="loadout-card__head">
+          <SubclassMark subclass={character.subclass} />
           <div className="loadout-card__titles">
             <h3 className="loadout-card__name">Wearing now</h3>
             <p className="loadout-card__meta">{character.subclass ? `${character.subclass.name} · ` : ''}{wearing.length} items</p>
@@ -120,7 +121,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
           </div>
         </div>
         <ItemStrip items={wearing} onSelect={onSelect} />
-        <BuildSummary subclass={character.subclass} sets={setBonuses(wearing, inv.itemSets)} artifact={character.artifact} compact />
+        <BuildSummary subclass={character.subclass} stats={character.stats} sets={setBonuses(wearing, inv.itemSets)} artifact={character.artifact} compact />
       </article>
 
       <h3 className="drawer__section loadouts__section">
@@ -135,7 +136,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
             const items = slot.items.map((id) => byId.get(id)).filter((i): i is AppraisedItem => !!i).sort((a, b) => bySlot(a.bucketHash, b.bucketHash));
             const status = loadoutStatus({ items: slot.items.map((id) => ({ instanceId: id, itemHash: 0 })) }, character.id, inv.items);
             return (
-              <li key={slot.index} className={`loadout-card loadout-card--game${slot.empty ? ' is-empty' : ''}`} aria-busy={busy === key || undefined}>
+              <li key={slot.index} className={`loadout-card loadout-card--game${slot.empty ? ' is-empty' : elementClass(slot.subclass)}`} aria-busy={busy === key || undefined}>
                 <div className="loadout-card__head">
                   <GameSwatch slot={slot} />
                   <div className="loadout-card__titles">
@@ -200,8 +201,9 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
           const items = l.items.map((x) => byId.get(x.instanceId)).filter((i): i is AppraisedItem => !!i).sort((a, b) => bySlot(a.bucketHash, b.bucketHash));
           const status = loadoutStatus(l, character.id, inv.items);
           return (
-            <li key={l.id} className="loadout-card" aria-busy={busy === key || undefined}>
+            <li key={l.id} className={`loadout-card${elementClass(l.subclass)}`} aria-busy={busy === key || undefined}>
               <div className="loadout-card__head">
+                <SubclassMark subclass={l.subclass} />
                 <div className="loadout-card__titles">
                   <h4 className="loadout-card__name">{l.name}</h4>
                   <p className="loadout-card__meta">{l.classType === 3 ? 'Any class · ' : ''}<StatusLine status={status} /></p>
@@ -347,6 +349,15 @@ function ItemStrip({ items, missing = 0, onSelect }: { items: AppraisedItem[]; m
       )}
     </div>
   );
+}
+
+/** Tints a card with its subclass element: a colored top edge, the way the game marks a build. */
+const elementClass = (sub?: { element?: string }) => (sub?.element ? ` has-element glance--${sub.element.toLowerCase()}` : '');
+
+/** The subclass diamond at the head of a card. The in-game cards use their slot swatch here instead. */
+function SubclassMark({ subclass }: { subclass?: { name: string; icon?: string } }) {
+  if (!subclass?.icon) return null;
+  return <span className="loadout-card__mark" title={subclass.name}><img src={subclass.icon} alt="" /></span>;
 }
 
 /** The in-game slot's color and glyph, drawn the way the game draws it. */

@@ -1,11 +1,14 @@
 // Subclass building blocks (supers, abilities, aspects, fragments) read from the manifest,
 // so the agent can suggest real options and build cards can show their icons.
 import type { ManifestTables } from './manifest.ts';
+import type { EquippedSubclass } from './vault.ts';
 
 export interface SubclassPart {
   name: string;
   icon?: string;
   description?: string;
+  /** 525×150 key art (secondaryIcon). */
+  banner?: string;
 }
 
 export const SUBCLASS_SLOTS = ['supers', 'grenades', 'melee', 'class_abilities', 'movement', 'aspects', 'fragments'] as const;
@@ -45,8 +48,13 @@ export function buildSubclassIndex(manifest: Pick<ManifestTables, 'items' | 'ext
     const d = manifest.items[hash];
     const name = d?.displayProperties.name;
     if (!name || /^empty|deprecated|unknown/i.test(name)) continue;
-    const part: SubclassPart = { name, icon: bungieUrl(d.displayProperties.icon), description: d.displayProperties.description || undefined };
-    const [, owner, element, slot] = m as unknown as [string, string, string, SubclassSlot];
+    const part: SubclassPart = {
+      name, icon: bungieUrl(d.displayProperties.icon), description: d.displayProperties.description || x.description || undefined,
+      ...(d.secondaryIcon ? { banner: bungieUrl(d.secondaryIcon) } : {}),
+    };
+    const [, owner, raw, slot] = m as unknown as [string, string, string, SubclassSlot];
+    // Plug categories say "prism"; keys use the element's full name, as EquippedSubclass.element does.
+    const element = raw === 'prism' ? 'prismatic' : raw;
     if (owner === 'shared') add(shared, element, slot, part);
     else add(perClass, `${owner}.${element}`, slot, part);
     if (!byName.has(name.toLowerCase()) || !byName.get(name.toLowerCase())!.icon) byName.set(name.toLowerCase(), part);
@@ -68,4 +76,24 @@ export function buildSubclassIndex(manifest: Pick<ManifestTables, 'items' | 'ext
     }
   }
   return { options, byName };
+}
+
+/**
+ * Fills in what an older saved subclass lacks: part banners (looked up by name) and the full element
+ * name ("Prism" was saved before plug categories were mapped). Returns the same object when nothing changes.
+ */
+export function withSubclassArt<T extends EquippedSubclass | undefined>(sub: T, index: SubclassIndex): T {
+  if (!sub) return sub;
+  let changed = false;
+  const parts: EquippedSubclass['parts'] = {};
+  for (const [slot, list] of Object.entries(sub.parts)) {
+    parts[slot] = list.map((p) => {
+      const banner = p.banner ?? index.byName.get(p.name.toLowerCase())?.banner;
+      if (banner && !p.banner) { changed = true; return { ...p, banner }; }
+      return p;
+    });
+  }
+  const element = sub.element === 'Prism' ? 'Prismatic' : sub.element;
+  if (element !== sub.element) changed = true;
+  return (changed ? { ...sub, element, parts } : sub) as T;
 }

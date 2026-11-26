@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import type { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
 import { equippedSubclass, summarizeAccount, summarizeCharacters, summarizeProfile, VAULT_BUCKET } from './vault.ts';
 import { needsRefresh, type Tokens } from './bungie.ts';
-import { slimItems, type ManifestTables } from './manifest.ts';
+import { fillPartDescriptions, slimItems, type ManifestTables } from './manifest.ts';
 
 const manifest = {
   version: 'test',
@@ -313,4 +313,16 @@ test('materials sort into groups by name and type', async () => {
   assert.equal(materialGroup('Synthweave Plate'), 'Synthweave');
   assert.equal(materialGroup('Vanguard Boost', 'Consumable'), 'Consumables');
   assert.equal(materialGroup('Alkane Mutation', 'Material'), 'Materials');
+});
+
+test('subclass parts with blank descriptions take their sandbox perk text', () => {
+  const x = slimItems({
+    7: { displayProperties: { name: 'Consecration', description: '' }, plug: { plugCategoryIdentifier: 'titan.prism.aspects' }, perks: [{ perkHash: 41, perkVisibility: 0 }, { perkHash: 42, perkVisibility: 2 }] },
+    8: { displayProperties: { name: 'Bladefury', description: 'Woven blades.' }, plug: { plugCategoryIdentifier: 'titan.prism.supers' }, perks: [{ perkHash: 43, perkVisibility: 0 }] },
+  } as never);
+  assert.deepEqual(x[7]?.perkHashes, [41]);
+  assert.equal(x[8]?.perkHashes, undefined);
+  fillPartDescriptions(x, { 41: { displayProperties: { description: 'Slam to release a wave of solar energy.' } } });
+  assert.equal(x[7]?.description, 'Slam to release a wave of solar energy.');
+  assert.equal(x[7]?.perkHashes, undefined);
 });

@@ -1571,10 +1571,16 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   background: var(--surface-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
 }
 .loadout-card[aria-busy] { opacity: 0.7; }
+/* Element edge: drawn inside the border so the card keeps its radius and size. */
+.loadout-card.has-element { box-shadow: inset 0 var(--loadout-edge) 0 var(--glance-element); }
+.loadout-card__mark { flex: none; display: grid; place-items: center; width: var(--loadout-mark-size); height: var(--loadout-mark-size); }
+.loadout-card__mark img { width: 100%; height: 100%; display: block; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--glance-element, transparent) 45%, transparent)); }
 .loadout-card--current { background: var(--surface-raised); }
 .loadout-card.is-empty { background: none; border-style: dashed; }
 .loadout-card__head { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.loadout-card__titles { flex: 1; min-width: 0; }
+.loadout-card__head { flex-wrap: wrap; }
+/* Titles keep a readable width; when they can't, the head's buttons drop to their own line. */
+.loadout-card__titles { flex: 1 1 var(--loadout-title-min); min-width: 0; }
 .loadout-card__name { margin: 0; font-size: var(--font-size-16); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .loadout-card.is-empty .loadout-card__name { color: var(--text-secondary); font-weight: var(--font-weight-semibold); }
 .loadout-card__meta { margin: var(--space-0-5) 0 0; font-size: var(--font-size-12); color: var(--text-secondary); }
@@ -1704,6 +1710,26 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .glance--stasis { --glance-element: var(--subclass-stasis); }
 .glance--strand { --glance-element: var(--subclass-strand); }
 .glance--prismatic { --glance-element: var(--subclass-prismatic); }
+.glance__stats { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0; padding: var(--space-0-5) 0 0; list-style: none; }
+.glance-stat { display: flex; align-items: center; gap: 3px; font-size: var(--font-size-13); font-weight: var(--font-weight-semibold); font-variant-numeric: tabular-nums; }
+.glance-stat img { width: var(--glance-stat-size); height: var(--glance-stat-size); }
+.glance-stat__name { font-size: var(--font-size-10); color: var(--text-muted); text-transform: uppercase; }
+/* Ability sheet: the 525×150 banner bleeds to the sheet's edges under the header. */
+.ability-sheet { --ability-banner-ratio: 525 / 150; }
+.ability-sheet__art {
+  margin: 0 calc(var(--space-4) * -1); aspect-ratio: var(--ability-banner-ratio); overflow: hidden;
+  display: grid; place-items: center;
+  background: color-mix(in srgb, var(--glance-element, var(--surface-hover)) 22%, var(--surface-panel));
+  box-shadow: inset 0 calc(var(--loadout-edge) * -1) 0 var(--glance-element, transparent);
+}
+.ability-sheet__art.has-art img { width: 100%; height: 100%; object-fit: cover; object-position: var(--banner-focus); display: block; }
+.ability-sheet__fallback { width: var(--size-72); height: var(--size-72); }
+.ability-sheet__head { display: flex; align-items: center; gap: var(--space-2); }
+.ability-sheet__icon { width: var(--glance-icon-size); height: var(--glance-icon-size); border-radius: var(--glance-icon-radius); background: var(--glance-icon-bg); }
+.ability-sheet__eyebrow { margin: 0; font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-secondary); }
+.ability-sheet__text { display: grid; gap: var(--space-2); max-width: 65ch; line-height: 1.5; white-space: pre-line; }
+.ability-sheet__text p { margin: 0; }
+.ability-sheet__text strong { color: var(--glance-element, var(--text-primary)); }
 .glance__sets { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; min-width: 0; }
 .glance-set { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); min-width: 0; }
 .glance-set__name { font-size: var(--font-size-13); font-weight: var(--font-weight-semibold); }

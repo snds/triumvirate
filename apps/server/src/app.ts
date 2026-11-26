@@ -9,7 +9,7 @@ import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getPro
 import Anthropic from '@anthropic-ai/sdk';
 import {
   applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, suggestBuilds, itemOrnaments, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
-  refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
+  refreshTokens, buildSubclassIndex, withSubclassArt, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
   type SavedLoadout, type CleanupState, type WatchEntry,
@@ -1038,7 +1038,11 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
 
   // Triumvirate's own loadouts.
   const loadouts = createLoadoutStore(store.dataDir);
-  app.get('/api/loadouts', async (c) => c.json(await loadouts.list()));
+  // Loadouts saved before part banners existed get them filled in from the manifest on the way out.
+  app.get('/api/loadouts', async (c) => {
+    const list = await loadouts.list();
+    return c.json(subclass ? list.map((l) => (l.subclass ? { ...l, subclass: withSubclassArt(l.subclass, subclass!) } : l)) : list);
+  });
   app.post('/api/loadouts', async (c) => {
     const data = cleanLoadout(await c.req.json().catch(() => undefined));
     if (!data) return c.json({ error: 'A loadout needs a name, a class, and at least one item.' }, 400);

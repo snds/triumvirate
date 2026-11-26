@@ -464,6 +464,10 @@
   --glance-perk-on: var(--accent);
   --glance-perk-off: var(--text-muted);
   --glance-divider: var(--border-subtle);
+  --glance-stat-size: 18px;
+  --loadout-edge: 3px;
+  --loadout-mark-size: var(--size-36);
+  --loadout-title-min: 9rem;
 
   /* Loadout builder: one row per slot, and the item picker that opens over it. */
   --editor-row-bg: var(--surface-panel);
