@@ -907,11 +907,10 @@ body.is-dragging-item .tile { pointer-events: none; }
 .item-header__close { align-self: start; color: var(--text-primary); }
 
 /* Ammo: the game's colors, white Primary, green Special, purple Heavy. */
-.ammo-icon { display: inline-block; }
-.ammo-icon--primary { fill: var(--ammo-primary); }
-.ammo-icon--special { fill: var(--ammo-special); }
-.ammo-icon--heavy { fill: var(--ammo-heavy); }
-.ammo-icon path { stroke: rgb(0 0 0 / 0.5); stroke-width: 0.6; }
+.ammo-icon { display: inline-block; filter: drop-shadow(0 0 1px var(--ammo-shadow)); }
+.ammo-icon--primary { color: var(--ammo-primary); }
+.ammo-icon--special { color: var(--ammo-special); }
+.ammo-icon--heavy { color: var(--ammo-heavy); }
 
 /* ── Item dialog ────────────────────────────────────────── */
 .dialog-scrim {
