@@ -14,6 +14,7 @@ export * from './postmaster.ts';
 export * from './power.ts';
 export * from './optimizer.ts';
 export * from './builds.ts';
+export * from './build-usage.ts';
 export * from './digest.ts';
 export * from './watch.ts';
 export * from './rolls.ts';

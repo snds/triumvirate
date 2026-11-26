@@ -9,6 +9,8 @@
 //   state.json             seen match ids, players to visit next, last run summary
 //   rollup.json            usage over the last 30 days (what the UI reads)
 //   history/YYYY-MM.json   one rollup per month, for usage trends over time
+//   armor-YYYY-MM.jsonl    one ArmorSample per line: class, exotic armor, sets, subclass, stat totals
+//   build-usage.json       most worn exotics per class and activity, last 30 days (build suggestions)
 import { appendFile, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { HttpClient, HttpClientConfig } from 'bungie-api-ts/http';
@@ -16,10 +18,11 @@ import {
   getActivityHistory, getPostGameCarnageReport, getProfile,
   type DestinyPostGameCarnageReportData, type DestinyProfileResponse,
 } from 'bungie-api-ts/destiny2';
-import { extractSamples, rollup, type CommunityRollup, type ManifestTables, type Sample } from '@triumvirate/core';
+import { buildUsage, extractArmorSamples, extractSamples, rollup, type ArmorSample, type BuildUsageRollup, type CommunityRollup, type ManifestTables, type Sample } from '@triumvirate/core';
 
-// DestinyComponentType numbers: Profiles (character ids), CharacterEquipment, ItemSockets.
-const PROFILE_COMPONENTS = [100, 205, 305];
+// DestinyComponentType numbers: Profiles (character ids), Characters (class, stat totals),
+// CharacterEquipment, ItemSockets.
+const PROFILE_COMPONENTS = [100, 200, 205, 305];
 const KEEP_SEEN = 50_000;
 const KEEP_FRONTIER = 5_000;
 const ROLLUP_DAYS = 30;
@@ -87,6 +90,7 @@ export function createCommunity(deps: CommunityDeps) {
   let stopRequested = false;
   let current: CommunityRollup | undefined;
   let history: Record<string, CommunityRollup> | undefined;
+  let builds: BuildUsageRollup | undefined;
 
   async function readJson<T>(file: string): Promise<T | undefined> {
     try { return JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { return undefined; }
@@ -132,6 +136,7 @@ export function createCommunity(deps: CommunityDeps) {
     status = { running: true, startedAt: started.toISOString(), requests: 0, matches: 0, samples: 0, lastRun: status.lastRun };
     let discovery = 0;
     const found: Sample[] = [];
+    const armorFound: ArmorSample[] = [];
     let state: State = { seen: [], frontier: [] };
     let loaded = false;
     try {
@@ -216,6 +221,7 @@ export function createCommunity(deps: CommunityDeps) {
               const s = extractSamples(manifest, pgcr, byId);
               found.push(...s);
               status.samples += s.length;
+              armorFound.push(...extractArmorSamples(manifest, pgcr, byId));
             }
           }
           // About to run out of players (say, a fresh start when you haven't played tonight):
@@ -238,6 +244,7 @@ export function createCommunity(deps: CommunityDeps) {
       }
       state.seen = [...seen].slice(-KEEP_SEEN);
       await saveSamples(found);
+      await saveLines('armor', armorFound);
       await rebuild(manifest);
     } catch (e) {
       status.error = (e as Error).message;
@@ -245,6 +252,7 @@ export function createCommunity(deps: CommunityDeps) {
       logError(`Crawl (${trigger}) failed:`, e);
       // Keep whatever was collected before the failure.
       await saveSamples(found).catch((err) => logError('Could not save samples:', err));
+      await saveLines('armor', armorFound).catch((err) => logError('Could not save armor samples:', err));
     } finally {
       const { requests, matches, samples, error } = status;
       state.lastRun = { finishedAt: now().toISOString(), requests, matches, samples, ...(error ? { error } : {}) };
@@ -270,6 +278,15 @@ export function createCommunity(deps: CommunityDeps) {
       byMonth.set(m, [...(byMonth.get(m) ?? []), JSON.stringify(s)]);
     }
     for (const [m, lines] of byMonth) await appendFile(join(dir, `samples-${m}.jsonl`), lines.join('\n') + '\n');
+  }
+
+  /** Appends records to `<prefix>-YYYY-MM.jsonl`, by the month each one happened. */
+  async function saveLines(prefix: string, records: { at: string }[]) {
+    if (!records.length) return;
+    await mkdir(dir, { recursive: true });
+    const byMonth = new Map<string, string[]>();
+    for (const r of records) byMonth.set(month(r.at), [...(byMonth.get(month(r.at)) ?? []), JSON.stringify(r)]);
+    for (const [m, lines] of byMonth) await appendFile(join(dir, `${prefix}-${m}.jsonl`), lines.join('\n') + '\n');
   }
 
   async function sampleMonths(): Promise<string[]> {
@@ -303,6 +320,21 @@ export function createCommunity(deps: CommunityDeps) {
     }
     current = rollup(manifest, recent, now());
     await writeJson('rollup.json', current);
+    // Builds: armor samples from the same 30 days.
+    const armor: ArmorSample[] = [];
+    for (const m of await monthsOf('armor')) {
+      if (m < month(since)) continue;
+      const text = await readFile(join(dir, `armor-${m}.jsonl`), 'utf8').catch(() => '');
+      for (const l of text.split('\n')) if (l) { const a = JSON.parse(l) as ArmorSample; if (a.at >= since) armor.push(a); }
+    }
+    builds = buildUsage(manifest, armor, now());
+    await writeJson('build-usage.json', builds);
+  }
+
+  async function monthsOf(prefix: string): Promise<string[]> {
+    try {
+      return (await readdir(dir)).map((f) => new RegExp(`^${prefix}-(\\d{4}-\\d{2})\\.jsonl$`).exec(f)?.[1]).filter((m): m is string => !!m).sort();
+    } catch { return []; }
   }
 
   async function loadRollups() {
@@ -330,6 +362,11 @@ export function createCommunity(deps: CommunityDeps) {
     async rollup(): Promise<CommunityRollup | undefined> {
       await loadRollups();
       return current;
+    },
+    /** Most worn exotic armor per class and activity (last 30 days), or undefined before a crawl collects any. */
+    async buildUsage(): Promise<BuildUsageRollup | undefined> {
+      builds ??= await readJson<BuildUsageRollup>('build-usage.json');
+      return builds;
     },
     /** Usage for one weapon: the last 30 days, plus a per-month summary for trends. */
     async weapon(itemHash: number) {

@@ -1968,6 +1968,21 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .build-row__stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
 .build-row__hint { font-size: var(--font-size-11); }
 .builds__add { justify-self: start; }
+/* Community suggestions: read-only cards with one Add action, under the editable list. */
+.builds__community { display: grid; gap: var(--space-2); margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
+.builds__community .drawer__section { margin: 0; }
+.builds__community-hint { margin: 0; font-size: 13px; }
+.suggestions { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.suggestion {
+  display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-panel);
+}
+.suggestion__text { display: grid; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.suggestion__name { font-weight: 600; }
+.suggestion__why { font-size: 13px; color: var(--text-muted); }
+.suggestion__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); font-size: 12px; }
+.suggestion__stats { color: var(--text-secondary); }
+.activity-chip.is-static { pointer-events: none; border-color: transparent; background: var(--surface-raised); }
 .builds__footer { display: flex; align-items: center; gap: var(--space-2); width: 100%; }
 .builds__spacer { flex: 1; }
 .builds { container: builds / inline-size; }
