@@ -195,6 +195,13 @@ export interface ItemExtra {
   itemSetHash?: number;
   /** Weapons, armor, and their ornaments: Bungie's 1920×1080 studio render, as a bungie.net path. */
   screenshot?: string;
+  /**
+   * Subclass parts whose own description is blank (most aspects and fragments): the text from
+   * their sandbox perks, which is where the game keeps it.
+   */
+  description?: string;
+  /** Working field while loading: the perks `description` is read from. Removed before saving. */
+  perkHashes?: number[];
   /** Armor: its ornament socket as [socket index, plug set hash (0 if none), default plug]. Weapons
    *  keep every socket in `socketEntries`; armor keeps only this one, to stay small. */
   ornamentSocket?: [number, number, number];
@@ -204,6 +211,19 @@ export interface ObjectiveExtra {
   /** DestinyObjectiveUiStyle: 2 = crafted weapon level. */
   uiStyle: number;
   progressDescription?: string;
+}
+
+const SUBCLASS_PART = /^(?:titan|hunter|warlock|shared)\.\w+\.(?:supers|grenades|melee|class_abilities|movement|aspects|fragments)$/;
+
+/** Moves perk text onto subclass parts that have none of their own, and drops the working field. */
+export function fillPartDescriptions(extras: Record<string, ItemExtra>, perks: Record<string, { displayProperties: { description?: string } }>) {
+  for (const x of Object.values(extras)) {
+    if (!x.perkHashes) continue;
+    const text = [...new Set(x.perkHashes.map((h) => perks[h]?.displayProperties.description?.trim()).filter(Boolean))].join('\n\n');
+    if (text) x.description = text;
+    delete x.perkHashes;
+  }
+  return extras;
 }
 
 /** Keeps only what ItemExtra needs, for gear and for plugs. */
@@ -242,6 +262,10 @@ export function slimItems(full: Record<string, DestinyInventoryItemDefinition>):
       }
     }
     if (d.plug?.plugCategoryIdentifier) x.plugCategory = d.plug.plugCategoryIdentifier;
+    if (SUBCLASS_PART.test(x.plugCategory ?? '') && !d.displayProperties?.description) {
+      const perks = (d.perks ?? []).filter((p) => p.perkVisibility === 0).map((p) => p.perkHash);
+      if (perks.length) x.perkHashes = perks;
+    }
     // Ornaments carry their own render, shown in the item dialog's header and strip.
     if (d.screenshot && /skins/.test(x.plugCategory ?? '')) x.screenshot = d.screenshot;
     const inv = (d.investmentStats ?? []).filter((st) => !st.isConditionallyActive && st.value !== 0);
@@ -277,7 +301,7 @@ const TABLES = {
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
-const SLIM_VERSION = 9;
+const SLIM_VERSION = 10;
 
 /**
  * Opens the live manifest: its version, and a loader that downloads a table once and keeps it on
@@ -297,8 +321,9 @@ async function openManifest(http: HttpClient, cacheDir: string, lang: string) {
     if (!res.ok) throw new Error(`Manifest download failed for ${table}: ${res.status}`);
     return res.text();
   };
-  const load = async <T>(table: string, slim?: (full: any) => T): Promise<T> => {
-    const file = join(dir, `${table}${slim ? `.slim${SLIM_VERSION}` : ''}.json`);
+  /** `tag` names a second slim cut of the same table (sandbox perks are cut once for sets, once for subclass parts). */
+  const load = async <T>(table: string, slim?: (full: any) => T, tag?: string): Promise<T> => {
+    const file = join(dir, `${table}${tag ? `.${tag}` : ''}${slim ? `.slim${SLIM_VERSION}` : ''}.json`);
     try {
       return JSON.parse(await readFile(file, 'utf8'));
     } catch {
@@ -370,6 +395,12 @@ export async function loadManifest(
   ]).then(([r, n]) => slimIdentity(r, n)).catch(() => undefined);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
+  // Aspects and fragments describe themselves through sandbox perks; keep only those perks' text.
+  const wanted = new Set(Object.values(extras).flatMap((x) => x.perkHashes ?? []).map(String));
+  await load(TABLES.sandboxPerks, (full: Record<string, DestinySandboxPerkDefinition>) =>
+    Object.fromEntries(Object.entries(full).filter(([h]) => wanted.has(h)).map(([h, p]) => [h, { displayProperties: p.displayProperties }])), 'parts')
+    .then((perks) => fillPartDescriptions(extras, perks))
+    .catch(() => fillPartDescriptions(extras, {}));
   return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources, season, identity };
 }
 

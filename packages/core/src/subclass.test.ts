@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ManifestTables } from './manifest.ts';
-import { buildSubclassIndex } from './subclass.ts';
+import { buildSubclassIndex, withSubclassArt } from './subclass.ts';
+import { subclassFromPlugs, type EquippedSubclass } from './vault.ts';
 
 test('groups class and shared subclass parts by element, deduped by name', () => {
   const m = {
@@ -28,4 +29,27 @@ test('groups class and shared subclass parts by element, deduped by name', () =>
   assert.deepEqual(wv.fragments, [{ name: 'Echo of Persistence', icon: 'https://www.bungie.net/e.png', description: undefined }]);
   assert.equal(wv.melee, undefined);
   assert.equal(idx.byName.get('nova bomb')?.icon, 'https://www.bungie.net/n.png');
+});
+
+test('prismatic parts carry banners, and old saved subclasses get them by name', () => {
+  const m = {
+    items: {
+      1: { displayProperties: { name: 'Consecration', icon: '/c.png' }, secondaryIcon: '/c-banner.jpg' },
+      2: { displayProperties: { name: 'Facet of Ruin' }, secondaryIcon: '/f-banner.jpg' },
+      9: { displayProperties: { name: 'Prismatic Titan' } },
+    },
+    extras: { 1: { plugCategory: 'titan.prism.aspects' }, 2: { plugCategory: 'shared.prism.fragments' } },
+  } as unknown as ManifestTables;
+  const idx = buildSubclassIndex(m);
+  assert.equal(idx.options.get('titan.prismatic')?.aspects?.[0]?.banner, 'https://www.bungie.net/c-banner.jpg');
+
+  const live = subclassFromPlugs(9, [1, 2], m);
+  assert.equal(live.element, 'Prismatic');
+  assert.equal(live.parts.fragments?.[0]?.banner, 'https://www.bungie.net/f-banner.jpg');
+
+  const saved: EquippedSubclass = { name: 'Prismatic Titan', element: 'Prism', parts: { aspects: [{ name: 'Consecration' }] } };
+  const filled = withSubclassArt(saved, idx);
+  assert.equal(filled.element, 'Prismatic');
+  assert.equal(filled.parts.aspects?.[0]?.banner, 'https://www.bungie.net/c-banner.jpg');
+  assert.equal(withSubclassArt(filled, idx), filled);
 });

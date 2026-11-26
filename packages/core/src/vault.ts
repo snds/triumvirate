@@ -174,7 +174,15 @@ export interface EquippedSubclass {
   element: string;
   icon?: string;
   /** Slotted parts by slot: supers, grenades, melee, class_abilities, movement, aspects, fragments. */
-  parts: Record<string, { name: string; icon?: string; description?: string }[]>;
+  parts: Record<string, SubclassPartView[]>;
+}
+
+/** One slotted subclass part. `banner` is its 525×150 key art (secondaryIcon), shown atop its detail sheet. */
+export interface SubclassPartView {
+  name: string;
+  icon?: string;
+  description?: string;
+  banner?: string;
 }
 
 export interface CharacterStat {
@@ -238,6 +246,9 @@ const ORNAMENT_PLUG = /skins/i;
 const TRANSFER_NOT_TRANSFERRABLE = 2;
 const SUBCLASS_PLUG = /^(?:titan|hunter|warlock|shared)\.(\w+)\.(supers|grenades|melee|class_abilities|movement|aspects|fragments)$/;
 
+/** Plug categories shorten Prismatic to "prism"; everything else is the element's own name. */
+export const elementName = (el: string) => (el === 'prism' ? 'Prismatic' : el[0]!.toUpperCase() + el.slice(1));
+
 /** A subclass and the plugs slotted in it (super, abilities, aspects, fragments), named and grouped by slot. */
 export function subclassFromPlugs(
   itemHash: number, plugHashes: number[], manifest: Pick<ManifestTables, 'items' | 'extras'>,
@@ -253,8 +264,11 @@ export function subclassFromPlugs(
     // Empty aspect/fragment sockets have plugs named "Empty ... Socket".
     if (!m || !name || /^empty/i.test(name)) continue;
     const [, el, slot] = m as unknown as [string, string, string];
-    if (el !== 'shared' && !element) element = el[0]!.toUpperCase() + el.slice(1);
-    (parts[slot] ??= []).push({ name, icon: bungieUrl(d.displayProperties.icon), description: d.displayProperties.description || undefined });
+    if (el !== 'shared' && !element) element = elementName(el);
+    (parts[slot] ??= []).push({
+      name, icon: bungieUrl(d.displayProperties.icon), description: d.displayProperties.description || manifest.extras?.[plugHash]?.description || undefined,
+      ...(d.secondaryIcon ? { banner: bungieUrl(d.secondaryIcon) } : {}),
+    });
   }
   return { name: def?.displayProperties.name ?? 'Subclass', element, icon: bungieUrl(def?.displayProperties.icon), parts };
 }
