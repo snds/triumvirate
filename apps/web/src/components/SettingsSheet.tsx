@@ -13,6 +13,9 @@ import { chime, DEFAULT_ROLL_SETTINGS, type RollSettings } from './RollsView.tsx
 import { Sheet } from '../ui/Sheet.tsx';
 import { Icon, type IconName } from './Icon.tsx';
 import { Segment, Segmented } from '../ui/Segmented.tsx';
+import { Switch } from '../ui/Switch.tsx';
+import { Select } from '../ui/Select.tsx';
+import { Tab as TabButton, TabList, TabPanel, Tabs } from '../ui/Tabs.tsx';
 
 export type Section = 'display' | 'rolls' | 'wishlists' | 'agents' | 'data' | 'status';
 const SECTIONS: { id: Section; label: string; icon: IconName }[] = [
@@ -40,18 +43,11 @@ export function SettingsSheet({ tileScale, onTileScale, autoRefresh, onAutoRefre
   useEffect(() => { if (initialSection) setSection(initialSection); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Sheet title="Settings" onClose={onClose} wide full className="settings">
-      <nav className="settings__nav segmented" aria-label="Settings sections">
-        {SECTIONS.map((s) => (
-          <button
-            key={s.id}
-            className={`segmented__option${section === s.id ? ' is-selected' : ''}`}
-            aria-current={section === s.id ? 'true' : undefined}
-            onClick={(e) => { setSection(s.id); e.currentTarget.scrollIntoView({ inline: 'nearest', block: 'nearest' }); }}
-          >
-            <Icon name={s.icon} /> {s.label}
-          </button>
-        ))}
-      </nav>
+      <Tabs value={section} onChange={setSection}>
+      <TabList label="Settings sections" className="settings__nav segmented">
+        {SECTIONS.map((s) => <TabButton key={s.id} id={s.id} className="segmented__option"><Icon name={s.icon} /> {s.label}</TabButton>)}
+      </TabList>
+      <TabPanel id={section} className="settings__panel">
       {section === 'display' && (
         <DisplaySection tileScale={tileScale} onTileScale={onTileScale} autoRefresh={autoRefresh} onAutoRefresh={onAutoRefresh} onOpenDigest={onOpenDigest} />
       )}
@@ -60,6 +56,8 @@ export function SettingsSheet({ tileScale, onTileScale, autoRefresh, onAutoRefre
       {section === 'agents' && <AgentsSection />}
       {section === 'data' && <BackupSection />}
       {section === 'status' && <StatusSection />}
+      </TabPanel>
+      </Tabs>
     </Sheet>
   );
 }
@@ -87,15 +85,6 @@ function Choice<T extends number | string>({ label, options, value, onChange }: 
     <Segmented label={label} value={value} onChange={onChange}>
       {options.map((o) => <Segment key={o.label} id={o.value}>{o.label}</Segment>)}
     </Segmented>
-  );
-}
-
-/** The app's switch: a button with role="switch", the track drawn inside it. */
-function Switch({ checked, onChange, label, labelledBy, disabled }: { checked: boolean; onChange: () => void; label?: string; labelledBy?: string; disabled?: boolean }) {
-  return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} aria-labelledby={labelledBy} className="switch" disabled={disabled} onClick={onChange}>
-      <span className="switch__track"><span className="switch__thumb" /></span>
-    </button>
   );
 }
 
@@ -138,12 +127,10 @@ function RollsSection() {
   return (
     <>
       <Group title="Activity" hint="New drops and vendor offers below this grade stay out of the activity stream and the sounds.">
-        <label className="settings__row">
-          <span>Minimum grade</span>
-          <select className="rolls__select" value={s.streamMin} onChange={(e) => set('streamMin', e.target.value as RollSettings['streamMin'])}>
-            {GRADE_ORDER.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
-        </label>
+        <Select
+          className="settings__row" label="Minimum grade" labelClassName="" triggerClassName="select__trigger rolls__select"
+          value={s.streamMin} onChange={(v) => set('streamMin', v)} options={GRADE_ORDER.map((g) => ({ value: g, label: g }))}
+        />
       </Group>
       <Group title="Characters">
         <Toggle checked={s.followCharacter} onChange={() => set('followCharacter', !s.followCharacter)} hint="A location filter set to your old class moves to the new one. The vault stays as you set it.">

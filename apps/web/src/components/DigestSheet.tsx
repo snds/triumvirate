@@ -7,6 +7,8 @@ import { Icon } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkText } from './Skeleton.tsx';
 import { alertState, clearDigestAlerts, disableAlerts, enableAlerts, sendTestAlert, type AlertState } from '../push.ts';
+import { Switch } from '../ui/Switch.tsx';
+import { Select } from '../ui/Select.tsx';
 
 const longDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
 const shortDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
@@ -46,9 +48,10 @@ export function DigestSheet({ items, onSelect, onClose, onSeen }: {
         <div className="sheet__actions">
           {error && <p className="error editor__error">{error}</p>}
           {(data?.dates.length ?? 0) > 1 && (
-            <select className="optimizer__select digest__dates" aria-label="Day" value={d?.date ?? ''} onChange={(e) => void load(e.target.value)}>
-              {data!.dates.map((x) => <option key={x} value={x}>{shortDate(x)}</option>)}
-            </select>
+            <Select
+              className="digest__dates" ariaLabel="Day" triggerClassName="select__trigger optimizer__select" value={d?.date ?? ''} onChange={(v) => void load(v)}
+              options={data!.dates.map((x) => ({ value: x, label: shortDate(x) }))}
+            />
           )}
           <button className="button button--primary" disabled={building} onClick={() => void build()}>
             <Icon name="refresh" /> {building ? 'Building…' : d?.date === today ? 'Rebuild today' : 'Build today'}
@@ -170,17 +173,13 @@ function MorningAlert() {
         {on && <button className="button button--quiet alert-setting__test" disabled={busy} onClick={() => void test()}>Send a test</button>}
       </div>
       {canToggle && (
-        <button
-          role="switch"
-          aria-checked={on}
-          aria-labelledby="alert-setting-title"
-          className="switch"
+        <Switch
+          checked={on}
+          labelledBy="alert-setting-title"
           disabled={busy}
           // Straight from the tap: iPhones only show the permission prompt for a direct user action.
-          onClick={() => void run(() => (state.kind === 'off' ? enableAlerts(state.publicKey) : disableAlerts()))}
-        >
-          <span className="switch__track"><span className="switch__thumb" /></span>
-        </button>
+          onChange={() => void run(() => (state.kind === 'off' ? enableAlerts(state.publicKey) : disableAlerts()))}
+        />
       )}
     </section>
   );

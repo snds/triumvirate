@@ -8,6 +8,8 @@ import { Icon, type IconName } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards } from './Skeleton.tsx';
 import { Segment, Segmented } from '../ui/Segmented.tsx';
+import { Switch } from '../ui/Switch.tsx';
+import { Select } from '../ui/Select.tsx';
 
 const CLASSES = ['Titan', 'Hunter', 'Warlock'] as const;
 export const ACTIVITY_ICON: Record<BuildActivity, IconName> = { endgame: 'endgame', pvp: 'pvp', casual: 'casual' };
@@ -119,14 +121,12 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
                 maxLength={80}
                 onChange={(e) => edit(b.id, { name: e.target.value })}
               />
-              <button
-                role="switch"
-                aria-checked={!b.off}
-                aria-label={`Use ${b.name} in cleanup`}
+              <Switch
+                checked={!b.off}
+                label={`Use ${b.name} in cleanup`}
                 title={b.off ? 'Off: protects nothing' : 'On: protects its best pieces'}
-                className="switch"
-                onClick={() => edit(b.id, { off: !b.off })}
-              ><span className="switch__track"><span className="switch__thumb" /></span></button>
+                onChange={() => edit(b.id, { off: !b.off })}
+              />
               <button className="button button--quiet build-row__delete" aria-label={`Delete ${b.name}`} title="Delete" onClick={() => remove(b.id)}>
                 <Icon name="delete" />
               </button>
@@ -164,33 +164,25 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
                   <span className="build-row__hint muted">You don't own this one, so every slot uses legendaries.</span>
                 )}
               </label>
-              <label className="field">
-                <span className="field__label">Armor set</span>
-                <select className="optimizer__select" value={b.set ?? ''} onChange={(e) => edit(b.id, { set: e.target.value || undefined })}>
-                  <option value="">Any</option>
-                  {[...new Set([...(b.set ? [b.set] : []), ...sets])].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </label>
+              <Select
+                className="field" label="Armor set" triggerClassName="select__trigger optimizer__select"
+                value={b.set ?? ''} onChange={(v) => edit(b.id, { set: v || undefined })}
+                options={[{ value: '', label: 'Any' }, ...[...new Set([...(b.set ? [b.set] : []), ...sets])].map((n) => ({ value: n, label: n }))]}
+              />
             </div>
 
             <div className="build-row__stats" role="group" aria-label="Stats it wants">
               {RANKS.map((label, k) => (
-                <label key={label} className="field">
-                  <span className="field__label">{label}</span>
-                  <select
-                    className="optimizer__select"
-                    value={b.stats[k] ?? ''}
-                    onChange={(e) => {
-                      const next = [...b.stats];
-                      const v = e.target.value as ArmorStat | '';
-                      if (v) { const at = next.indexOf(v); if (at >= 0) next[at] = next[k]!; next[k] = v; } else next.splice(k);
-                      edit(b.id, { stats: next.filter(Boolean).slice(0, 3) });
-                    }}
-                  >
-                    {k > 0 && <option value="">None</option>}
-                    {ARMOR_STATS.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </label>
+                <Select
+                  key={label} className="field" label={label} triggerClassName="select__trigger optimizer__select"
+                  value={b.stats[k] ?? ''}
+                  onChange={(v: ArmorStat | '') => {
+                    const next = [...b.stats];
+                    if (v) { const at = next.indexOf(v); if (at >= 0) next[at] = next[k]!; next[k] = v; } else next.splice(k);
+                    edit(b.id, { stats: next.filter(Boolean).slice(0, 3) });
+                  }}
+                  options={[...(k > 0 ? [{ value: '' as const, label: 'None' }] : []), ...ARMOR_STATS.map((s) => ({ value: s, label: s }))]}
+                />
               ))}
             </div>
           </li>

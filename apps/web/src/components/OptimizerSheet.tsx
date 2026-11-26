@@ -9,6 +9,7 @@ import type { LoadoutDraft } from '../api.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
+import { Select } from '../ui/Select.tsx';
 
 type Targets = Record<ArmorStat, number>;
 const NO_TARGETS = Object.fromEntries(ARMOR_STATS.map((s) => [s, 0])) as Targets;
@@ -121,29 +122,18 @@ export function OptimizerSheet({ character, items, itemSets, onClose, onEquip, o
           </ul>
           <p className="muted optimizer__hint">Stats you set highest get the spare points and mods.</p>
           <div className="optimizer__choices">
-            <label className="field">
-              <span className="field__label">Exotic</span>
-              <select className="optimizer__select" value={exotic} onChange={(e) => setExotic(e.target.value)}>
-                <option value="any">Any or none</option>
-                <option value="none">No exotic</option>
-                {exotics.map((i) => <option key={i.itemHash} value={i.itemHash}>{i.name}</option>)}
-              </select>
-            </label>
-            <label className="field">
-              <span className="field__label">Set bonus</span>
-              <select className="optimizer__select" value={set} onChange={(e) => setSet(e.target.value)}>
-                <option value="">Not needed</option>
-                {sets.flatMap((s) => [2, 4].filter((n) => n <= s.slots && s.perks.some((p) => p.count === n)).map((n) => (
-                  <option key={`${s.hash}:${n}`} value={`${s.hash}:${n}`}>{s.name}, {n} pieces</option>
-                )))}
-              </select>
-            </label>
-            <label className="field">
-              <span className="field__label">Stat mods to use</span>
-              <select className="optimizer__select" value={mods} onChange={(e) => setMods(Number(e.target.value))}>
-                {[0, 1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n === 0 ? 'None' : `Up to ${n} (+10 each)`}</option>)}
-              </select>
-            </label>
+            <Select
+              className="field" label="Exotic" triggerClassName="select__trigger optimizer__select" value={exotic} onChange={setExotic}
+              options={[{ value: 'any', label: 'Any or none' }, { value: 'none', label: 'No exotic' }, ...exotics.map((i) => ({ value: String(i.itemHash), label: i.name }))]}
+            />
+            <Select
+              className="field" label="Set bonus" triggerClassName="select__trigger optimizer__select" value={set} onChange={setSet}
+              options={[{ value: '', label: 'Not needed' }, ...sets.flatMap((s) => [2, 4].filter((n) => n <= s.slots && s.perks.some((p) => p.count === n)).map((n) => ({ value: `${s.hash}:${n}`, label: `${s.name}, ${n} pieces` })))]}
+            />
+            <Select
+              className="field" label="Stat mods to use" triggerClassName="select__trigger optimizer__select" value={mods} onChange={setMods}
+              options={[0, 1, 2, 3, 4, 5].map((n) => ({ value: n, label: n === 0 ? 'None' : `Up to ${n} (+10 each)` }))}
+            />
           </div>
           <button className="button button--quiet" onClick={() => { setTargets(NO_TARGETS); setExotic('any'); setSet(''); setMods(5); }}>Reset</button>
         </section>
