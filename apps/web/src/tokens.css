@@ -199,6 +199,8 @@
   --ammo-primary: #f2f2f2;
   --ammo-special: #7af48b;
   --ammo-heavy: #b286ff;
+  /* A thin dark halo so the badge reads on the tier band and on weapon art. */
+  --ammo-shadow: rgb(0 0 0 / 0.55);
   --agent-width: 460px; /* default; the user's drag overrides it */
   /* Tile indicators, in px at scale 1; tiles multiply them by their own scale (--s). */
   --badge-size: 14px;
