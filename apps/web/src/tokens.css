@@ -91,6 +91,7 @@
   --on-accent: var(--gray-950);
   --warning: var(--orange-500);
   --danger: #e5534b;
+  --success: var(--mint-400);
   /* Text on a danger fill: dark, since light text on this red measures about 3:1. */
   --on-danger: var(--gray-950);
 

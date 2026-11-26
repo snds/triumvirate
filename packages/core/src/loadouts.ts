@@ -205,6 +205,18 @@ export function applyLock(profile: DestinyProfileResponse, instanceId: string, l
   return false;
 }
 
+/**
+ * Records a perk swap Bungie accepted: the socket now holds `plugHash`. Bungie's profile endpoint keeps
+ * serving the old perks for a while after a change, so a fresh sync can't be trusted to show it.
+ */
+export function applyPlug(profile: DestinyProfileResponse, instanceId: string, socketIndex: number, plugHash: number): boolean {
+  const socket = profile.itemComponents?.sockets?.data?.[instanceId]?.sockets?.[socketIndex];
+  if (!socket) return false;
+  // Snapshot data is plain JSON, so writing the read-only fields is safe here.
+  Object.assign(socket, { plugHash, isEnabled: true, isVisible: true });
+  return true;
+}
+
 // ── In-game loadouts ───────────────────────────────────────────
 
 export interface GameLoadout {
