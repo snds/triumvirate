@@ -2535,7 +2535,18 @@ li.title-card { cursor: default; }
 }
 @container records (max-width: 560px) {
   .records__header { flex-direction: column; align-items: stretch; }
-  .records__tools .segmented { width: 100%; }
-  .records__tools .segmented__option { flex: 1; padding-inline: var(--space-1); white-space: nowrap; }
+  /* Six sections don't fit a phone's width: the row scrolls sideways instead of squeezing. */
+  .records__tools .segmented { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .records__tools .segmented::-webkit-scrollbar { display: none; }
+  .records__tools .segmented__option { flex: none; padding-inline: var(--space-3); white-space: nowrap; }
 }
 .records-tree__body { display: grid; gap: var(--space-3); min-width: 0; }
+
+/* Missing exotics: a tile with its name, type, and where it drops. */
+.exotic-grid { display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--record-card-min)), 1fr)); margin: 0; padding: 0; list-style: none; }
+.exotic { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-2); background: var(--surface-panel); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.exotic .tile { height: calc(var(--tile-base) * var(--s)); }
+.exotic__text { display: grid; gap: 2px; min-width: 0; }
+.exotic__name { font-size: 14px; font-weight: 600; }
+.exotic__type { font-size: 12px; color: var(--text-secondary); }
+.exotic__source { font-size: 12px; color: var(--text-muted); }

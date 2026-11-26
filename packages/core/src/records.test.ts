@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { filterNodes, filterRecords, recordRoots, recordsScreen, slimNodes, slimRecords, type RecordTables } from './records.ts';
+import { exoticGaps, filterNodes, filterRecords, recordRoots, recordsScreen, slimNodes, slimRecords, type RecordTables } from './records.ts';
 
 const obj = (objectiveHash: number, progress: number, completionValue: number) => ({ objectiveHash, progress, completionValue, complete: progress >= completionValue, visible: true });
 const NOT_DONE = 4;
@@ -8,7 +8,7 @@ const NOT_DONE = 4;
 function tables(): RecordTables {
   return {
     version: 'v1',
-    roots: { legacySeals: 30 },
+    roots: { legacySeals: 30, catalysts: 40 },
     nodes: slimNodes({
       10: { displayProperties: { name: 'Seals' }, children: { presentationNodes: [{ presentationNodeHash: 11 }, { presentationNodeHash: 13 }] } },
       11: { displayProperties: { name: 'Conqueror', icon: '/c.png' }, completionRecordHash: 900, children: { presentationNodes: [{ presentationNodeHash: 12 }] } },
@@ -19,6 +19,8 @@ function tables(): RecordTables {
       22: { displayProperties: { name: 'EDZ' }, children: { records: [201, 202, 203, 204, 205].map((recordHash) => ({ recordHash })) } },
       30: { displayProperties: { name: 'Legacy seals' }, children: { presentationNodes: [{ presentationNodeHash: 31 }] } },
       31: { displayProperties: { name: 'Rivensbane' }, completionRecordHash: 930, children: { records: [{ recordHash: 301 }] } },
+      40: { displayProperties: { name: 'Catalysts' }, children: { presentationNodes: [{ presentationNodeHash: 41 }] } },
+      41: { displayProperties: { name: 'Hand Cannons' }, children: { records: [{ recordHash: 401 }] } },
       99: { redacted: true, displayProperties: { name: 'x' } },
     }),
     records: slimRecords({
@@ -34,6 +36,7 @@ function tables(): RecordTables {
       204: { displayProperties: { name: 'Stepper' }, intervalInfo: { intervalObjectives: [{ intervalObjectiveHash: 1, intervalScoreValue: 5 }, { intervalObjectiveHash: 2, intervalScoreValue: 5 }, { intervalObjectiveHash: 3, intervalScoreValue: 10 }] } },
       205: { displayProperties: { name: 'Per character' }, scope: 1 },
       301: { displayProperties: { name: 'Old raid' } },
+      401: { displayProperties: { name: 'Ace of Spades Catalyst' } },
       999: { redacted: true },
     }),
   };
@@ -55,6 +58,7 @@ function screen(tracked: number[] = []) {
         201: rec(1, [obj(7, 10, 10)]), 202: rec(NOT_DONE, [obj(7, 80, 100)]), 203: rec(16 | NOT_DONE),
         204: rec(NOT_DONE, [], { intervalObjectives: [obj(1, 10, 10), obj(2, 25, 25), obj(3, 30, 50)] }),
         301: rec(1, [obj(7, 1, 1)]),
+        401: rec(NOT_DONE, [obj(7, 250, 500)]),
       } as never,
     },
     characterRecords: { records: { 205: rec(NOT_DONE, [obj(7, 3, 4)]) } as never },
@@ -117,4 +121,26 @@ test('filters: hide completed and search, keeping a matching category whole', ()
   assert.equal(filterNodes(s.triumphs, { query: 'edz' })[0]!.nodes![0]!.records!.length, 4);
   assert.equal(filterNodes(s.triumphs, { query: 'zzz' }).length, 0);
   assert.equal(filterNodes(s.triumphs, { hideComplete: true })[0]!.nodes![0]!.records!.length, 3);
+});
+
+test('catalysts come from their own root', () => {
+  const s = screen();
+  assert.equal(s.catalysts[0]!.name, 'Hand Cannons');
+  assert.equal(s.catalysts[0]!.records![0]!.name, 'Ace of Spades Catalyst');
+  assert.deepEqual(s.catalysts[0]!.records![0]!.path, ['Hand Cannons']);
+});
+
+test('exotic gaps: missing exotics once each, hidden and owned ones left out, with their source', () => {
+  const item = (hash: number, name: string, collectibleHash: number, itemType: number, tier = 'Exotic', classType = 3) =>
+    ({ hash, collectibleHash, itemType, classType, itemTypeDisplayName: itemType === 3 ? 'Hand Cannon' : 'Helmet', displayProperties: { name, icon: '/i.png' }, inventory: { tierTypeName: tier } });
+  const items = {
+    1: item(1, 'Ace of Spades', 11, 3), 2: item(2, 'Ace of Spades', 11, 3), // two versions, one collectible
+    3: item(3, 'Celestial Nighthawk', 13, 2, 'Exotic', 1),
+    4: item(4, 'Owned Gun', 14, 3), 5: item(5, 'Retired Gun', 15, 3), 6: item(6, 'Legendary Gun', 16, 3, 'Legendary'),
+  };
+  const gaps = exoticGaps({ items: items as never, sources: { 1: 'Exotic engrams' } }, { 11: { state: 1 }, 13: { state: 1 }, 14: { state: 0 }, 15: { state: 5 }, 16: { state: 1 } });
+  assert.deepEqual(gaps.map((g) => [g.name, g.itemType, g.classType, g.source]), [
+    ['Celestial Nighthawk', 2, 1, undefined],
+    ['Ace of Spades', 3, 3, 'Exotic engrams'],
+  ]);
 });

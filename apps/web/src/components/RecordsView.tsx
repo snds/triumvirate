@@ -2,20 +2,23 @@
 // track. Search uses the app's search box; "Hide completed" trims every tab.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { filterNodes, filterRecords } from '@triumvirate/core/browser';
-import type { CharacterRow, NodeView, RecordView, TitleView } from '@triumvirate/core';
+import type { CharacterRow, ExoticGap, NodeView, RecordView, TitleView } from '@triumvirate/core';
 import { fetchRecords, trackRecord, type RecordsResponse } from '../api.ts';
 import { timeAgo } from '../inventory.ts';
 import { usePref } from '../prefs.ts';
 import { Icon } from './Icon.tsx';
 import { Reveal, Sk } from './Skeleton.tsx';
 
-type Tab = 'titles' | 'triumphs' | 'nearly' | 'tracked';
+type Tab = 'titles' | 'triumphs' | 'nearly' | 'tracked' | 'catalysts' | 'exotics';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'titles', label: 'Titles' },
   { id: 'triumphs', label: 'Triumphs' },
   { id: 'nearly', label: 'Nearly done' },
   { id: 'tracked', label: 'Tracked' },
+  { id: 'catalysts', label: 'Catalysts' },
+  { id: 'exotics', label: 'Exotics' },
 ];
+const CLASS_NAMES: Record<number, string> = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
 
 const pct = (progress: number, completion: number) => (completion > 0 ? Math.min(100, (progress / completion) * 100) : 0);
 
@@ -35,6 +38,7 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
   const [mine, setMine] = useState<Set<number>>(new Set());
   const [openTitle, setOpenTitle] = useState<number>();
   const [category, setCategory] = useState<number>();
+  const [catalystType, setCatalystType] = useState<number>();
 
   const load = useCallback(async (refresh = false) => {
     setBusy(true);
@@ -56,7 +60,7 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
     const m = new Map<number, RecordView>();
     if (!data) return m;
     const walk = (n: NodeView) => { for (const r of n.records ?? []) m.set(r.hash, r); for (const k of n.nodes ?? []) walk(k); };
-    [...data.triumphs, ...data.legacy].forEach(walk);
+    [...data.triumphs, ...data.legacy, ...(data.catalysts ?? [])].forEach(walk);
     for (const t of data.titles) for (const r of t.records) if (!m.has(r.hash)) m.set(r.hash, r);
     for (const r of [...data.tracked, ...data.nearly]) if (!m.has(r.hash)) m.set(r.hash, r);
     return m;
@@ -155,6 +159,10 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
             card={card}
           />
         )}
+        {data && tab === 'catalysts' && (
+          <Triumphs active={filterNodes(data.catalysts ?? [], f)} legacy={[]} selected={catalystType} onSelect={setCatalystType} card={card} />
+        )}
+        {data && tab === 'exotics' && <Exotics gaps={data.exotics ?? []} query={query} />}
         {data && tab === 'nearly' && (
           <>
             <p className="muted records__hint">Triumphs at least three-quarters done, closest first.</p>
@@ -169,6 +177,42 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
         )}
       </Reveal>
     </section>
+  );
+}
+
+/** Exotics you haven't picked up, weapons first, then armor by class, each with where it comes from. */
+function Exotics({ gaps, query }: { gaps: ExoticGap[]; query: string }) {
+  const q = query.trim().toLowerCase();
+  const shown = gaps.filter((g) => !q || `${g.name} ${g.type ?? ''} ${g.source ?? ''}`.toLowerCase().includes(q));
+  const groups = [
+    { label: 'Weapons', list: shown.filter((g) => g.itemType === 3) },
+    ...[1, 0, 2].map((c) => ({ label: `${CLASS_NAMES[c]} armor`, list: shown.filter((g) => g.itemType === 2 && g.classType === c) })),
+  ].filter((g) => g.list.length);
+  if (!gaps.length) return <p className="empty">You have every exotic in your collections. Nice.</p>;
+  return (
+    <>
+      <p className="muted records__hint">Exotics in your collections you haven't picked up yet, and where they come from.</p>
+      {!groups.length && <p className="empty">No missing exotics match.</p>}
+      {groups.map((g) => (
+        <section key={g.label} className="records__section" aria-label={g.label}>
+          <h3 className="records__section-title">{g.label} <span className="muted">{g.list.length}</span></h3>
+          <ul className="exotic-grid">
+            {g.list.map((x) => (
+              <li key={x.itemHash} className="exotic">
+                <div className="tile tier-exotic" aria-hidden>
+                  {x.icon && <img className="tile__icon" src={x.icon} alt="" decoding="async" draggable={false} data-art="cached" />}
+                </div>
+                <div className="exotic__text">
+                  <span className="exotic__name">{x.name}</span>
+                  {x.type && <span className="exotic__type">{x.type}</span>}
+                  {x.source && <span className="exotic__source">{x.source}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </>
   );
 }
 
