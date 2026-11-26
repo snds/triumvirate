@@ -318,3 +318,62 @@ export const fetchFarming = async (refresh = false): Promise<FarmingResponse> =>
 // ── Season tracker ────────────────────────────────────────────
 export type SeasonResponse = SeasonSummary & { syncedAt: string };
 export const fetchSeason = async (): Promise<SeasonResponse> => json(await fetch('/api/season'), sameOriginImages);
+// ── Settings ──────────────────────────────────────────────────
+export interface WishListSourceInfo {
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
+  rolls: number;
+  updatedAt?: string;
+  error?: string;
+}
+export interface WishListsResponse { sources: WishListSourceInfo[]; error?: string }
+export const fetchWishLists = async (): Promise<WishListsResponse> => json(await fetch('/api/settings/wishlists'));
+/** Sends a wish list change. Never throws; a failure comes back as `error`. */
+async function wishListCall(path: string, method: string, body?: unknown): Promise<WishListsResponse> {
+  try {
+    const res = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+    const out = (await res.json().catch(() => ({}))) as WishListsResponse;
+    if (!res.ok && !out.error) out.error = `Couldn't update wish lists (${res.status})`;
+    return out;
+  } catch (err) {
+    return { sources: [], error: err instanceof Error ? err.message : String(err) };
+  }
+}
+export const addWishList = (url: string) => wishListCall('/api/settings/wishlists', 'POST', { url });
+export const refreshWishLists = () => wishListCall('/api/settings/wishlists/refresh', 'POST', {});
+export const setWishListEnabled = (id: string, enabled: boolean) => wishListCall(`/api/settings/wishlists/${encodeURIComponent(id)}`, 'PATCH', { enabled });
+export const removeWishList = (id: string) => wishListCall(`/api/settings/wishlists/${encodeURIComponent(id)}`, 'DELETE');
+
+export interface ServerStatus {
+  now: string;
+  syncedAt: string | null;
+  manifestVersion: string | null;
+  crawl: {
+    hour: number | null;
+    running: boolean;
+    startedAt: string | null;
+    lastRun: { finishedAt: string; requests: number; matches: number; samples: number; error?: string } | null;
+    rollupBuiltAt: string | null;
+    samples: number;
+  };
+  digest: { hour: number | null; latest: { date: string; builtAt: string } | null };
+  watch: { everyMinutes: number | null; entries: number; checkedAt: string | null };
+  alerts: boolean;
+  agent: boolean;
+  wishLists: WishListSourceInfo[] | null;
+}
+export const fetchStatus = async (): Promise<ServerStatus> => json(await fetch('/api/status'));
+
+export interface BackupFile {
+  app: 'triumvirate';
+  kind: 'backup';
+  version: number;
+  exportedAt: string;
+  data: Record<string, unknown>;
+  /** This device's view settings (item size, roll filters...). */
+  prefs?: Record<string, unknown>;
+}
+export const fetchBackup = async (): Promise<BackupFile> => json(await fetch('/api/backup'));
+export const restoreBackup = (file: BackupFile) => act<{ restored?: string[]; error?: string }>('/api/backup', file, 'restore the backup');

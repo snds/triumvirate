@@ -2158,3 +2158,42 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   /* Flat blocks and a still ground; the cross-fades stay, since they carry the change of state. */
   .sk, .item-header.has-art:not(.is-art-loaded)::before { animation: none; background-image: none; }
 }
+
+/* ── Settings ──────────────────────────────────────────────── */
+.settings .sheet__content { align-content: start; gap: var(--space-4); }
+/* Section tabs: one row that scrolls sideways on a phone rather than wrapping. */
+.settings__nav { position: sticky; top: 0; z-index: 1; background: var(--surface-sheet); overflow-x: auto; scrollbar-width: none; }
+.settings__nav::-webkit-scrollbar { display: none; }
+.settings__nav .segmented__option { display: inline-flex; align-items: center; gap: var(--space-1); flex: 1 0 auto; justify-content: center; white-space: nowrap; min-height: var(--control-size); }
+.settings__nav .segmented__option .icon { font-size: 18px; }
+.settings__group { display: grid; gap: var(--space-2); padding-bottom: var(--space-4); border-bottom: 1px solid var(--border-subtle); }
+.settings__group:last-child { border-bottom: 0; }
+.settings__group > .segmented { justify-self: start; }
+.settings__group > .button { justify-self: start; }
+.settings__title { margin: 0; font-size: var(--font-size-14); font-weight: 600; }
+.settings__hint { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+.settings__row, .settings__toggle { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-height: var(--control-size); }
+.settings__toggle-text { display: grid; gap: 2px; }
+.settings__summary { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-2); }
+.settings__list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.settings__source { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--surface-raised); }
+.settings__source-text { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.settings__source-name { font-weight: 600; }
+.settings__source-actions { display: flex; align-items: center; gap: var(--space-1); }
+.settings__url { font-size: 12px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings__add { display: flex; gap: var(--space-2); }
+.settings__add .field__input { flex: 1; min-width: 0; }
+.settings__error, .settings__ok { display: flex; align-items: flex-start; gap: var(--space-1); margin: 0; font-size: 13px; }
+.settings__error { color: var(--grade-f); }
+.settings__ok { color: var(--success); }
+.settings__error .icon, .settings__ok .icon { font-size: 16px; }
+.settings__status { margin: 0; display: grid; gap: 0; }
+.settings__status > div { display: grid; grid-template-columns: minmax(140px, 1fr) 2fr; gap: var(--space-3); padding: var(--space-2) 0; border-bottom: 1px solid var(--border-subtle); }
+.settings__status > div:last-child { border-bottom: 0; }
+.settings__status dt { color: var(--text-secondary); font-size: 13px; }
+.settings__status dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.settings__status .is-bad dd { color: var(--grade-f); }
+@media (max-width: 640px) {
+  .settings__status > div { grid-template-columns: 1fr; gap: 2px; }
+  .settings__add { flex-direction: column; }
+}

@@ -12,7 +12,9 @@ import {
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
+  type SavedLoadout, type CleanupState, type WatchEntry,
 } from '@triumvirate/core';
+import type { WishListCache } from './wishlist-cache.ts';
 import type { Push } from './push.ts';
 import type { Store, Snapshot } from './store.ts';
 import { streamAgent, type AgentContext, type AgentEvent, type ChatTurn } from './agent.ts';
@@ -50,6 +52,8 @@ const IMAGE_TYPES: Record<string, string> = {
 export interface AppDeps {
   /** Returns the parsed community wish list; may download it. */
   wishList: () => Promise<WishList>;
+  /** Manages the wish list sources behind `wishList` (Settings). Optional so tests can pass a plain function. */
+  wishLists?: WishListCache;
   /** Present when ANTHROPIC_API_KEY is set. */
   anthropic?: Anthropic;
   /** Local hour (0-23) for the nightly community crawl; off when unset. */
@@ -377,7 +381,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   /** Vendor weapons with grades. Needs a loaded inventory. */
   async function vendorOffers(t: Tokens, refresh: boolean) {
     if (!current || !lastView || !manifest) throw new Error('Load your inventory first.');
-    const key = `${current.membershipId}.${manifest.version}`;
+    const key = `${current.membershipId}.${manifest.version}.${deps.wishLists?.version ?? 0}`;
     if (!vendorCache || vendorCache.key !== key || refresh || Date.now() - vendorCache.at > 15 * 60_000) {
       const http = createHttpClient(cfg.apiKey, t.accessToken);
       const responses = [];
@@ -810,7 +814,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     // Community grades sharpen cleanup picks; a new nightly rollup means a new view.
     const r = await community.rollup();
     const { builds } = await buildStore.get();
-    const key = `${snapVersion}.${manifest!.version}.${r?.builtAt ?? ''}.${buildStore.version}`;
+    const key = `${snapVersion}.${manifest!.version}.${r?.builtAt ?? ''}.${buildStore.version}.${deps.wishLists?.version ?? 0}`;
     if (viewCache && viewCache.key === key && viewCache.list === list && lastView) return viewCache.view;
     const items: AppraisedItem[] = summarizeProfile(snap.profile, manifest!).map((i) =>
       i.itemType === 3 && i.perks
@@ -1032,6 +1036,127 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     }, 5 * 60_000);
     t.unref();
   }
+
+  // ── Settings: wish list sources, server status, backup ─────
+  /** Wish list changes regrade everything, so the vendor pull (graded with the old list) is dropped too. */
+  const wishListsChanged = () => { vendorCache = undefined; };
+  const noLists = (c: Context) => c.json({ error: 'Wish list settings aren\'t available on this server.' }, 501);
+  app.get('/api/settings/wishlists', async (c) => (deps.wishLists ? c.json({ sources: await deps.wishLists.info() }) : noLists(c)));
+  app.post('/api/settings/wishlists', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    const b = (await c.req.json().catch(() => ({}))) as { url?: unknown; name?: unknown };
+    try {
+      const sources = await deps.wishLists.add(String(b.url ?? '').trim(), typeof b.name === 'string' ? b.name : undefined);
+      wishListsChanged();
+      return c.json({ sources });
+    } catch (e) { return c.json({ error: (e as Error).message }, 400); }
+  });
+  app.post('/api/settings/wishlists/refresh', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    const sources = await deps.wishLists.refresh();
+    wishListsChanged();
+    return c.json({ sources });
+  });
+  app.patch('/api/settings/wishlists/:id', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    const b = (await c.req.json().catch(() => ({}))) as { enabled?: unknown };
+    try {
+      const sources = await deps.wishLists.setEnabled(c.req.param('id'), !!b.enabled);
+      if (!sources) return c.json({ error: 'No such wish list.' }, 404);
+      wishListsChanged();
+      return c.json({ sources });
+    } catch (e) { return c.json({ error: (e as Error).message }, 400); }
+  });
+  app.delete('/api/settings/wishlists/:id', async (c) => {
+    if (!deps.wishLists) return noLists(c);
+    try {
+      const sources = await deps.wishLists.remove(c.req.param('id'));
+      if (!sources) return c.json({ error: 'No such wish list.' }, 404);
+      wishListsChanged();
+      return c.json({ sources });
+    } catch (e) { return c.json({ error: (e as Error).message }, 400); }
+  });
+
+  // What the server has been doing, so "did last night's crawl run?" needs no ssh.
+  app.get('/api/status', async (c) => {
+    const [crawl, digest, rollup, watchState, lists] = await Promise.all([
+      community.status(), digests.latest(), community.rollup(), watch.read(), deps.wishLists?.info(),
+    ]);
+    return c.json({
+      now: new Date().toISOString(),
+      syncedAt: current?.syncedAt ?? null,
+      manifestVersion: manifest?.version ?? null,
+      crawl: {
+        hour: deps.communityCrawlHour ?? null,
+        running: crawl.running,
+        startedAt: crawl.startedAt ?? null,
+        lastRun: crawl.lastRun ?? null,
+        rollupBuiltAt: rollup?.builtAt ?? null,
+        samples: rollup?.samples ?? 0,
+      },
+      digest: { hour: deps.digestHour ?? null, latest: digest ? { date: digest.date, builtAt: digest.builtAt } : null },
+      watch: { everyMinutes: deps.watchMinutes ?? null, entries: watchState.entries.length, checkedAt: watchState.checkedAt ?? null },
+      alerts: !!deps.push,
+      agent: !!deps.anthropic,
+      wishLists: lists ?? null,
+    });
+  });
+
+  // One file with everything you'd hate to lose: loadouts, builds, cleanup decisions, the watch
+  // list, and wish list sources. Never tokens, snapshots, or caches. The web app adds its own prefs.
+  app.get('/api/backup', async (c) => {
+    const [saved, builds, cleanup, watchState, lists] = await Promise.all([
+      loadouts.list(), buildStore.get(), cleanupStore.get(), watch.read(), deps.wishLists?.sources(),
+    ]);
+    c.header('Cache-Control', 'no-store');
+    return c.json({
+      app: 'triumvirate', kind: 'backup', version: 1, exportedAt: new Date().toISOString(),
+      data: {
+        loadouts: saved,
+        ...(builds.custom ? { builds: builds.builds } : {}),
+        cleanup,
+        watch: { entries: watchState.entries },
+        ...(lists ? { wishLists: lists } : {}),
+      },
+    });
+  });
+  /** Restores a backup. Each part is optional and replaces what's there; anything malformed is skipped. */
+  app.post('/api/backup', async (c) => {
+    const body = (await c.req.json().catch(() => undefined)) as { app?: unknown; kind?: unknown; data?: Record<string, unknown> } | undefined;
+    if (!body || body.app !== 'triumvirate' || body.kind !== 'backup' || typeof body.data !== 'object' || !body.data) {
+      return c.json({ error: 'That isn\'t a Triumvirate backup file.' }, 400);
+    }
+    const d = body.data;
+    const restored: string[] = [];
+    if (Array.isArray(d.loadouts)) {
+      const ok = (d.loadouts as SavedLoadout[]).filter((l) => l && validLoadoutId(l.id) && typeof l.name === 'string' && Array.isArray(l.items));
+      await loadouts.replace(ok);
+      restored.push(`${ok.length} loadout${ok.length === 1 ? '' : 's'}`);
+    }
+    if (Array.isArray(d.builds)) {
+      const next = await buildStore.set(d.builds as PopularBuild[]);
+      restored.push(`${next.builds.length} build${next.builds.length === 1 ? '' : 's'}`);
+    }
+    const cl = d.cleanup as Partial<CleanupState> | undefined;
+    if (cl && typeof cl === 'object' && cl.decisions && typeof cl.decisions === 'object') {
+      await cleanupStore.set({ decisions: cl.decisions, cleared: Array.isArray(cl.cleared) ? cl.cleared : [] });
+      cleanupVersion++;
+      restored.push('cleanup decisions');
+    }
+    const w = d.watch as { entries?: unknown } | undefined;
+    if (w && Array.isArray(w.entries)) {
+      const entries = (w.entries as WatchEntry[]).filter((e) => e && typeof e.id === 'string' && Number.isFinite(Number(e.itemHash)) && typeof e.name === 'string')
+        .map((e) => ({ ...e, itemHash: Number(e.itemHash), perks: cleanWantedPerks(e.perks) }));
+      await watch.update((s) => ({ state: { ...s, entries }, result: undefined }));
+      restored.push(`${entries.length} watched weapon${entries.length === 1 ? '' : 's'}`);
+    }
+    if (Array.isArray(d.wishLists) && deps.wishLists) {
+      await deps.wishLists.restore(d.wishLists as never);
+      wishListsChanged();
+      restored.push('wish list sources');
+    }
+    return c.json({ restored });
+  });
 
   app.onError((err, c) => {
     console.error(err);

@@ -25,11 +25,13 @@ const dataDir = process.env.DATA_DIR ? resolve(process.env.DATA_DIR) : join(impo
 // Web Push keys are read (or made) the first time something needs them.
 let pushConfig: Promise<PushConfig> | undefined;
 const push = createPush(dataDir, () => (pushConfig ??= loadPushConfig(dataDir, process.env).catch((e) => { pushConfig = undefined; throw e; })));
+const wishLists = createWishListCache(dataDir);
 const app = createApp(
   { apiKey: env('BUNGIE_API_KEY'), clientId: env('BUNGIE_CLIENT_ID'), clientSecret: env('BUNGIE_CLIENT_SECRET') },
   createStore(dataDir),
   {
-    wishList: createWishListCache(dataDir),
+    wishList: wishLists,
+    wishLists,
     // The SDK reads ANTHROPIC_API_KEY itself; the agent is simply off without it.
     anthropic: process.env.ANTHROPIC_API_KEY ? new Anthropic() : undefined,
     // e.g. COMMUNITY_CRAWL_HOUR=3 crawls public matches at 3 AM while the server runs.

@@ -14,6 +14,7 @@ import { LoadoutsView } from './components/LoadoutsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
+import { SettingsSheet } from './components/SettingsSheet.tsx';
 import { SeasonSheet } from './components/SeasonSheet.tsx';
 import { WatchListSheet } from './components/WatchSheet.tsx';
 import { Icon } from './components/Icon.tsx';
@@ -64,6 +65,7 @@ export function App() {
   const [chatStatus, setChatStatus] = useState<ChatStatus>({ active: false, busy: false, unread: 0 });
   // Daily digest: the newest one's date, and the last one you opened (for the button's dot).
   const [digestOpen, setDigestOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [seasonOpen, setSeasonOpen] = useState(false);
   const [watchOpen, setWatchOpen] = useState(false);
   const [latestDigest, setLatestDigest] = useState('');
@@ -504,11 +506,9 @@ export function App() {
             name={inv.displayName}
             picture={inv.profilePicture}
             synced={timeAgo(inv.syncedAt)}
-            tileScale={tileScale}
-            onTileScale={setTileScale}
+            onSettings={() => setSettingsOpen(true)}
             onSignOut={() => void signOut()}
             autoRefresh={autoRefresh}
-            onAutoRefresh={setAutoRefresh}
             compact={compact}
           />
         </div>
@@ -627,6 +627,16 @@ export function App() {
         {!agentOpen && chatStatus.unread === 0 && chatStatus.active && <span className="chat-fab__dot" />}
       </button>}
       {seasonOpen && <SeasonSheet onClose={() => setSeasonOpen(false)} />}
+      {settingsOpen && (
+        <SettingsSheet
+          tileScale={tileScale}
+          onTileScale={setTileScale}
+          autoRefresh={autoRefresh}
+          onAutoRefresh={setAutoRefresh}
+          onOpenDigest={() => { setSettingsOpen(false); setDigestOpen(true); }}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
       {digestOpen && (
         <DigestSheet
           items={inv.items}
