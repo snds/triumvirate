@@ -17,7 +17,7 @@ export function ItemChip({ id, label }: { id: string; label?: string }) {
       type="button"
       className={`item-chip tier-${item.tier.toLowerCase() || 'common'}`}
       onClick={() => { hover?.leave(); select(item); }}
-      onPointerEnter={hover ? (e) => hover.enter(item, e.currentTarget.getBoundingClientRect()) : undefined}
+      onPointerEnter={hover ? (e) => hover.enter(item, e.currentTarget) : undefined}
       onPointerLeave={hover ? () => hover.leave() : undefined}
     >
       {item.icon && <img className="item-chip__icon" src={item.icon} alt="" />}

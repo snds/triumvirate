@@ -4,7 +4,8 @@ import { createContext, useContext } from 'react';
 import type { AppraisedItem } from '@triumvirate/core/browser';
 
 export interface HoverApi {
-  enter: (item: AppraisedItem, anchor: DOMRect) => void;
+  /** The hovered element: the card is placed beside it. */
+  enter: (item: AppraisedItem, anchor: Element) => void;
   leave: () => void;
 }
 
