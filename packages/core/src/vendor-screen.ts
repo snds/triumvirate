@@ -19,7 +19,21 @@ export interface VendorInfo {
   categories: string[];
   /** Why a sale can't be bought, by failure index. */
   failures: string[];
+  /** Display category indexes that aren't for sale: the vendor's help page, intro steps, unnamed rows. */
+  hiddenCategories?: number[];
 }
+
+/**
+ * Category identifiers that hold no sales: a vendor's help page ("xur_help_name", "crucible.help.name")
+ * and its intro quest steps. Checked against the live manifest.
+ */
+const HIDDEN_VENDOR_CATEGORY = /(^|[._])help([._]|$)|^intro_step/;
+
+/** Whether a display category is for show only (help page, intro step, or a nameless spacer row). */
+export const hiddenVendorCategory = (c: { identifier?: string; displayProperties?: { name?: string } }) =>
+  HIDDEN_VENDOR_CATEGORY.test(c.identifier ?? '') || (!c.identifier && !c.displayProperties?.name);
+/** DestinyItemType.None: placeholder sales (a sub-page link, the vendor's own portrait). */
+const ITEM_TYPE_NONE = 0;
 
 export interface VendorGroupInfo { name: string; order: number }
 
@@ -106,6 +120,11 @@ export interface VendorScreenInput {
   collectibles?: Record<string, { state: number }>;
   /** Ids of rolled-item rows that exist (`vendor-<vendor>-<index>`). */
   rowIds?: Set<string>;
+  /**
+   * The vendor a sale opens instead of being bought (its item's preview vendor), such as
+   * Zavala's "Weapons" page. Those pages' stock is folded into the vendor that links to them.
+   */
+  links?: (itemHash: number) => number | undefined;
 }
 
 /**
@@ -120,6 +139,25 @@ export function vendorScreen(input: VendorScreenInput): VendorGroupView[] {
   const groupsOut: VendorGroupView[] = [];
   const placed = new Set<number>();
 
+  // Sub-pages: a sale whose item opens another vendor in this response. The page shows inside
+  // the vendor that links to it, under the link's name, and never on its own.
+  const subPages = new Map<number, { vendor: number; label: string }[]>();
+  const isSubPage = new Set<number>();
+  if (input.links) {
+    for (const [vh, s] of Object.entries(sales)) {
+      for (const sale of Object.values(s.saleItems ?? {})) {
+        const target = input.links(sale.itemHash);
+        if (!target || target === Number(vh) || !comps[target]) continue;
+        const label = manifest.items[sale.itemHash]?.displayProperties.name || 'More';
+        const list = subPages.get(Number(vh)) ?? [];
+        if (!list.some((x) => x.vendor === target)) list.push({ vendor: target, label });
+        subPages.set(Number(vh), list);
+        isSubPage.add(target);
+      }
+    }
+  }
+  const building = new Set<number>();
+
   const card = (vendorHash: number): VendorCard | undefined => {
     const v = comps[vendorHash];
     const info = input.info(vendorHash);
@@ -128,6 +166,7 @@ export function vendorScreen(input: VendorScreenInput): VendorGroupView[] {
     const byIndex = new Map(Object.values(saleItems).map((s) => [s.vendorItemIndex, s]));
     const categories: VendorCategory[] = [];
     const used = new Set<number>();
+    const hidden = new Set(info.hiddenCategories ?? []);
     const toSale = (index: number): VendorSale | undefined => {
       const s = byIndex.get(index);
       if (!s) return undefined;
@@ -135,6 +174,9 @@ export function vendorScreen(input: VendorScreenInput): VendorGroupView[] {
       const name = def?.displayProperties.name;
       if (!name) return undefined; // hidden or classified entries
       used.add(index);
+      // A link to a sub-page shows as that page's stock; a free placeholder with no type is noise.
+      if (input.links?.(s.itemHash)) return undefined;
+      if (def.itemType === ITEM_TYPE_NONE && !def.itemTypeDisplayName && !(s.costs ?? []).some((c) => c.quantity > 0)) return undefined;
       const costs: VendorCost[] = (s.costs ?? []).filter((c) => c.quantity > 0).map((c) => {
         const cd = manifest.items[c.itemHash];
         return { itemHash: c.itemHash, name: cd?.displayProperties.name || 'Currency', icon: bungieUrl(cd?.displayProperties.icon), quantity: c.quantity, have: input.balances.get(c.itemHash) };
@@ -158,12 +200,28 @@ export function vendorScreen(input: VendorScreenInput): VendorGroupView[] {
     };
     // The response lists each category's sale indexes in the game's order.
     for (const c of cats[vendorHash]?.categories ?? []) {
+      if (hidden.has(c.displayCategoryIndex)) { c.itemIndexes.forEach((i) => used.add(i)); continue; }
       const list = c.itemIndexes.map(toSale).filter((x): x is VendorSale => !!x);
       if (list.length) categories.push({ name: info.categories[c.displayCategoryIndex] || 'Offers', sales: list });
     }
     // Anything on sale but in no category still shows.
     const rest = [...byIndex.keys()].filter((i) => !used.has(i)).sort((a, b) => a - b).map(toSale).filter((x): x is VendorSale => !!x);
     if (rest.length) categories.push({ name: 'Offers', sales: rest });
+    // Sub-pages' stock, under the link's name ("Weapons"), or "Weapons · Kinetic" when it has several.
+    if (!building.has(vendorHash)) {
+      building.add(vendorHash);
+      for (const sub of subPages.get(vendorHash) ?? []) {
+        const child = card(sub.vendor);
+        if (!child) continue;
+        for (const c of child.categories) {
+          const name = child.categories.length === 1 || c.name === sub.label ? sub.label : `${sub.label} · ${c.name}`;
+          const existing = categories.find((x) => x.name === name);
+          if (existing) existing.sales.push(...c.sales);
+          else categories.push({ name, sales: c.sales });
+        }
+      }
+      building.delete(vendorHash);
+    }
 
     let rank: VendorRank | undefined;
     if (v.progression?.progressionHash && input.rank) {
@@ -187,8 +245,9 @@ export function vendorScreen(input: VendorScreenInput): VendorGroupView[] {
     };
   };
 
+  for (const h of isSubPage) placed.add(h);
   for (const g of res.vendorGroups?.data?.groups ?? []) {
-    const list = g.vendorHashes.map((h) => { placed.add(h); return card(h); }).filter((x): x is VendorCard => !!x);
+    const list = g.vendorHashes.filter((h) => !isSubPage.has(h)).map((h) => { placed.add(h); return card(h); }).filter((x): x is VendorCard => !!x);
     if (!list.length) continue;
     groupsOut.push({ hash: g.vendorGroupHash, name: input.group(g.vendorGroupHash)?.name ?? 'Vendors', vendors: list });
   }

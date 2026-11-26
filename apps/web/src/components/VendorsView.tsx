@@ -174,7 +174,7 @@ function VendorCardView({ vendor: v, data, now, onSelect }: { vendor: VendorCard
         <section key={c.name} className="vendor-cat" aria-label={c.name}>
           <h5 className="vendor-cat__title">{c.name} <span className="muted">{c.sales.length}</span></h5>
           <ul className="vendor-cat__grid">
-            {c.sales.map((s) => <SaleView key={s.index} sale={s} data={data} onSelect={onSelect} />)}
+            {c.sales.map((s, i) => <SaleView key={`${s.index}-${i}`} sale={s} data={data} onSelect={onSelect} />)}
           </ul>
         </section>
       ))}

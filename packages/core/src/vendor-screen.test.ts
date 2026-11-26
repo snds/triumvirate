@@ -93,3 +93,36 @@ test('balances add up currencies and stacks; the character lookup wins', () => {
   assert.equal(b.get(5), 14);
   assert.equal(b.get(900), 250);
 });
+
+test('live-manifest shapes: help pages hidden, placeholders dropped, sub-pages folded into their vendor', () => {
+  const its: Record<string, unknown> = {
+    ...items,
+    50: { displayProperties: { name: 'Xûr' }, itemType: 0, inventory: { tierTypeName: 'Common' } }, // portrait on the help page
+    51: { displayProperties: { name: 'Weapons' }, itemType: 0 }, // link to the "Weapons" page
+    52: { displayProperties: { name: 'Vanguard Ops' }, itemType: 0 }, // free placeholder, no link
+  };
+  const v: Record<number, VendorInfo> = {
+    1: { name: 'Commander Zavala', locations: [], categories: ['Gear', 'Commander Zavala', 'Pages'], hiddenCategories: [1], failures: [] },
+    2: { name: 'Weapons', locations: [], categories: ['Weapons'], failures: [] },
+  };
+  const r = {
+    vendorGroups: { data: { groups: [{ vendorGroupHash: 7, vendorHashes: [1, 2] }] } },
+    vendors: { data: { 1: { vendorHash: 1, enabled: true, vendorLocationIndex: 0 }, 2: { vendorHash: 2, enabled: true, vendorLocationIndex: 0 } } },
+    categories: { data: {
+      1: { categories: [{ displayCategoryIndex: 0, itemIndexes: [1, 3] }, { displayCategoryIndex: 1, itemIndexes: [2] }, { displayCategoryIndex: 2, itemIndexes: [4] }] },
+      2: { categories: [{ displayCategoryIndex: 0, itemIndexes: [1] }] },
+    } },
+    sales: { data: {
+      1: { saleItems: {
+        1: { vendorItemIndex: 1, itemHash: 2, quantity: 1, augments: 0, costs: [], failureIndexes: [] },
+        2: { vendorItemIndex: 2, itemHash: 50, quantity: 1, augments: 0, costs: [], failureIndexes: [] },
+        3: { vendorItemIndex: 3, itemHash: 52, quantity: 1, augments: 0, costs: [], failureIndexes: [] },
+        4: { vendorItemIndex: 4, itemHash: 51, quantity: 1, augments: 0, costs: [], failureIndexes: [] },
+      } },
+      2: { saleItems: { 1: { vendorItemIndex: 1, itemHash: 1, quantity: 1, augments: 0, costs: [{ itemHash: 900, quantity: 5 }], failureIndexes: [] } } },
+    } },
+  } as never;
+  const g = vendorScreen({ vendors: r, manifest: { items: its } as never, info: (h) => v[h], group: () => ({ name: 'Tower', order: 0 }), balances: new Map(), links: (h) => (h === 51 ? 2 : undefined) });
+  assert.deepEqual(g[0]!.vendors.map((x) => x.name), ['Commander Zavala']);
+  assert.deepEqual(g[0]!.vendors[0]!.categories.map((c) => [c.name, c.sales.map((s) => s.name)]), [['Gear', ['Shiny Shader']], ['Weapons', ['Fatebringer']]]);
+});
