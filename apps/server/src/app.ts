@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh,
+  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
 } from '@triumvirate/core';
@@ -403,6 +403,24 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     if (!t) return c.json({ signedIn: false }, 401);
     if (!current || !lastView || !manifest) return c.json({ error: 'Load your inventory first.' }, 409);
     return c.json(await vendorOffers(t, !!c.req.query('refresh')));
+  });
+  // Farming targets: god rolls you're missing, where they drop, and vendors selling them now.
+  app.get('/api/farming', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { view } = await ready(t);
+    const r = await community.rollup();
+    const seen: Record<string, number> = {};
+    for (const [h, w] of Object.entries(r?.weapons ?? {})) seen[h] = w.roles.reduce((n, x) => n + x.copies, 0);
+    // Vendors are a bonus: without them the list still says where each weapon drops.
+    let vendorError: string | undefined;
+    const vendors = await vendorOffers(t, !!c.req.query('refresh')).catch((e: Error) => { vendorError = e.message; return undefined; });
+    const targets = farmTargets({ manifest: manifest!, wishList: await deps.wishList(), items: view.items, vendors: vendors?.items, seen });
+    return c.json({
+      targets, vendorsAt: vendors?.fetchedAt, vendorError,
+      community: r ? { builtAt: r.builtAt, samples: r.samples } : undefined,
+      sourcesKnown: !!manifest!.sources,
+    });
   });
   app.get('/api/community/items/:hash', async (c) => {
     const hash = Number(c.req.param('hash'));

@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -265,3 +265,15 @@ export const decideCleanup = (instanceIds: string[], action: 'dismantle' | 'keep
 /** Brings the queue out of the vault onto a character, where the game can dismantle it. */
 export const pullCleanup = (characterId: string) =>
   act<Partial<CleanupStatus> & ActionResult>('/api/cleanup/pull', { characterId }, 'pull the queue');
+// ── Farming targets ───────────────────────────────────────────
+export interface FarmingResponse {
+  targets: FarmTarget[];
+  /** When vendors were last checked; absent when they couldn't be. */
+  vendorsAt?: string;
+  vendorError?: string;
+  community?: { builtAt: string; samples: number };
+  /** False on a server whose item tables predate drop sources. */
+  sourcesKnown: boolean;
+}
+export const fetchFarming = async (refresh = false): Promise<FarmingResponse> =>
+  json(await fetch(`/api/farming${refresh ? '?refresh=1' : ''}`), sameOriginImages);

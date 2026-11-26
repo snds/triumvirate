@@ -60,6 +60,8 @@ const GLYPHS = {
   info: 'info',
   select: 'checklist',
   checkCircle: 'check_circle',
+  target: 'target',
+  sale: 'sell',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

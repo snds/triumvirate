@@ -44,6 +44,18 @@ export interface ManifestTables {
   loadoutStyles?: LoadoutStyles;
   /** Armor sets and the perks that switch on at 2 and 4 pieces, by set hash. */
   itemSets?: Record<string, ArmorSet>;
+  /** Where an item comes from ("Source: ..." from its collection entry), by item hash. */
+  sources?: Record<string, string>;
+}
+
+/** Item hash to its collection source text, without the "Source: " prefix. Empty sources are left out. */
+export function slimSources(full: Record<string, { itemHash?: number; sourceString?: string }>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const c of Object.values(full)) {
+    const text = c.sourceString?.replace(/^Source:\s*/i, '').trim();
+    if (c.itemHash && text) out[c.itemHash] = text;
+  }
+  return out;
 }
 
 /** An armor set (Armor 3.0): its name and the bonus perks wearing enough of it turns on. */
@@ -173,6 +185,7 @@ const TABLES = {
   loadoutIcons: 'DestinyLoadoutIconDefinition',
   itemSets: 'DestinyEquipableItemSetDefinition',
   sandboxPerks: 'DestinySandboxPerkDefinition',
+  collectibles: 'DestinyCollectibleDefinition',
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
@@ -247,7 +260,9 @@ export async function loadManifest(
         Object.fromEntries(Object.entries(full).filter(([h]) => used.has(h)).map(([h, p]) => [h, { displayProperties: p.displayProperties }])));
       return slimItemSets(sets, perks);
     }).catch(() => undefined);
+  // Where weapons drop, for farming targets. A nice-to-have, so a missing table never blocks the app.
+  const sources = await load(TABLES.collectibles, slimSources).catch(() => undefined);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources };
 }
