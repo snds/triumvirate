@@ -50,14 +50,23 @@
   --ammo-special-global: #7af48b;
   --ammo-heavy-global: #b286ff;
 
+  /* Spacing: a 4px base with two half steps (2 and 6). */
+  --space-0-5: 2px;
   --space-1: 4px;
+  --space-1-5: 6px;
   --space-2: 8px;
   --space-3: 12px;
   --space-4: 16px;
+  --space-5: 20px;
   --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --radius-xs: 2px;
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 16px;
+  --radius-circle: 50%;
   /* Size ramp for controls, targets, and icons (literal: the name is the value). */
   --size-18: 18px;
   --size-24: 24px;
@@ -79,13 +88,37 @@
   --white-a12: rgb(255 255 255 / 0.12);
   --blur-lg: 24px;
   --saturate-lg: 180%;
-  --shadow-float-global: 0 10px 30px rgb(0 0 0 / 0.45);
   --size-sheet-max: 82dvh;
+  /* Type: one family (Inter), 12 sizes, 3 weights. Components name a role (--type-*) where they can, never a raw size. */
   --font-size-10: 10px;
+  --font-size-11: 11px;
+  --font-size-12: 12px;
+  --font-size-13: 13px;
   --font-size-14: 14px;
   --font-size-16: 16px;
-  --shadow-down-lg: 0 8px 24px rgb(0 0 0 / 0.55);
-  --shadow-up-xl: 0 -16px 48px rgb(0 0 0 / 0.55);
+  --font-size-18: 18px;
+  --font-size-20: 20px;
+  --font-size-24: 24px;
+  --font-size-28: 28px;
+  --font-size-32: 32px;
+  --font-size-40: 40px;
+  --font-weight-regular: 400;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --leading-none: 1;
+  --leading-tight: 1.15;
+  --leading-snug: 1.25;
+  --leading-normal: 1.4;
+  --leading-relaxed: 1.5;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.06em;
+  /* Elevation: in a dark UI a higher layer is a lighter surface; the shadow only separates it from what's under it. */
+  --shadow-1: 0 2px 6px rgb(0 0 0 / 0.4);
+  --shadow-2: 0 8px 24px rgb(0 0 0 / 0.55);
+  --shadow-3: 0 10px 30px rgb(0 0 0 / 0.45);
+  --shadow-up: 0 -16px 48px rgb(0 0 0 / 0.55);
+  --shadow-4: 0 24px 64px rgb(0 0 0 / 0.55);
   /* The device's notch and home-indicator insets; 0 unless the page uses viewport-fit=cover. */
   --env-safe-top: env(safe-area-inset-top, 0px);
   --env-safe-right: env(safe-area-inset-right, 0px);
@@ -122,6 +155,23 @@
   /* Muted is for non-essential text only (timestamps, placeholders): 3.8:1 on panels, under the 4.5:1 body bar. */
   --text-muted: var(--ink-10);
   --text-disabled: var(--ink-8);
+  /* Rings: keyboard focus (with a gap so it reads on any fill) and a picked/selected state. */
+  --ring-focus: 0 0 0 2px var(--surface-page), 0 0 0 4px var(--focus-ring);
+  --ring-selected: inset 0 0 0 2px var(--accent);
+  /* Type roles: a font shorthand plus a tracking value. Use with `font: var(--type-x); letter-spacing: var(--type-x-tracking)`. */
+  --type-display: var(--font-weight-bold) var(--font-size-32)/var(--leading-tight) var(--font-sans);
+  --type-headline: var(--font-weight-bold) var(--font-size-24)/var(--leading-tight) var(--font-sans);
+  --type-title: var(--font-weight-semibold) var(--font-size-18)/var(--leading-snug) var(--font-sans);
+  --type-title-sm: var(--font-weight-semibold) var(--font-size-16)/var(--leading-snug) var(--font-sans);
+  --type-body: var(--font-weight-regular) var(--font-size-14)/var(--leading-normal) var(--font-sans);
+  --type-body-sm: var(--font-weight-regular) var(--font-size-13)/var(--leading-normal) var(--font-sans);
+  --type-label: var(--font-weight-semibold) var(--font-size-13)/var(--leading-snug) var(--font-sans);
+  --type-label-sm: var(--font-weight-semibold) var(--font-size-12)/var(--leading-snug) var(--font-sans);
+  --type-label-sm-tracking: var(--tracking-wide);
+  --type-caption: var(--font-weight-regular) var(--font-size-11)/var(--leading-snug) var(--font-sans);
+  --type-overline: var(--font-weight-bold) var(--font-size-11)/var(--leading-snug) var(--font-sans);
+  --type-overline-tracking: var(--tracking-caps);
+  --type-numeric: var(--font-weight-bold) var(--font-size-10)/var(--leading-none) var(--font-sans);
   --accent: var(--exotic-9);
   --accent-hover: var(--exotic-10);
   --accent-text: var(--exotic-11);
@@ -221,8 +271,9 @@
   /* Elevation. Dark UI: a higher layer is a lighter surface; shadow only separates it from what's under it.
      Base (page, panels, full-screen sheets) → raised (cards, bottom sheets) → overlay (menus, toasts). */
   --surface-sheet: var(--surface-raised);
-  --shadow-overlay: var(--shadow-down-lg);
-  --shadow-sheet: var(--shadow-up-xl);
+  --shadow-overlay: var(--shadow-2);
+  --shadow-dialog: var(--shadow-4);
+  --shadow-sheet: var(--shadow-up);
   /* Glass: the floating material for chrome over content (iOS 26 Liquid Glass, approximated with
      a translucent fill, background blur and saturation, a hairline edge, and a top highlight). */
   --surface-glass: var(--ink-2-a70);
@@ -231,7 +282,7 @@
   --fill-glass-selected: var(--white-a12);
   --blur-glass: var(--blur-lg);
   --saturate-glass: var(--saturate-lg);
-  --shadow-float: var(--shadow-float-global);
+  --shadow-float: var(--shadow-3);
   /* Motion, named by job. Arrivals decelerate to rest (enter), departures accelerate away (exit),
      on-screen moves do both (move). Sheets slide on a longer, softer enter (surface).
      fast = hover and press · normal = most state changes · slow = large surfaces.
