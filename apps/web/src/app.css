@@ -2689,3 +2689,17 @@ li.title-card { cursor: default; }
 
 /* React Aria tab roots and titled segment content draw nothing; the caller's layout holds. */
 .tabs-root, .segment__inner { display: contents; }
+/* ── Settings: Agents ── */
+.agents__steps { margin: 0; padding-left: var(--space-6); display: grid; gap: var(--space-2); }
+.agents__url { display: flex; gap: var(--space-2); margin-top: var(--space-1); }
+.agents__url .search { flex: 1; min-width: 0; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: var(--font-size-12); }
+.agents__list { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-1); }
+.agents__list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: var(--space-2); padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); background: var(--surface-raised); }
+.agents__list li .button { grid-row: 1 / span 2; grid-column: 2; }
+.agents__name { display: inline-flex; align-items: center; gap: var(--space-1); font-weight: var(--font-weight-semibold); }
+.agents__name .icon, .agents__state .icon { color: var(--status-success-text); }
+.agents__state { margin: 0; display: inline-flex; align-items: center; gap: var(--space-1); }
+.agents__help { margin-top: var(--space-3); font-size: var(--font-size-13); color: var(--text-secondary); }
+.agents__help summary { cursor: pointer; color: var(--text-primary); }
+.agents__help p { margin: var(--space-2) 0; }
+.agents__help code { display: block; padding: var(--space-2); border-radius: var(--radius-md); background: var(--surface-raised); color: var(--text-primary); font-size: var(--font-size-12); word-break: break-word; }

@@ -95,6 +95,24 @@ Files live in `.data/community/`. A crawl makes at most 3,000 requests at 4 per 
 A crawl only samples matches from the last 6 hours. When it runs out of players to visit (say, a fresh
 start when you haven't played tonight), it uses older matches only to find more players.
 
+## Connect Claude (MCP)
+
+Triumvirate is an MCP server at `/mcp`, so Claude can use your gear with your own Claude account; no
+`ANTHROPIC_API_KEY` needed. Settings, Agents shows the address and who's connected (with Disconnect).
+
+1. In Cloudflare Zero Trust, add a **Bypass** Access application on this hostname for
+   `/mcp`, `/oauth/register`, `/oauth/token`, `/.well-known/oauth-authorization-server`, and
+   `/.well-known/oauth-protected-resource`. Claude's servers can't pass Access; each of these paths
+   checks its own OAuth sign-in instead. Keep `/oauth/authorize` (the Allow page) behind Access.
+2. In Claude: Settings, Connectors, Add custom connector, paste `https://<your host>/mcp`.
+3. Claude opens the Allow page; choose Allow.
+
+Tools: the chat's read tools (inventory, search, item, cleanup, optimizer, subclass options) plus
+`move_item`, `equip_items`, and `set_lock`. Nothing can dismantle. Only Claude's callback hosts may
+register (`claude.ai`, `claude.com`, and localhost for Claude Code). Tokens are stored hashed in
+`.data/mcp-auth.json`; access tokens last an hour, refresh tokens 90 days and rotate on use. Set
+`PUBLIC_URL` if the address the server sees isn't the one Claude uses.
+
 ## Daily digest
 
 Once a day the server syncs your inventory and writes a digest: new weapons and armor since yesterday (best first, with grades and stat totals), vendor weapons worth buying, and how full the vault is. With the assistant turned on, it opens with a few sentences on what to do first. Open it from the **Today** button in the top bar, or build one now from there.

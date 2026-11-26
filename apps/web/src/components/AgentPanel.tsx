@@ -36,8 +36,10 @@ export interface ChatStatus {
 }
 
 // The floating chat. Stays mounted while hidden so the conversation survives toggling.
-export function AgentPanel({ enabled, open, about, onClose, onStatus, width, onWidth }: {
+export function AgentPanel({ enabled, open, about, onClose, onStatus, width, onWidth, onConnect }: {
   enabled: boolean; open: boolean; width: number; onWidth: (w: number) => void;
+  /** Opens Settings at Agents, where Claude or an API key can be connected. */
+  onConnect?: () => void;
   onClose: () => void;
   onStatus: (s: ChatStatus) => void;
   /** An item to talk about (from "Ask about this item"); `id` changes on each ask. */
@@ -209,7 +211,8 @@ export function AgentPanel({ enabled, open, about, onClose, onStatus, width, onW
           <div className="agent__off">
             <Mark className="agent__off-mark" />
             <strong>Chat is off on this server</strong>
-            <p className="muted">Ask about rolls, builds, and what to clean up. To turn it on, add <code>ANTHROPIC_API_KEY</code> to the server's environment and restart the app.</p>
+            <p className="muted">Ask about rolls, builds, and what to clean up. Connect Claude with your own Claude account, or add an API key to this server.</p>
+            {onConnect && <button className="button button--primary" onClick={onConnect}>Connect an agent</button>}
           </div>
         )}
         {enabled && turns.length === 0 && !busy && (
