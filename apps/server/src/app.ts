@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh,
+  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
 } from '@triumvirate/core';
@@ -25,6 +25,7 @@ import { createCleanupStore } from './cleanup-store.ts';
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
   100, // Profiles
+  104, // ProfileProgression (artifact power bonus and points)
   103, // ProfileCurrencies (glimmer, bright dust, silver)
   102, // ProfileInventories (vault)
   200, // Characters
@@ -112,7 +113,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       loadManifestCached(http),
     ]);
     manifest = man;
-    trimProgressions(profile);
+    trimProgressions(profile, trackedProgressions(man));
     const now = new Date().toISOString();
     // Bungie stamps each profile response; the same stamps mean the same data.
     if (prev && sameProfile(prev.profile, profile)) {
@@ -421,6 +422,13 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       community: r ? { builtAt: r.builtAt, samples: r.samples } : undefined,
       sourcesKnown: !!manifest!.sources,
     });
+  });
+  // Season tracker: pass rank, artifact, and ritual ranks from the last sync.
+  app.get('/api/season', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { snap } = await ready(t);
+    return c.json({ syncedAt: snap.syncedAt, ...seasonSummary(snap.profile, manifest!) });
   });
   app.get('/api/community/items/:hash', async (c) => {
     const hash = Number(c.req.param('hash'));
@@ -950,10 +958,14 @@ interface View {
  * Character progressions hold every faction, milestone, and quest, but the app only reads the
  * seasonal artifact, so the rest is dropped before a snapshot is saved (it would triple its size).
  */
-export function trimProgressions(profile: DestinyProfileResponse) {
-  const data = profile.characterProgressions?.data as Record<string, { seasonalArtifact?: unknown }> | undefined;
+export function trimProgressions(profile: DestinyProfileResponse, keep: Set<number> = new Set()) {
+  const data = profile.characterProgressions?.data as Record<string, { seasonalArtifact?: unknown; progressions?: Record<string, unknown> }> | undefined;
   if (!data) return;
-  for (const [id, p] of Object.entries(data)) data[id] = { seasonalArtifact: p.seasonalArtifact } as never;
+  for (const [id, p] of Object.entries(data)) {
+    // The season tracker's ranks and season pass are a handful of entries out of hundreds.
+    const progressions = Object.fromEntries(Object.entries(p.progressions ?? {}).filter(([h]) => keep.has(Number(h))));
+    data[id] = { seasonalArtifact: p.seasonalArtifact, ...(Object.keys(progressions).length ? { progressions } : {}) } as never;
+  }
 }
 
 /** Bungie stamps when it built each part of a profile; matching stamps mean nothing changed. */

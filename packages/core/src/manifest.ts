@@ -46,6 +46,62 @@ export interface ManifestTables {
   itemSets?: Record<string, ArmorSet>;
   /** Where an item comes from ("Source: ..." from its collection entry), by item hash. */
   sources?: Record<string, string>;
+  /** Seasons, season passes, artifacts, and the rank progressions the season tracker reads. */
+  season?: SeasonTables;
+}
+
+export interface ProgressionInfo {
+  name: string;
+  icon?: string;
+  /** Rank names and points per step (e.g. "Guardian I" … "Legend"). */
+  steps: { name: string; total: number; icon?: string }[];
+}
+export interface SeasonTables {
+  seasons: Record<string, { name: string; number: number; startDate?: string; endDate?: string; passes: { hash: number; start?: string; end?: string }[]; icon?: string }>;
+  passes: Record<string, { name: string; icon?: string; reward: number; prestige?: number }>;
+  artifacts: Record<string, { name: string; icon?: string }>;
+  /** Only the ranks and season pass progressions; the full table is mostly faction trivia. */
+  progressions: Record<string, ProgressionInfo>;
+  /** Rank progressions to show, in display order. */
+  ranks: number[];
+}
+
+/** Rank progressions worth tracking: the ritual and vendor ranks ("Guardian I" ladders) and Competitive. */
+const RANK_ORDER = [457612306, 2083746873, 3696598664, 3008065600, 2755675426, 1471185389, 2411069437, 3011295063];
+const isRankLadder = (p: { steps?: { stepName?: string }[] }) => /^guardian i$/i.test(p.steps?.[0]?.stepName ?? '') && (p.steps?.length ?? 0) >= 10;
+
+/** Joins the four small season tables into what the tracker needs. */
+export function slimSeason(
+  seasons: Record<string, any>, passes: Record<string, any>, progressions: Record<string, any>, artifacts: Record<string, any>,
+): SeasonTables {
+  const url = (p?: string) => (p ? `https://www.bungie.net${p}` : undefined);
+  const out: SeasonTables = { seasons: {}, passes: {}, artifacts: {}, progressions: {}, ranks: [] };
+  for (const [h, s] of Object.entries(seasons)) {
+    out.seasons[h] = {
+      name: s.displayProperties?.name ?? '', number: s.seasonNumber ?? 0, startDate: s.startDate, endDate: s.endDate,
+      passes: (s.seasonPassList ?? []).map((x: any) => ({ hash: x.seasonPassHash, start: x.seasonPassStartDate, end: x.seasonPassEndDate })),
+      icon: url(s.displayProperties?.icon),
+    };
+  }
+  const keep = new Set<number>();
+  for (const [h, p] of Object.entries(passes)) {
+    out.passes[h] = { name: p.displayProperties?.name ?? '', icon: url(p.displayProperties?.icon), reward: p.rewardProgressionHash, ...(p.prestigeProgressionHash ? { prestige: p.prestigeProgressionHash } : {}) };
+    keep.add(p.rewardProgressionHash);
+    if (p.prestigeProgressionHash) keep.add(p.prestigeProgressionHash);
+  }
+  const ladders = Object.entries(progressions).filter(([, p]) => isRankLadder(p) || Number(p.hash) === 3696598664).map(([h]) => Number(h));
+  out.ranks = [...RANK_ORDER.filter((h) => ladders.includes(h)), ...ladders.filter((h) => !RANK_ORDER.includes(h))];
+  for (const h of out.ranks) keep.add(h);
+  for (const h of keep) {
+    const p = progressions[h];
+    if (!p) continue;
+    out.progressions[h] = {
+      name: p.displayProperties?.name ?? '', icon: url(p.rankIcon?.foregroundImagePath ?? p.displayProperties?.icon),
+      steps: (p.steps ?? []).map((st: any) => ({ name: st.stepName ?? '', total: st.progressTotal ?? 0, ...(st.icon ? { icon: url(st.icon) } : {}) })),
+    };
+  }
+  for (const [h, a] of Object.entries(artifacts)) out.artifacts[h] = { name: a.displayProperties?.name ?? '', icon: url(a.displayProperties?.icon) };
+  return out;
 }
 
 /** Item hash to its collection source text, without the "Source: " prefix. Empty sources are left out. */
@@ -186,6 +242,10 @@ const TABLES = {
   itemSets: 'DestinyEquipableItemSetDefinition',
   sandboxPerks: 'DestinySandboxPerkDefinition',
   collectibles: 'DestinyCollectibleDefinition',
+  seasons: 'DestinySeasonDefinition',
+  seasonPasses: 'DestinySeasonPassDefinition',
+  progressions: 'DestinyProgressionDefinition',
+  artifacts: 'DestinyArtifactDefinition',
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
@@ -262,7 +322,13 @@ export async function loadManifest(
     }).catch(() => undefined);
   // Where weapons drop, for farming targets. A nice-to-have, so a missing table never blocks the app.
   const sources = await load(TABLES.collectibles, slimSources).catch(() => undefined);
+  // The season tracker's tables: small, cosmetic, so a missing one never blocks the app.
+  // Kept as downloaded (about 1 MB together) and joined in memory.
+  const season = await Promise.all([
+    load<Record<string, any>>(TABLES.seasons), load<Record<string, any>>(TABLES.seasonPasses),
+    load<Record<string, any>>(TABLES.progressions), load<Record<string, any>>(TABLES.artifacts),
+  ]).then(([a, b, c, d]) => slimSeason(a, b, c, d)).catch(() => undefined);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources, season };
 }

@@ -6,6 +6,7 @@ export * from './cleanup.ts';
 export * from './autopilot.ts';
 export * from './farming.ts';
 export * from './share.ts';
+export * from './season.ts';
 export * from './subclass.ts';
 export * from './transfer.ts';
 export * from './loadouts.ts';

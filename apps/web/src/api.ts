@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, FarmTarget, SeasonSummary, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -277,3 +277,6 @@ export interface FarmingResponse {
 }
 export const fetchFarming = async (refresh = false): Promise<FarmingResponse> =>
   json(await fetch(`/api/farming${refresh ? '?refresh=1' : ''}`), sameOriginImages);
+// ── Season tracker ────────────────────────────────────────────
+export type SeasonResponse = SeasonSummary & { syncedAt: string };
+export const fetchSeason = async (): Promise<SeasonResponse> => json(await fetch('/api/season'), sameOriginImages);

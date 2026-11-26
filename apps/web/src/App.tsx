@@ -14,6 +14,7 @@ import { LoadoutsView } from './components/LoadoutsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
+import { SeasonSheet } from './components/SeasonSheet.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
 import { INVENTORY_ROWS, planBulkMove, SLOT_ORDER } from './inventory.ts';
@@ -60,6 +61,7 @@ export function App() {
   const [chatStatus, setChatStatus] = useState<ChatStatus>({ active: false, busy: false, unread: 0 });
   // Daily digest: the newest one's date, and the last one you opened (for the button's dot).
   const [digestOpen, setDigestOpen] = useState(false);
+  const [seasonOpen, setSeasonOpen] = useState(false);
   const [latestDigest, setLatestDigest] = useState('');
   const [seenDigest, setSeenDigest] = usePref('digestSeen', '');
   // Tapping the morning alert opens the digest: as ?open=digest on a fresh launch, or as a
@@ -458,6 +460,9 @@ export function App() {
               <Icon name="select" />
             </button>
           )}
+          <button className="icon-button" onClick={() => setSeasonOpen(true)} aria-label="Season progress" title="Season progress">
+            <Icon name="season" />
+          </button>
           <button
             className="icon-button topbar__digest"
             onClick={() => setDigestOpen(true)}
@@ -600,6 +605,7 @@ export function App() {
         {!agentOpen && chatStatus.unread > 0 && <span className="chat-fab__badge">{chatStatus.unread}</span>}
         {!agentOpen && chatStatus.unread === 0 && chatStatus.active && <span className="chat-fab__dot" />}
       </button>}
+      {seasonOpen && <SeasonSheet onClose={() => setSeasonOpen(false)} />}
       {digestOpen && (
         <DigestSheet
           items={inv.items}
