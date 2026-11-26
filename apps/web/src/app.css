@@ -2687,6 +2687,8 @@ li.title-card { cursor: default; }
 .agent__off code { padding: 0 var(--space-1); border-radius: var(--radius-sm); background: var(--surface-hover); color: var(--text-primary); }
 .agent__off-mark { width: var(--size-36); height: var(--size-28); fill: var(--border-subtle); }
 
+/* React Aria tab roots and titled segment content draw nothing; the caller's layout holds. */
+.tabs-root, .segment__inner { display: contents; }
 /* ── Settings: Agents ── */
 .agents__steps { margin: 0; padding-left: var(--space-6); display: grid; gap: var(--space-2); }
 .agents__url { display: flex; gap: var(--space-2); margin-top: var(--space-1); }

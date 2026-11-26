@@ -35,6 +35,7 @@ import { Mark } from './components/Mark.tsx';
 import { MID_QUERY, NARROW_QUERY, useCompact, useMediaQuery } from './media.ts';
 import { bootShowing, dismissBoot } from './boot.ts';
 import { StatusBanner } from './components/StatusBanner.tsx';
+import { Segment, Segmented } from './ui/Segmented.tsx';
 
 type State =
   | { status: 'loading' }
@@ -519,19 +520,9 @@ export function App() {
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search items"
         />
-        <div className="segmented topbar__kind" role="radiogroup" aria-label="Item kind">
-          {KINDS.map((k) => (
-            <button
-              key={k.value}
-              role="radio"
-              aria-checked={kind === k.value}
-              className={`segmented__option${kind === k.value ? ' is-selected' : ''}`}
-              onClick={() => setKind(k.value)}
-            >
-              {k.label}
-            </button>
-          ))}
-        </div></>}
+        <Segmented className="segmented topbar__kind" label="Item kind" value={kind} onChange={setKind}>
+          {KINDS.map((k) => <Segment key={k.value} id={k.value}>{k.label}</Segment>)}
+        </Segmented></>}
         <div className="topbar__end">
           {compact && view === 'inventory' && (
             <button

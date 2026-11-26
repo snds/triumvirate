@@ -12,6 +12,7 @@ import { GRADE_ORDER } from '../rolls-view.ts';
 import { chime, DEFAULT_ROLL_SETTINGS, type RollSettings } from './RollsView.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Icon, type IconName } from './Icon.tsx';
+import { Segment, Segmented } from '../ui/Segmented.tsx';
 
 export type Section = 'display' | 'rolls' | 'wishlists' | 'agents' | 'data' | 'status';
 const SECTIONS: { id: Section; label: string; icon: IconName }[] = [
@@ -79,23 +80,13 @@ function Group({ title, hint, children }: { title: string; hint?: ReactNode; chi
   );
 }
 
-function Segmented<T extends number | string>({ label, options, value, onChange }: {
+function Choice<T extends number | string>({ label, options, value, onChange }: {
   label: string; options: readonly { label: string; value: T }[]; value: T; onChange: (v: T) => void;
 }) {
   return (
-    <div className="segmented" role="radiogroup" aria-label={label}>
-      {options.map((o) => (
-        <button
-          key={o.label}
-          role="radio"
-          aria-checked={value === o.value}
-          className={`segmented__option${value === o.value ? ' is-selected' : ''}`}
-          onClick={() => onChange(o.value)}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
+    <Segmented label={label} value={value} onChange={onChange}>
+      {options.map((o) => <Segment key={o.label} id={o.value}>{o.label}</Segment>)}
+    </Segmented>
   );
 }
 
@@ -128,10 +119,10 @@ function DisplaySection({ tileScale, onTileScale, autoRefresh, onAutoRefresh, on
   return (
     <>
       <Group title="Item size" hint="Applies to every tile: inventory, rolls, loadouts, and cleanup.">
-        <Segmented label="Item size" options={TILE_SCALES} value={tileScale} onChange={onTileScale} />
+        <Choice label="Item size" options={TILE_SCALES} value={tileScale} onChange={onTileScale} />
       </Group>
       <Group title="Auto refresh" hint="Syncs quietly from Bungie, only while this tab is open and visible.">
-        <Segmented label="Auto refresh" options={AUTO_REFRESH} value={autoRefresh} onChange={onAutoRefresh} />
+        <Choice label="Auto refresh" options={AUTO_REFRESH} value={autoRefresh} onChange={onAutoRefresh} />
       </Group>
       <Group title="Alerts" hint="The morning digest and watch list alerts are turned on in the digest, per device.">
         <button className="button" onClick={onOpenDigest}><Icon name="today" /> Open the digest</button>
