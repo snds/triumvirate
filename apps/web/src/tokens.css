@@ -478,6 +478,11 @@
   --item-art-ground: var(--surface-raised);
   --item-art-fade-in: var(--reveal-duration);
   --item-art-tag-bg: rgb(0 0 0 / 0.45);
+  /* Shared art treatment for banners and key art: a scrim from the text side keeps type at 4.5:1. */
+  --art-scrim: linear-gradient(0deg, rgb(0 0 0 / 0.78) 0%, rgb(0 0 0 / 0.45) 45%, rgb(0 0 0 / 0) 100%);
+  /* Banner: Bungie's 525×150 strips (vendors, abilities). Faces sit left of center, so crops keep that. */
+  --banner-height: 128px;
+  --banner-focus: 35% 30%;
   /* Ornament strip: tiles at the inventory tile size; the previewed one takes the focus ring color,
      the applied one carries a small check, locked ones dim but still preview. */
   --ornament-size: var(--tile-base);
@@ -555,3 +560,8 @@
 /* iOS Home Screen bug (see viewport.ts): the web view already ends well above the home indicator,
    so its inset would only push bars and content further from the bottom edge. */
 :root[data-viewport-short] { --safe-bottom: 0px; }
+
+/* Phone: banners shrink so the vendor's own stock stays the focus. */
+@media (max-width: 640px) {
+  :root { --banner-height: 96px; }
+}

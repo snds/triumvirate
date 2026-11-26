@@ -131,9 +131,13 @@ function VendorCardView({ vendor: v, data, now, onSelect }: { vendor: VendorCard
   const resets = v.refreshesAt ? untilText(v.refreshesAt, now) : undefined;
   const pct = v.rank && v.rank.next > 0 ? Math.min(100, (v.rank.progress / v.rank.next) * 100) : 0;
   return (
-    <article className="vendor-card" id={`vendor-${v.hash}`}>
+    <article className={`vendor-card${v.banner ? ' has-banner' : ''}`} id={`vendor-${v.hash}`}>
       <header className="vendor-card__head">
-        {v.icon ? <img className="vendor-card__icon" src={v.icon} alt="" /> : <span className="vendor-card__icon" aria-hidden><Icon name="vendor" /></span>}
+        {/* The portrait banner sits at the head's end at its own shape, so faces never crop; its
+            start fades into the card. No banner, the round icon. */}
+        {v.banner
+          ? <span className="vendor-card__art" aria-hidden><img src={v.banner} alt="" decoding="async" loading="lazy" /></span>
+          : v.icon ? <img className="vendor-card__icon" src={v.icon} alt="" /> : <span className="vendor-card__icon" aria-hidden><Icon name="vendor" /></span>}
         <div className="vendor-card__titles">
           <h4 className="vendor-card__name">{v.name}</h4>
           <p className="vendor-card__meta">{[v.subtitle, v.location].filter(Boolean).join(' · ')}</p>
