@@ -51,7 +51,17 @@ export function App() {
   const [syncing, setSyncing] = useState(false);
   const [query, setQuery] = useState('');
   const [kind, setKind] = useState<Kind>('all');
-  const [view, setView] = useState<View>('inventory');
+  // The view lives in the URL hash (#rolls), so reload keeps it and Back steps between views.
+  const [view, setViewState] = useState<View>(viewFromHash);
+  const setView = useCallback((v: View) => {
+    setViewState(v);
+    if (viewFromHash() !== v) history.pushState(history.state, '', `${location.pathname}${location.search}${v === 'inventory' ? '' : `#${v}`}`);
+  }, []);
+  useEffect(() => {
+    const onPop = () => setViewState(viewFromHash());
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
   // Phones show one store (a character or the vault) at a time; this is the one on screen.
   const compact = useCompact();
   const [store, setStore] = usePref<string>('phoneStore', '');
@@ -587,7 +597,9 @@ export function App() {
               onChange={setStore}
             />
           )}
-          <div
+          {visible.length === 0 && query.trim() ? (
+            <NoMatches query={query} kind={kind} onAllKinds={() => setKind('all')} onClear={() => setQuery('')} />
+          ) : <div
             className={`inventory${isCollapsed ? ' inventory--collapsed' : ''}`}
             style={{ '--character-count': shown.length, '--inventory-rows': INVENTORY_ROWS.length } as React.CSSProperties}
             {...(compact ? { role: 'tabpanel', id: 'store-panel' } : {})}
@@ -612,7 +624,7 @@ export function App() {
               onToggleClassOnly={() => setClassOnly((v) => !v)}
               onSelect={setSelected}
             />}
-          </div>
+          </div>}
           </>
         ) : view === 'loadouts' ? (
           <LoadoutsView
@@ -765,6 +777,29 @@ export function App() {
     </InventoryContext.Provider>
     </HoverContext.Provider>
   );
+}
+
+/** Nothing anywhere matches the search: one message naming it, instead of a row of blank columns. */
+function NoMatches({ query, kind, onAllKinds, onClear }: { query: string; kind: Kind; onAllKinds: () => void; onClear: () => void }) {
+  const where = kind === 'all' ? 'your gear' : KINDS.find((k) => k.value === kind)?.label ?? 'your gear';
+  return (
+    <div className="no-matches" role="status">
+      <span className="no-matches__icon"><Icon name="search" /></span>
+      <p className="no-matches__title">Nothing in {where} matches <span className="no-matches__query">{query.trim()}</span></p>
+      <p className="no-matches__text">{kind === 'all' ? 'Try part of the name, a weapon type, or an element.' : 'It might be in another kind, or spelled differently.'}</p>
+      <div className="no-matches__actions">
+        {kind !== 'all' && <button className="button" onClick={onAllKinds}>Search all kinds</button>}
+        <button className={`button${kind === 'all' ? '' : ' button--ghost'}`} onClick={onClear}>Clear search</button>
+      </div>
+    </div>
+  );
+}
+
+const VIEWS: readonly View[] = ['inventory', 'cleanup', 'rolls', 'loadouts', 'vendors', 'records'];
+/** The view named in the URL hash; Inventory when there's none (or one we don't know). */
+function viewFromHash(): View {
+  const v = location.hash.slice(1) as View;
+  return VIEWS.includes(v) ? v : 'inventory';
 }
 
 /** What the chat button says about a hidden chat. */
