@@ -96,3 +96,90 @@ test('a crawl without item data reports why and keeps saved state', async () => 
   const status = await c.crawl();
   assert.match(status.error ?? '', /not loaded/);
 });
+
+test('a fresh start with only older matches uses them to find players, then samples recent ones', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'tri-community-'));
+  const base = fakeBungie();
+  // p1 (you) last played two days ago with p2. p2 played a raid an hour ago (m1).
+  const http = async <T>(c: HttpClientConfig): Promise<T> => {
+    if (c.url.includes('/Account/p1/') && c.url.includes('/Activities/')) {
+      return { ErrorCode: 1, Response: { activities: [{ period: '2026-11-22T21:00:00Z', activityDetails: { instanceId: 'old1' } }] } } as T;
+    }
+    if (c.url.includes('PostGameCarnageReport/old1')) {
+      const entry = (id: string) => ({ player: { destinyUserInfo: { membershipType: 3, membershipId: id, crossSaveOverride: 0 } } });
+      return { ErrorCode: 1, Response: { entries: [entry('p1'), entry('p2')] } } as T;
+    }
+    return base.http<T>(c);
+  };
+  const logs: string[] = [];
+  const c = createCommunity({
+    dataDir, http, manifest: async () => manifest, seed: async () => ({ membershipType: 3, membershipId: 'p1' }),
+    sleep: async () => {}, now: () => NOW, log: (m) => logs.push(m),
+  });
+  const status = await c.crawl({ ratePerSecond: 1000 });
+  assert.equal(status.error, undefined);
+  assert.equal(status.matches, 1); // m1 only: the old match found players but wasn't sampled
+  assert.equal(status.samples, 2);
+  assert.match(logs[0]!, /fresh start/);
+  assert.match(logs.at(-1)!, /1 matches, 2 samples, 1 older matches used to find players/);
+});
+
+test('a failed crawl is logged, not only kept in the status', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'tri-community-'));
+  const errors: string[] = [];
+  const c = createCommunity({
+    dataDir, http: fakeBungie().http, manifest: async () => undefined, seed: async () => undefined,
+    sleep: async () => {}, now: () => NOW, log: () => {}, logError: (m, e) => errors.push(`${m} ${(e as Error)?.message ?? ''}`),
+  });
+  await c.crawl({}, 'schedule');
+  assert.deepEqual(errors, ['Crawl (schedule) failed: Item data is not loaded yet.']);
+});
+
+test('a Bungie call that hangs is given up on, so the crawl finishes', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const dataDir = await mkdtemp(join(tmpdir(), 'tri-community-'));
+  const c = createCommunity({
+    dataDir, http: () => new Promise(() => {}), manifest: async () => manifest, seed: async () => ({ membershipType: 3, membershipId: 'p1' }),
+    sleep: async () => {}, now: () => NOW, log: () => {},
+  });
+  const run = c.crawl({ ratePerSecond: 1000 });
+  for (let i = 0; i < 5; i++) { await new Promise<void>((r) => setImmediate(r)); t.mock.timers.tick(30_000); }
+  const status = await run;
+  assert.equal(status.running, false);
+  assert.equal(status.matches, 0);
+});
+
+test('the schedule says when it will run, fires once in its hour, and rejects a bad hour', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const dataDir = await mkdtemp(join(tmpdir(), 'tri-community-'));
+  let clock = new Date('2026-11-25T16:30:00Z');
+  const logs: string[] = [];
+  const errors: string[] = [];
+  const { http } = fakeBungie();
+  const c = createCommunity({
+    dataDir, http, manifest: async () => manifest, seed: async () => ({ membershipType: 3, membershipId: 'p1' }),
+    sleep: async () => {}, now: () => clock, timeZone: 'UTC', log: (m) => logs.push(m), logError: (m) => errors.push(m),
+  });
+  // Bad values never schedule anything, and say why.
+  c.schedule(Number('3am'));
+  assert.match(errors[0]!, /must be a whole hour/);
+
+  // getHours() follows the process time zone, so pick the hour the clock will read locally.
+  const hour = new Date('2026-11-26T03:00:00Z').getHours();
+  const stop = c.schedule(hour);
+  assert.match(logs[0]!, /Nightly crawl scheduled for/);
+  assert.match(logs[0]!, /Next run:/);
+
+  t.mock.timers.tick(5 * 60_000); // not the hour yet
+  assert.equal(logs.length, 1);
+  clock = new Date('2026-11-26T03:02:00Z');
+  t.mock.timers.tick(5 * 60_000);
+  clock = new Date('2026-11-26T03:07:00Z');
+  t.mock.timers.tick(5 * 60_000); // same hour again: no second run
+  // The crawl writes files, so give it real time to finish (only setInterval is faked).
+  for (let i = 0; i < 100 && !logs.some((m) => m.startsWith('Next nightly crawl')); i++) await new Promise<void>((r) => setTimeout(r, 10));
+  assert.equal(logs.filter((m) => m.startsWith('Crawl (schedule) started')).length, 1);
+  assert.ok(logs.some((m) => m.startsWith('Crawl (schedule) finished')));
+  assert.ok(logs.some((m) => m.startsWith('Next nightly crawl')));
+  stop();
+});
