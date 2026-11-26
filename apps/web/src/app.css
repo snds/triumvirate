@@ -1749,3 +1749,60 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .switch:focus-visible { outline: none; }
 .switch:focus-visible .switch__track { outline: 2px solid var(--accent); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .switch__track, .switch__thumb { transition: none; } }
+
+/* ── Cleanup autopilot ─────────────────────────────────────── */
+.cleanup .vault__title { display: flex; align-items: center; gap: var(--space-2); }
+.cleanup__group { margin-top: var(--space-6); }
+.cleanup__group-head { margin: 0; font-size: 15px; }
+.cleanup__group-note { margin: 2px 0 0; font-size: 12px; }
+.cleanup__group .cleanup__list { margin-top: var(--space-3); }
+.cleanup__row { grid-template-columns: var(--tile-size) minmax(0, 1fr) auto; }
+.cleanup__body { min-width: 0; }
+.cleanup__signals { display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-1); }
+.pill--wish-none { background: var(--surface-raised); color: var(--text-secondary); }
+.grade--xs { width: 20px; height: 20px; font-size: 12px; font-weight: 800; }
+.cleanup__actions { display: flex; gap: var(--space-2); }
+.cleanup__actions .button { min-height: var(--control-size); }
+.cleanup-queue {
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-panel);
+}
+.cleanup-queue__head h3 { margin: 0; font-size: 15px; }
+.cleanup-queue__head p { margin: 2px 0 0; font-size: 12px; max-width: 70ch; }
+.cleanup-queue__items {
+  list-style: none; padding: 0; margin: var(--space-3) 0;
+  display: flex; flex-wrap: wrap; gap: var(--tile-gap);
+}
+.cleanup-queue__item { position: relative; }
+/* A small round × on each tile's corner takes it back off the queue. */
+.cleanup-queue__undo {
+  position: absolute; top: -6px; right: -6px;
+  display: grid; place-items: center;
+  width: 20px; height: 20px; padding: 0;
+  border: 1px solid var(--border-subtle); border-radius: 50%;
+  background: var(--surface-raised); color: var(--text-secondary); cursor: pointer;
+}
+.cleanup-queue__undo .icon { font-size: 14px; }
+.cleanup-queue__undo:hover { color: var(--text-primary); background: var(--surface-hover); }
+.cleanup-queue__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.cleanup__footer { display: flex; flex-wrap: wrap; gap: var(--space-4); margin-top: var(--space-6); font-size: 12px; }
+.cleanup__footer span { display: inline-flex; align-items: center; gap: var(--space-1); }
+.cleanup__footer .icon { font-size: 16px; }
+@media (pointer: coarse) {
+  /* The × grows an invisible hit area to the touch minimum without growing the glyph. */
+  .cleanup-queue__undo::after { content: ''; position: absolute; inset: -12px; }
+}
+@container cleanup (max-width: 560px) {
+  .cleanup__row { grid-template-columns: var(--tile-size) minmax(0, 1fr); }
+  /* Actions sit under the text, lined up with it, so each row stays short. */
+  .cleanup__actions { grid-column: 2; }
+  .cleanup__actions .button { flex: 1; justify-content: center; }
+  .cleanup__actions .button--quiet { border-color: var(--border-subtle); }
+  .cleanup-queue { padding: var(--space-3); }
+  .cleanup-queue__actions > * { flex: 1 1 auto; justify-content: center; }
+  .cleanup-queue__actions .segmented { flex-basis: 100%; }
+  .cleanup-queue__actions .segmented__option { flex: 1; }
+}

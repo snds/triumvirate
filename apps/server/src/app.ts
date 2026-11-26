@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, createHttpClient, exchangeCode, loadManifest, needsRefresh,
+  applyEquip, applyLock, applyStep, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, needsRefresh,
   refreshTokens, buildSubclassIndex, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
 } from '@triumvirate/core';
@@ -20,6 +20,7 @@ import { createChatStore, validChatId } from './chats.ts';
 import { createCommunity } from './community.ts';
 import { createLoadoutStore, validLoadoutId } from './loadouts.ts';
 import { createDigestStore, localDate, validDigestDate } from './digests.ts';
+import { createCleanupStore } from './cleanup-store.ts';
 
 // Component numbers from Bungie's DestinyComponentType (a const enum, so written as literals).
 const COMPONENTS = [
@@ -215,8 +216,9 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     setCurrent(snap);
     const view = await buildView(snap);
     const cache = viewCache!;
-    // "synced 3 min ago" is part of the body, so it's in the tag too.
-    const etag = `"${cache.key}|${snap.syncedAt}"`;
+    const cleanupState = await cleanupNow(view.items);
+    // "synced 3 min ago" is part of the body, so it's in the tag too; so is the cleanup queue.
+    const etag = `"${cache.key}|${snap.syncedAt}|${cleanupVersion}"`;
     if (cache.etag !== etag) {
       cache.body = JSON.stringify({
         signedIn: true,
@@ -226,6 +228,9 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
         manifestVersion: manifest!.version,
         agentEnabled: !!deps.anthropic,
         ...view,
+        // Picks you've already decided on live in the autopilot's queue, not the list.
+        cleanup: openPicks(view.cleanup, cleanupState),
+        cleanupQueued: queuedItems(view.items, cleanupState).length,
       });
       cache.etag = etag;
     }
@@ -583,6 +588,97 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     return c.json(out.body, out.status);
   });
 
+  // ── Cleanup autopilot ──────────────────────────────────────
+  // The API can't dismantle, so a "dismantle" decision queues the item; Pull brings the queue onto a
+  // character, where the game lets you shard it. "Keep" locks it in game so it never comes back.
+  const cleanupStore = createCleanupStore(store.dataDir);
+  let cleanupVersion = 0;
+  /** Saved decisions, reconciled with what's in the inventory now (gone = dismantled). */
+  async function cleanupNow(items: AppraisedItem[]) {
+    const state = await cleanupStore.get();
+    const next = reconcileCleanup(state, items);
+    if (next !== state) { await cleanupStore.set(next); cleanupVersion++; }
+    return next;
+  }
+  async function cleanupBody() {
+    const view = viewCache!.view;
+    const state = await cleanupNow(view.items);
+    const r = await community.rollup();
+    return {
+      picks: openPicks(view.cleanup, state),
+      queue: queuedItems(view.items, state),
+      kept: Object.values(state.decisions).filter((d) => d.action === 'keep').length,
+      cleared: state.cleared.slice(0, 20),
+      clearedWeek: clearedSince(state, 7),
+      community: r ? { builtAt: r.builtAt, samples: r.samples } : undefined,
+    };
+  }
+  app.get('/api/cleanup', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    await ready(t);
+    return c.json(await cleanupBody());
+  });
+  // Dismantle (queue), keep (lock in game), or undo (forget; unlocks what Keep locked).
+  app.post('/api/cleanup/decide', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const body = (await c.req.json().catch(() => ({}))) as { instanceIds?: unknown; action?: string };
+    const ids = Array.isArray(body.instanceIds)
+      ? [...new Set(body.instanceIds.filter((x): x is string => typeof x === 'string' && /^\d{1,20}$/.test(x)))].slice(0, 500)
+      : [];
+    const action = body.action as CleanupAction | 'undo';
+    if (!ids.length || !['dismantle', 'keep', 'undo'].includes(action)) return c.json({ error: 'Say which items and what to do with them.' }, 400);
+    const out = await queued(async () => {
+      const { snap, view, http } = await ready(t);
+      let state = await cleanupNow(view.items);
+      const errors: string[] = [];
+      let done = ids;
+      // Keep and undo-a-keep change the lock in game; only the ones Bungie accepts are recorded.
+      const lockFor = (id: string) => action === 'keep' ? true : action === 'undo' && state.decisions[id]?.action === 'keep' ? false : undefined;
+      if (ids.some((id) => lockFor(id) !== undefined)) {
+        done = [];
+        for (const id of ids) {
+          const lock = lockFor(id);
+          const item = view.items.find((i) => i.instanceId === id);
+          if (lock === undefined || !item || item.locked === lock) { done.push(id); continue; }
+          const characterId = item.owner !== 'vault' ? item.owner : view.characters[0]?.id;
+          try {
+            if (!characterId) throw new Error('No character found to act through.');
+            await setItemLockState(http, { state: lock, itemId: id, characterId, membershipType: snap.membershipType });
+            applyLock(snap.profile, id, lock);
+            snapVersion++;
+            done.push(id);
+          } catch (err) {
+            errors.push(`${item.name}: ${friendlyMoveError(err)}`);
+            if (/permission|slow down/i.test(errors.at(-1)!)) break; // the rest would fail the same way
+          }
+          await pause(120);
+        }
+        await store.saveSnapshot(snap);
+        await buildView(snap);
+      }
+      state = decideCleanup(state, viewCache!.view.items, done, action);
+      await cleanupStore.set(state);
+      cleanupVersion++;
+      return { status: errors.length && !done.length ? 409 as const : 200 as const, body: { error: errors[0], errors, ...(await cleanupBody()), items: viewCache!.view.items.filter((i) => done.includes(i.instanceId ?? '')) } };
+    });
+    return c.json(out.body, out.status);
+  });
+  // Brings queued vault items onto a character so they can be dismantled in game.
+  app.post('/api/cleanup/pull', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { characterId } = (await c.req.json().catch(() => ({}))) as { characterId?: string };
+    if (!characterId) return c.json({ error: 'Say which character.' }, 400);
+    const state = await cleanupStore.get();
+    const out = await runPlan(t, (view) => {
+      if (!view.characters.some((ch) => ch.id === characterId)) return { steps: [], skipped: [{ instanceId: '', reason: 'Unknown character.' }] };
+      return planPull(queuedItems(view.items, state).map((i) => i.instanceId!), characterId, view.items, view.characters);
+    });
+    return c.json({ ...out.body, ...(await cleanupBody()) }, out.status);
+  });
+
   // Triumvirate's own loadouts.
   const loadouts = createLoadoutStore(store.dataDir);
   app.get('/api/loadouts', async (c) => c.json(await loadouts.list()));
@@ -659,7 +755,9 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
   // Turns a raw snapshot into what the web app and the agent see: items with roll verdicts, plus cleanup picks.
   async function buildView(snap: Snapshot): Promise<View> {
     const list = await deps.wishList();
-    const key = `${snapVersion}.${manifest!.version}`;
+    // Community grades sharpen cleanup picks; a new nightly rollup means a new view.
+    const r = await community.rollup();
+    const key = `${snapVersion}.${manifest!.version}.${r?.builtAt ?? ''}`;
     if (viewCache && viewCache.key === key && viewCache.list === list && lastView) return viewCache.view;
     const items: AppraisedItem[] = summarizeProfile(snap.profile, manifest!).map((i) =>
       i.itemType === 3 && i.perks
@@ -668,7 +766,9 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     );
     const characters = summarizeCharacters(snap.profile, manifest!, snap.titles);
     const account = summarizeAccount(snap.profile, manifest!);
-    const cleanup = cleanupCandidates(items);
+    const grades: GradeLookup = {};
+    if (r) for (const i of items) if (i.itemType === 3 && i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest!, r.weapons[i.itemHash], i.itemHash, i.perks);
+    const cleanup = cleanupCandidates(items, grades);
     const hashById = new Map(items.filter((i) => i.instanceId).map((i) => [i.instanceId!, i.itemHash]));
     const gameLoadouts = summarizeGameLoadouts(snap.profile, manifest!, (id) => hashById.get(id));
     // Only the armor sets this account owns pieces of; the full list is mostly other people's gear.
@@ -704,7 +804,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       const vendors = await vendorOffers(t, true).catch((e) => { console.error('Digest vendors failed:', e); return undefined; });
       const digest = buildDigest({
         date, items: view.items, prevSeen: (await digests.before(date))?.seen ?? (await digests.get(date))?.seen, grades, vendors,
-        cleanup: view.cleanup, vault: view.account.vault,
+        cleanup: openPicks(view.cleanup, await cleanupNow(view.items)), vault: view.account.vault,
         crawl: r ? { builtAt: r.builtAt, samples: r.samples } : undefined,
       });
       if (deps.anthropic) {

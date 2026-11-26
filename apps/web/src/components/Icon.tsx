@@ -55,6 +55,8 @@ const GLYPHS = {
   warning: 'warning',
   today: 'today',
   alertsOff: 'notifications_off',
+  autopilot: 'auto_delete',
+  pull: 'unarchive',
 } as const;
 
 export type IconName = keyof typeof GLYPHS;

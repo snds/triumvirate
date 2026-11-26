@@ -50,3 +50,38 @@ test('builds a DIM search for the candidates', () => {
   const out = cleanupCandidates([weapon('god', { itemHash: 3 }), weapon('meh', { itemHash: 3, instanceId: '42' })]);
   assert.equal(dimSearch(out), 'id:42');
 });
+
+test('community grades protect popular rolls and firm up weak ones', () => {
+  const keeper = weapon('god', { itemHash: 20 });
+  const popularDupe = weapon('meh', { itemHash: 20 });
+  const middling = weapon('meh', { itemHash: 20 });
+  const loneMehWeak = weapon('meh', { itemHash: 21 });
+  const loneMehLoved = weapon('meh', { itemHash: 22 });
+  const loneUnratedWeak = weapon('unrated', { itemHash: 23 });
+  const loneTrashLoved = weapon('trash', { itemHash: 24 });
+  const grades = {
+    [popularDupe.instanceId!]: { grade: 'A' as const },
+    [middling.instanceId!]: { grade: 'B' as const },
+    [loneMehWeak.instanceId!]: { grade: 'F' as const },
+    [loneMehLoved.instanceId!]: { grade: 'S' as const },
+    [loneUnratedWeak.instanceId!]: { grade: 'D' as const },
+    [loneTrashLoved.instanceId!]: { grade: 'A' as const },
+  };
+  const out = cleanupCandidates([keeper, popularDupe, middling, loneMehWeak, loneMehLoved, loneUnratedWeak, loneTrashLoved], grades);
+  const by = new Map(out.map((c) => [c.item, c]));
+  assert.equal(by.has(popularDupe), false, 'an A-grade duplicate stays');
+  assert.equal(by.get(middling)?.confidence, 'medium');
+  assert.equal(by.get(middling)?.keeperId, keeper.instanceId);
+  assert.equal(by.get(loneMehWeak)?.confidence, 'high');
+  assert.deepEqual(by.get(loneMehWeak)?.signals, { verdict: 'meh', grade: 'F' });
+  assert.equal(by.has(loneMehLoved), false, 'an S-grade lone roll stays');
+  assert.equal(by.get(loneUnratedWeak)?.confidence, 'medium');
+  assert.equal(by.get(loneTrashLoved)?.confidence, 'medium');
+});
+
+test('community grade breaks a tie between duplicates', () => {
+  const a = weapon('meh', { itemHash: 30, power: 10 });
+  const b = weapon('meh', { itemHash: 30, power: 10 });
+  const out = cleanupCandidates([a, b], { [b.instanceId!]: { grade: 'B' }, [a.instanceId!]: { grade: 'D' } });
+  assert.deepEqual(out.map((c) => c.item), [a]);
+});

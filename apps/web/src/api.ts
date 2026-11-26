@@ -1,4 +1,4 @@
-import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, CommunityAppraisal, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
+import type { AccountSummary, AppraisedItem, ArmorSet, CharacterRow, CleanupCandidate, ClearedItem, CommunityAppraisal, Digest, GameLoadout, LoadoutStyles, RollOptions, SavedLoadout } from '@triumvirate/core';
 
 export interface Inventory {
   signedIn: true;
@@ -11,7 +11,10 @@ export interface Inventory {
   /** Optional so an older server still renders. */
   account?: AccountSummary;
   items: AppraisedItem[];
+  /** Cleanup picks you haven't decided on yet. */
   cleanup: CleanupCandidate[];
+  /** Items waiting in the dismantle queue. Optional so an older server still renders. */
+  cleanupQueued?: number;
   /** In-game loadout slots by character id. Optional so an older server still renders. */
   gameLoadouts?: Record<string, GameLoadout[]>;
   loadoutStyles?: LoadoutStyles;
@@ -240,3 +243,25 @@ export const saveGameLoadout = (characterId: string, index: number, look: GameSl
   act<{ error?: string }>('/api/game-loadouts/save', { characterId, index, ...look }, 'save the loadout');
 export const restyleGameLoadout = (characterId: string, index: number, look: GameSlotLook) =>
   act<{ error?: string }>('/api/game-loadouts/identify', { characterId, index, ...look }, 'rename the loadout');
+
+// ── Cleanup autopilot ─────────────────────────────────────────
+
+export interface CleanupStatus {
+  /** Picks you haven't decided on. */
+  picks: CleanupCandidate[];
+  /** The dismantle queue, as the items are now. */
+  queue: AppraisedItem[];
+  kept: number;
+  /** Queued items that have since left your inventory, newest first. */
+  cleared: ClearedItem[];
+  clearedWeek: number;
+  /** When community grades last updated; absent before the first crawl. */
+  community?: { builtAt: string; samples: number };
+}
+export const fetchCleanup = async (): Promise<CleanupStatus> => json(await fetch('/api/cleanup'), sameOriginImages);
+/** Dismantle queues, keep locks in game, undo forgets (and unlocks what keep locked). */
+export const decideCleanup = (instanceIds: string[], action: 'dismantle' | 'keep' | 'undo') =>
+  act<Partial<CleanupStatus> & { items?: AppraisedItem[]; errors?: string[]; error?: string }>('/api/cleanup/decide', { instanceIds, action }, 'update cleanup');
+/** Brings the queue out of the vault onto a character, where the game can dismantle it. */
+export const pullCleanup = (characterId: string) =>
+  act<Partial<CleanupStatus> & ActionResult>('/api/cleanup/pull', { characterId }, 'pull the queue');
