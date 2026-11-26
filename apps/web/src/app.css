@@ -1722,7 +1722,8 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   background: color-mix(in srgb, var(--glance-element, var(--surface-hover)) 22%, var(--surface-panel));
   box-shadow: inset 0 calc(var(--loadout-edge) * -1) 0 var(--glance-element, transparent);
 }
-.ability-sheet__art.has-art img { width: 100%; height: 100%; object-fit: cover; object-position: var(--banner-focus); display: block; }
+.ability-sheet__art.has-art { aspect-ratio: auto; }
+.ability-sheet__art.has-art img { width: 100%; height: auto; display: block; }
 .ability-sheet__fallback { width: var(--size-72); height: var(--size-72); }
 .ability-sheet__head { display: flex; align-items: center; gap: var(--space-2); }
 .ability-sheet__icon { width: var(--glance-icon-size); height: var(--glance-icon-size); border-radius: var(--glance-icon-radius); background: var(--glance-icon-bg); }
@@ -1855,6 +1856,54 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 }
 .digest { display: grid; gap: var(--space-4); max-width: 760px; margin: 0 auto; width: 100%; }
 .digest[aria-busy] { opacity: 0.6; }
+
+/* This week: key-art cards (the art system's key-art variant: image, heavy bottom scrim, title on top). */
+.week { container: week / inline-size; display: grid; gap: var(--space-3); }
+.week__cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.week__more { display: contents; margin: 0; padding: 0; list-style: none; }
+.week__more > li { display: grid; }
+.week-card {
+  position: relative; display: grid; align-items: end; overflow: hidden; min-width: 0;
+  aspect-ratio: var(--week-card-ratio); padding: 0; text-align: start; color: var(--text-primary);
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); cursor: pointer;
+}
+.week-card:hover { border-color: var(--border-strong); }
+.week-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.week-card--ghost { cursor: default; }
+.week-card--ghost .sk { position: absolute; inset: 0; height: auto; border-radius: 0; }
+.week-card__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.week-card.has-art::after { content: ''; position: absolute; inset: 0; background: var(--key-art-scrim); pointer-events: none; }
+.week-card__body { position: relative; z-index: 1; display: grid; gap: 2px; padding: var(--space-3); min-width: 0; }
+.week-card__eyebrow { font-size: var(--font-size-11); font-weight: var(--font-weight-semibold); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-secondary); }
+.week-card__name { font-size: var(--font-size-18); font-weight: var(--font-weight-bold); line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.week-card--lead .week-card__name { font-size: var(--font-size-20); }
+.week-card__detail { font-size: var(--font-size-13); color: var(--text-secondary); }
+.week-card__mods { display: flex; align-items: center; gap: var(--space-1); margin-top: var(--space-1); }
+.week-card__mods img { width: var(--week-mod-size); height: var(--week-mod-size); }
+.week-card__more { font-size: var(--font-size-12); font-weight: var(--font-weight-semibold); color: var(--text-secondary); }
+/* Phone: the lead card full width, the rest in a row that scrolls sideways and snaps. */
+@container week (max-width: 520px) {
+  .week__cards { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .week__more { display: flex; gap: var(--space-2); overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 calc(var(--space-4) * -1); padding: 0 var(--space-4); scrollbar-width: none; }
+  .week__more > li { flex: 0 0 var(--week-row-card); scroll-snap-align: start; }
+  .week__more .week-card__name { font-size: var(--font-size-16); }
+}
+.week-event { position: relative; overflow: hidden; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); box-shadow: inset var(--loadout-edge) 0 0 var(--event-color, var(--accent)); min-height: var(--banner-height); display: grid; align-items: center; }
+.week-event__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
+.week-event::after { content: ''; position: absolute; inset: 0; background: var(--event-scrim); }
+.week-event__body { position: relative; z-index: 1; display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-4); max-width: 34rem; }
+.week-event__icon { width: var(--size-52); height: var(--size-52); flex: none; }
+.week-event__eyebrow { margin: 0; font-size: var(--font-size-11); font-weight: var(--font-weight-semibold); letter-spacing: var(--tracking-wide); text-transform: uppercase; color: var(--text-secondary); }
+.week-event__name { margin: 0; font-size: var(--font-size-18); font-weight: var(--font-weight-bold); }
+.week-event__text { margin: 2px 0 0; font-size: var(--font-size-13); color: var(--text-secondary); }
+.activity-sheet__art { margin: 0 calc(var(--space-4) * -1); }
+/* Sized by the image itself (16:9 at source): an aspect-ratio box can collapse in the sheet's scrolling grid. */
+.activity-sheet__art img { width: 100%; height: auto; display: block; }
+.activity-sheet__mods { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.activity-mod { display: grid; grid-template-columns: var(--week-mod-sheet-size) minmax(0, 1fr); gap: var(--space-3); align-items: start; }
+.activity-mod img { width: var(--week-mod-sheet-size); height: var(--week-mod-sheet-size); }
+.activity-mod__name { margin: 0; font-weight: var(--font-weight-semibold); }
+.activity-mod__text { margin: 2px 0 0; font-size: var(--font-size-13); color: var(--text-secondary); line-height: 1.45; max-width: 65ch; }
 .digest__head { display: grid; gap: var(--space-0-5); }
 .digest__date { margin: 0; font-size: var(--font-size-20); }
 .digest__built, .digest__none { margin: 0; font-size: var(--font-size-12); }

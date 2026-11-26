@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { AppraisedItem, DigestItem } from '@triumvirate/core/browser';
 import { fetchDigest, runDigest, type DigestResponse } from '../api.ts';
 import { ItemTile } from './ItemTile.tsx';
+import { ThisWeek } from './ThisWeek.tsx';
 import { Icon } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkText } from './Skeleton.tsx';
@@ -64,6 +65,7 @@ export function DigestSheet({ items, onSelect, onClose, onSeen }: {
         <div className="digest__empty">
           <p>No digest yet. Build one now, or set <code>DIGEST_HOUR</code> on the server to get one every morning.</p>
           <p className="muted">The first one takes stock of what you own; new drops show up from the next one on.</p>
+          <ThisWeek />
         </div>
       )}
       {d && (
@@ -78,6 +80,7 @@ export function DigestSheet({ items, onSelect, onClose, onSeen }: {
             <div><dt>Vault</dt><dd>{d.vault.used}<span className="muted">/{d.vault.capacity}</span></dd></div>
             <div><dt>Cleanup picks</dt><dd>{d.cleanup.count}{d.cleanup.high ? <span className="digest__sub">{d.cleanup.high} high confidence</span> : null}</dd></div>
           </dl>
+          <ThisWeek />
 
           {d.firstRun
             ? <p className="muted">This first digest takes stock of everything you own. Tomorrow's will list what's new.</p>

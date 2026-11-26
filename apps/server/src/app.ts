@@ -5,11 +5,11 @@ import { dirname, join } from 'node:path';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { Hono, type Context } from 'hono';
 import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
-import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
+import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getPublicMilestones, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
   applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, suggestBuilds, itemOrnaments, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
-  refreshTokens, buildSubclassIndex, withSubclassArt, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
+  refreshTokens, buildSubclassIndex, withSubclassArt, thisWeek, weekHashes, weekModifierHashes, type EventCardDef, type ThisWeek, type WeekDefs, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
   type SavedLoadout, type CleanupState, type WatchEntry,
@@ -522,6 +522,35 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const d = await defs.get<{ displayProperties?: { name?: string; description?: string }; subtitle?: string }>(http, manifest.version, 'DestinyLoreDefinition', hash);
     if (!d?.displayProperties?.description) return c.json({ error: 'Bungie has no lore for this one.' }, 404);
     return c.json({ name: d.displayProperties.name ?? '', subtitle: d.subtitle || undefined, text: d.displayProperties.description });
+  });
+
+  // This week: the weekly rotation with its key art and modifiers, and the event running now.
+  // Rotations change at the weekly reset, so the result is kept until the soonest end date (or an hour).
+  let week: { key: string; until: number; body: ThisWeek } | undefined;
+  app.get('/api/week', async (c) => {
+    const t = await validTokens();
+    if (!t) return c.json({ signedIn: false }, 401);
+    const { snap, http } = await ready(t);
+    if (!manifest) return c.json({ error: 'Load your inventory first.' }, 409);
+    const eventHash = snap.profile.profile?.data?.activeEventCardHash;
+    const key = `${manifest.version}.${eventHash ?? 0}`;
+    if (week && week.key === key && Date.now() < week.until && !c.req.query('refresh')) return c.json(week.body);
+    const mv = manifest.version;
+    const { Response: milestones } = await getPublicMilestones(http);
+    const hashes = weekHashes(milestones);
+    const [ms, acts, ev, vars] = await Promise.all([
+      defs.many<NonNullable<ReturnType<WeekDefs['milestones']['get']>>>(http, mv, 'DestinyMilestoneDefinition', hashes.milestones),
+      defs.many<NonNullable<ReturnType<WeekDefs['activities']['get']>>>(http, mv, 'DestinyActivityDefinition', hashes.activities),
+      eventHash ? defs.get<EventCardDef>(http, mv, 'DestinyEventCardDefinition', eventHash) : Promise.resolve(undefined),
+      // StringVariables: the numbers modifier text refers to as {var:N}. Optional; text reads fine without.
+      getProfile(http, { membershipType: snap.membershipType, destinyMembershipId: snap.membershipId, components: [1200] as never })
+        .then((r) => r.Response.profileStringVariables?.data?.integerValuesByHash ?? {}, () => ({})),
+    ]);
+    const mods = await defs.many<NonNullable<ReturnType<WeekDefs['modifiers']['get']>>>(http, mv, 'DestinyActivityModifierDefinition', weekModifierHashes(milestones, acts));
+    const body = thisWeek(milestones, { milestones: ms, activities: acts, modifiers: mods }, ev, new Date(), vars);
+    const ends = Object.values(milestones).map((m) => Date.parse(m.endDate ?? '')).filter((n) => n > Date.now());
+    week = { key, until: Math.min(Date.now() + 60 * 60_000, ...ends), body };
+    return c.json(body);
   });
 
   app.get('/api/vendors', async (c) => {

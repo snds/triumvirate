@@ -25,3 +25,4 @@ export * from './vendor-screen.ts'; // pure logic; bungie-api-ts import is type-
 export * from './records.ts'; // pure logic; imports are type-only
 export type { LoadoutStyles } from './manifest.ts';
 export type { ArmorSet } from './manifest.ts';
+export type * from './this-week.ts';
