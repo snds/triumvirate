@@ -67,28 +67,38 @@ export const ItemTile = memo(function ItemTile({
 }: { item: AppraisedItem; size?: 'md' | 'lg'; onSelect?: (i: AppraisedItem) => void }) {
   const hover = useHover();
   const drag = useDragActions();
-  const { moving, quick } = useInventory();
+  const { moving, quick, selection, pick } = useInventory();
+  const selecting = selection.active;
+  const isPicked = !!item.instanceId && selection.ids.has(item.instanceId);
+  // Equipped gear can't move, so in select mode it can't be picked either.
+  const pickable = !!item.movable && !item.equipped && !!item.instanceId;
   const press = useLongPress(() => quick(item));
   const isMoving = !!item.instanceId && moving.has(item.instanceId);
-  const draggable = !!item.movable && !item.equipped && !isMoving;
+  const draggable = !!item.movable && !item.equipped && !isMoving && !selecting;
   const verdict = item.appraisal?.verdict;
   const label = [item.name, item.type, item.damage, item.power && `${item.power} power`,
     verdict && VERDICT_LABEL[verdict], item.gearTier && `tier ${item.gearTier}`, item.masterworked && 'masterworked', item.locked && 'locked'].filter(Boolean).join(' · ');
   return (
     <button
       type="button"
-      className={`tile tile--${size} ${tierClass(item.tier)}${isMoving ? ' is-moving' : ''}${item.masterworked ? ' is-masterworked' : ''}`}
+      className={`tile tile--${size} ${tierClass(item.tier)}${isMoving ? ' is-moving' : ''}${item.masterworked ? ' is-masterworked' : ''}${selecting ? (isPicked ? ' is-picked' : pickable ? '' : ' is-unpickable') : ''}`}
+      aria-pressed={selecting && pickable ? isPicked : undefined}
+      disabled={selecting && !pickable}
       aria-label={label}
       aria-busy={isMoving || undefined}
       data-movable={draggable || undefined}
       data-instance={item.instanceId}
-      onPointerDown={(e) => { press.down(e); if (draggable) drag.press(e, item); }}
+      onPointerDown={(e) => { if (!selecting) press.down(e); if (draggable) drag.press(e, item); }}
       onPointerMove={(e) => { press.move(e); if (hover && e.pointerType === 'mouse') tilt(e); }}
       onPointerUp={press.stop}
       onPointerCancel={press.stop}
       // Right-click (and Android's own long-press) opens the same sheet, instead of the browser menu.
       onContextMenu={onSelect ? (e) => { e.preventDefault(); press.stop(); hover?.leave(); quick(item); } : undefined}
-      onClick={onSelect ? () => { if (press.fired.current) { press.fired.current = false; return; } hover?.leave(); onSelect(item); } : undefined}
+      onClick={onSelect ? () => {
+        if (press.fired.current) { press.fired.current = false; return; }
+        if (selecting) { pick(item); return; }
+        hover?.leave(); onSelect(item);
+      } : undefined}
       // Hovercards are for a mouse; a tap on a phone goes straight to the item dialog.
       onPointerEnter={hover ? (e) => { if (e.pointerType === 'mouse') hover.enter(item, e.currentTarget.getBoundingClientRect()); } : undefined}
       onPointerLeave={(e) => { press.stop(); hover?.leave(); e.currentTarget.style.removeProperty('--mx'); e.currentTarget.style.removeProperty('--my'); }}
@@ -109,6 +119,7 @@ export const ItemTile = memo(function ItemTile({
       )}
       {item.locked && <span className="tile__lock"><Icon name="lock" filled /></span>}
       {isMoving && <span className="tile__moving"><span className="spinner" /></span>}
+      {isPicked && <span className="tile__picked"><Icon name="checkCircle" filled /></span>}
     </button>
   );
 });

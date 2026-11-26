@@ -16,7 +16,8 @@ import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
 import { Icon } from './components/Icon.tsx';
 import { isPostmaster } from './inventory.ts';
-import { INVENTORY_ROWS, SLOT_ORDER } from './inventory.ts';
+import { INVENTORY_ROWS, planBulkMove, SLOT_ORDER } from './inventory.ts';
+import { SelectBar } from './components/SelectBar.tsx';
 import { clampChatWidth, CHAT_WIDTH, usePref } from './prefs.ts';
 import { HoverContext, type HoverApi } from './hover.ts';
 import { InventoryContext, type InventoryApi } from './inventory-context.ts';
@@ -49,6 +50,11 @@ export function App() {
   const [selected, setSelected] = useState<AppraisedItem | null>(null);
   /** Instance id of the item in the quick-move sheet; looked up live so it shows moves as they land. */
   const [quickId, setQuickId] = useState<string>();
+  /** Phone select mode: tap tiles to pick them, then move them all at once from the bar below. */
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  /** Bulk move progress, while one is running. */
+  const [bulk, setBulk] = useState<{ done: number; total: number; to: string }>();
   // Always starts closed; the chat button shows when a conversation is going.
   const [agentOpen, setAgentOpen] = useState(false);
   const [chatStatus, setChatStatus] = useState<ChatStatus>({ active: false, busy: false, unread: 0 });
@@ -182,7 +188,7 @@ export function App() {
   const [moving, setMoving] = useState<Set<string>>(() => new Set());
   // Remembered across reloads so a raid shuffle stays at the front; only the last 60 moves are kept.
   const [recentMoves, setRecentMoves] = usePref<Record<string, number>>('recentMoves', {});
-  const [toast, setToast] = useState<{ id: number; text: string }>();
+  const [toast, setToast] = useState<{ id: number; text: string; ok?: boolean }>();
   useEffect(() => {
     if (!toast) return;
     const id = setTimeout(() => setToast(undefined), 8000);
@@ -231,7 +237,8 @@ export function App() {
     });
   }, []);
 
-  const move = useCallback(async (item: AppraisedItem, to: string) => {
+  /** `quiet` skips the scroll-and-glow, for bulk moves that would otherwise jump around. */
+  const move = useCallback(async (item: AppraisedItem, to: string, quiet = false) => {
     if (state.status !== 'ready' || !item.instanceId) return;
     const id = item.instanceId;
     const { inv } = state;
@@ -244,11 +251,11 @@ export function App() {
       patchItem(id, { ...item, owner: to, location: ch ? `${ch.className} (${ch.light})` : 'Vault' },
         inv.account && { ...inv.account, vault: { ...inv.account.vault, used: inv.account.vault.used + delta } });
     }
-    spotlight(id);
+    if (!quiet) spotlight(id);
     const res = await moveItem(id, to);
     // The server's copy is the truth: where it landed, or where it stopped if a step failed.
     patchItem(id, res.item ?? item, res.account);
-    spotlight(id);
+    if (!quiet) spotlight(id);
     if (res.error) setToast({ id: Date.now(), text: `Couldn't move ${item.name}: ${res.error}` });
     setMoving((m) => { const n = new Set(m); n.delete(id); return n; });
   }, [state, patchItem, spotlight, setRecentMoves]);
@@ -287,8 +294,39 @@ export function App() {
       equip: (item, characterId) => void equip(item, characterId),
       setLocked: (item, locked) => void lock(item, locked),
       quick: (item) => { if (item.instanceId) setQuickId(item.instanceId); },
+      selection: { active: selecting, ids: picked },
+      pick: (item) => {
+        if (!item.instanceId) return;
+        const id = item.instanceId;
+        setSelecting(true);
+        setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+      },
     };
-  }, [state, moving, move, recentMoves, equip, lock]);
+  }, [state, moving, move, recentMoves, equip, lock, selecting, picked]);
+
+  // Bulk moves go one at a time through the latest `move`, so each sees where the last one landed.
+  const moveRef = useRef(move);
+  moveRef.current = move;
+  const endSelect = useCallback(() => { setSelecting(false); setPicked(new Set()); }, []);
+  // Select mode belongs to the phone inventory; leaving it (or widening the window) ends it.
+  useEffect(() => { if (!compact || view !== 'inventory') endSelect(); }, [compact, view, endSelect]);
+  const moveAll = useCallback(async (to: string) => {
+    if (state.status !== 'ready') return;
+    const { inv } = state;
+    const chosen = inv.items.filter((i) => i.instanceId && picked.has(i.instanceId));
+    const plan = planBulkMove(chosen, to, inv.items, inv.account, (i, dest, items, account) => checkMove(i, dest, inv.characters, items, account));
+    const place = to === 'vault' ? 'the vault' : inv.characters.find((c) => c.id === to)?.className ?? 'there';
+    setBulk({ done: 0, total: plan.go.length, to });
+    for (const [n, item] of plan.go.entries()) {
+      await moveRef.current(item, to, true);
+      setBulk({ done: n + 1, total: plan.go.length, to });
+    }
+    setBulk(undefined);
+    endSelect();
+    const first = plan.skip[0];
+    const moved = `Moved ${plan.go.length} ${plan.go.length === 1 ? 'item' : 'items'} to ${place}`;
+    setToast({ id: Date.now(), ok: !first, text: first ? `${moved}. ${plan.skip.length} stayed put: ${first.reason}${plan.skip.length > 1 ? ' and more' : ''}.` : `${moved}.` });
+  }, [state, picked, endSelect]);
   // Dropping re-checks the move, so a drop on a red column does nothing.
   const drag = useItemDrag((item, to) => {
     if (inventoryApi.check(item, to).ok) inventoryApi.move(item, to);
@@ -409,6 +447,17 @@ export function App() {
           ))}
         </div></>}
         <div className="topbar__end">
+          {compact && view === 'inventory' && (
+            <button
+              className={`icon-button${selecting ? ' is-active' : ''}`}
+              onClick={() => (selecting ? endSelect() : setSelecting(true))}
+              aria-pressed={selecting}
+              aria-label={selecting ? 'Stop selecting' : 'Select items to move'}
+              title={selecting ? 'Stop selecting' : 'Select items to move'}
+            >
+              <Icon name="select" />
+            </button>
+          )}
           <button
             className="icon-button topbar__digest"
             onClick={() => setDigestOpen(true)}
@@ -441,7 +490,7 @@ export function App() {
         </div>
       </header>
 
-      <main className="main" onScroll={hovered ? hoverApi.leave : undefined}>
+      <main className={`main${selecting && compact ? ' main--selecting' : ''}`} onScroll={hovered ? hoverApi.leave : undefined}>
         {view === 'inventory' ? (
           <>
           {compact && (
@@ -509,7 +558,17 @@ export function App() {
         width={clampChatWidth(chatWidth, windowWidth)}
         onWidth={setChatWidth}
       />
-      {compact ? (
+      {compact && selecting && view === 'inventory' ? (
+        <SelectBar
+          items={inv.items.filter((i) => i.instanceId && picked.has(i.instanceId))}
+          characters={inv.characters}
+          check={inventoryApi.check}
+          progress={bulk}
+          onMove={(to) => void moveAll(to)}
+          onClear={() => setPicked(new Set())}
+          onDone={endSelect}
+        />
+      ) : compact ? (
         <TabBar
           view={view}
           onView={(v) => { setView(v); setAgentOpen(false); }}
@@ -554,12 +613,17 @@ export function App() {
         />
       )}
       {quickId && inventoryApi.byId.get(quickId) && (
-        <QuickMoveSheet item={inventoryApi.byId.get(quickId)!} onClose={() => setQuickId(undefined)} onDetails={setSelected} />
+        <QuickMoveSheet
+          item={inventoryApi.byId.get(quickId)!}
+          onClose={() => setQuickId(undefined)}
+          onDetails={setSelected}
+          onSelectMore={compact ? (item) => { setQuickId(undefined); inventoryApi.pick(item); } : undefined}
+        />
       )}
       {hovered && !selected && !dragging && !compact && <ItemHovercard item={hovered.item} anchor={hovered.anchor} copies={copiesOf(hovered.item).length} />}
       {drag.ghost}
       {toast && (
-        <div className="toast" role="alert" key={toast.id}>
+        <div className={`toast${toast.ok ? ' toast--ok' : ''}`} role={toast.ok ? 'status' : 'alert'} key={toast.id}>
           <span>{toast.text}</span>
           <button className="icon-button" onClick={() => setToast(undefined)} aria-label="Dismiss" title="Dismiss"><Icon name="close" /></button>
         </div>

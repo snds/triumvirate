@@ -11,8 +11,10 @@ import { EquipButtons, LockButton } from './ItemDetail.tsx';
  * tabs above the inventory, so "move to Titan" is the same tap as "show Titan". A move closes the
  * sheet and you stay on the tab you were on.
  */
-export function QuickMoveSheet({ item, onClose, onDetails }: {
+export function QuickMoveSheet({ item, onClose, onDetails, onSelectMore }: {
   item: AppraisedItem; onClose: () => void; onDetails: (i: AppraisedItem) => void;
+  /** Phone only: starts select mode with this item picked, for moving several at once. */
+  onSelectMore?: (i: AppraisedItem) => void;
 }) {
   const inv = useInventory();
   const busy = !!item.instanceId && inv.moving.has(item.instanceId);
@@ -31,9 +33,16 @@ export function QuickMoveSheet({ item, onClose, onDetails }: {
       onClose={onClose}
       className="quick-move"
       footer={(
-        <button className="button button--quiet" onClick={() => { onClose(); onDetails(item); }}>
-          <Icon name="info" />Full details
-        </button>
+        <div className="quick-move__footer">
+          <button className="button button--quiet" onClick={() => { onClose(); onDetails(item); }}>
+            <Icon name="info" />Full details
+          </button>
+          {onSelectMore && canMove && (
+            <button className="button button--quiet" onClick={() => onSelectMore(item)}>
+              <Icon name="select" />Select more
+            </button>
+          )}
+        </div>
       )}
     >
       <div className="quick-move__item">

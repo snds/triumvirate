@@ -763,6 +763,8 @@ body.is-dragging-item .tile { pointer-events: none; }
   background: var(--surface-raised); border: 1px solid var(--danger); color: var(--text-primary);
   box-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
 }
+/* A plain report ("Moved 5 items"), not a failure. */
+.toast--ok { border-color: var(--toast-ok-border); }
 
 /* A just-moved tile pulses a gold ring so it's easy to spot in a long vault. */
 [data-just-moved].tile { animation: just-moved 2.4s ease-out; z-index: 3; }
@@ -1779,3 +1781,33 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .quick-move__place.is-selected .store-switcher__meta { color: var(--text-secondary); }
 .quick-move__note { margin: 0; font-size: 12px; color: var(--text-secondary); }
 .quick-move__actions { display: grid; gap: var(--space-2); justify-items: start; }
+.quick-move__footer { display: flex; justify-content: space-between; gap: var(--target-gap); }
+
+/* ── Select mode (phone) ───────────────────────────────────
+   Tap tiles to pick them; the toolbar that replaces the tab bar moves them all at once. */
+.icon-button.is-active { color: var(--accent); background: var(--fill-glass-selected); }
+/* An offset ring, so a picked legendary never reads as an exotic's gold border. */
+.tile.is-picked { box-shadow: 0 0 0 2px var(--surface-page), 0 0 0 4px var(--tile-picked-ring); }
+.tile.is-unpickable { opacity: var(--tile-unpickable-opacity); cursor: default; }
+.tile__picked {
+  position: absolute; left: 2px; top: 2px; display: grid; place-items: center;
+  border-radius: 50%; background: var(--surface-page); color: var(--tile-picked-badge);
+}
+.tile__picked .icon { font-size: calc(var(--tile-lock-font) * var(--s) * 1.6); }
+.select-bar__panel { display: grid; gap: var(--space-2); padding: var(--space-2); border-radius: var(--select-bar-radius); pointer-events: auto; }
+.select-bar__head { display: flex; align-items: center; gap: var(--space-1); padding-left: var(--space-2); }
+.select-bar__count { flex: 1; font-size: 13px; font-weight: 600; }
+.select-bar__places { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--target-gap); }
+.select-bar__place {
+  display: grid; justify-items: center; align-content: center; gap: 1px;
+  min-height: var(--control-size); padding: var(--space-1); min-width: 0;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  background: var(--surface-raised); color: var(--text-primary); font: inherit; cursor: pointer;
+}
+.select-bar__place .icon { font-size: 18px; color: var(--text-secondary); }
+.select-bar__place:disabled { opacity: 0.4; cursor: default; }
+.select-bar__name { font-size: 12px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.select-bar__can { font-size: 11px; color: var(--accent); font-weight: 600; min-height: 1.2em; }
+.select-bar__place .spinner { width: 12px; height: 12px; }
+/* The toolbar is taller than the tab bar it replaces; keep the last row of tiles clear of it. */
+.main.main--selecting { padding-bottom: calc(var(--select-bar-clearance) + var(--tabbar-lift) + var(--safe-bottom)); }
