@@ -481,7 +481,6 @@ button.tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2p
 
 /* Hovercard */
 .hovercard {
-  position: fixed;
   z-index: 5;
   width: var(--hovercard-width);
   pointer-events: none;
@@ -2152,20 +2151,21 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 }
 .character__light.info-trigger:hover, .character__light.info-trigger[aria-expanded="true"] { background: var(--surface-glass); }
 .info-card {
-  position: fixed; z-index: 6; max-width: calc(100vw - 16px);
+  z-index: 6; max-width: calc(100vw - 16px);
   background: var(--info-card-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
   box-shadow: var(--info-card-shadow);
   animation: info-card-in 120ms ease-out;
 }
-/* A small notch pointing at the trigger. */
-.info-card::before {
-  content: ''; position: absolute; top: -6px; left: calc(var(--arrow-x, 50%) - 6px);
-  width: 10px; height: 10px; background: var(--info-card-section);
-  border: 1px solid var(--border-subtle); border-right: 0; border-bottom: 0; transform: rotate(45deg);
+.info-card__dialog { outline: none; }
+/* A small notch pointing at the trigger (React Aria's OverlayArrow places it). Under the card it
+   takes the title band's fill; over the card (card above the trigger), the body's. */
+.info-card__arrow span {
+  display: block; width: 10px; height: 10px; background: var(--info-card-section);
+  border: 1px solid var(--border-subtle); border-right: 0; border-bottom: 0; transform: translateY(5px) rotate(45deg);
 }
-.info-card--above::before { top: auto; bottom: -6px; background: var(--info-card-surface); transform: rotate(225deg); }
+.info-card[data-placement="top"] .info-card__arrow span { background: var(--info-card-surface); transform: translateY(-5px) rotate(225deg); }
 @keyframes info-card-in { from { opacity: 0; transform: translateY(-4px); } }
-.info-card--above { animation-name: info-card-in-up; }
+.info-card[data-placement="top"] { animation-name: info-card-in-up; }
 @keyframes info-card-in-up { from { opacity: 0; transform: translateY(4px); } }
 @media (prefers-reduced-motion: reduce) { .info-card { animation: none; } }
 .info-card__title {

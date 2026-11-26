@@ -122,7 +122,7 @@ export function App() {
     return () => window.removeEventListener('resize', onResize);
   }, []);
   const [, tick] = useState(0);
-  const [hovered, setHovered] = useState<{ item: AppraisedItem; anchor: DOMRect } | null>(null);
+  const [hovered, setHovered] = useState<{ item: AppraisedItem; anchor: Element } | null>(null);
 
   // Hovercard: a short delay so sweeping the mouse across the grid doesn't flash cards.
   const closeDetail = useCallback(() => setSelected(null), []);

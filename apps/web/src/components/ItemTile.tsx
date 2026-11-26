@@ -100,7 +100,7 @@ export const ItemTile = memo(function ItemTile({
         hover?.leave(); onSelect(item);
       } : undefined}
       // Hovercards are for a mouse; a tap on a phone goes straight to the item dialog.
-      onPointerEnter={hover ? (e) => { if (e.pointerType === 'mouse') hover.enter(item, e.currentTarget.getBoundingClientRect()); } : undefined}
+      onPointerEnter={hover ? (e) => { if (e.pointerType === 'mouse') hover.enter(item, e.currentTarget); } : undefined}
       onPointerLeave={(e) => { press.stop(); hover?.leave(); e.currentTarget.style.removeProperty('--mx'); e.currentTarget.style.removeProperty('--my'); }}
     >
       {item.icon && <img className="tile__icon" src={item.icon} alt="" decoding="async" draggable={false} ref={artReady} onLoad={artLoaded} />}

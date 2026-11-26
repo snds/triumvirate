@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { maxPower, setBonuses, type AppraisedItem, type CharacterRow, type Material, type PowerSlot, MATERIAL_GROUPS } from '@triumvirate/core/browser';
 import { useInventory } from '../inventory-context.ts';
-import { InfoPopover } from './InfoPopover.tsx';
+import { InfoCard } from '../ui/InfoCard.tsx';
 import { Icon } from './Icon.tsx';
 
 const fmt = new Intl.NumberFormat('en-US');
@@ -46,7 +46,7 @@ export function PowerBreakdown({ character }: { character: CharacterRow }) {
   const max = Math.floor(power.total);
   const eighths = partial(power.total);
   return (
-    <InfoPopover
+    <InfoCard
       label={`Power ${character.light}. Show max power breakdown`}
       title="Max power"
       triggerClassName="character__light"
@@ -67,7 +67,7 @@ export function PowerBreakdown({ character }: { character: CharacterRow }) {
         <strong>{Math.floor(account)}</strong>
       </p>
       <p className="info-card__note">Your best character's max. Counts gear in the vault and on other characters, not the postmaster.</p>
-    </InfoPopover>
+    </InfoCard>
   );
 }
 
@@ -86,7 +86,7 @@ export function SetBadges({ items }: { items: AppraisedItem[] }) {
         const pieces = items.filter((i) => i.setHash === s.hash);
         const icon = s.icon ?? active[0]?.icon;
         return (
-          <InfoPopover
+          <InfoCard
             key={s.hash}
             label={`${s.name}: ${active.map((p) => `${p.count}-piece ${p.name}`).join(', ')}`}
             title={s.name}
@@ -116,7 +116,7 @@ export function SetBadges({ items }: { items: AppraisedItem[] }) {
                 </button>
               ))}
             </div>
-          </InfoPopover>
+          </InfoCard>
         );
       })}
     </span>
@@ -128,7 +128,7 @@ export function MaterialsCard({ materials }: { materials: Material[] }) {
   if (!materials.length) return null;
   const groups = MATERIAL_GROUPS.map((g) => ({ g, list: materials.filter((m) => m.group === g) })).filter((x) => x.list.length);
   return (
-    <InfoPopover
+    <InfoCard
       label={`Materials and consumables: ${materials.length} kinds`}
       title="Materials and consumables"
       triggerClassName="chip materials-chip"
@@ -149,6 +149,6 @@ export function MaterialsCard({ materials }: { materials: Material[] }) {
           </ul>
         </section>
       ))}
-    </InfoPopover>
+    </InfoCard>
   );
 }
