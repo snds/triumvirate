@@ -11,6 +11,7 @@ import { ShareSheet } from './ShareSheet.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { LoadoutEditor } from './LoadoutEditor.tsx';
 import { OptimizerSheet } from './OptimizerSheet.tsx';
+import { CharacterPicker } from './CharacterPicker.tsx';
 import { Icon } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 
@@ -99,23 +100,7 @@ export function LoadoutsView({ inv, characterId, onCharacter, onSelect, onSettle
           <p className="muted loadouts__lede">Equipping works in orbit, in a social space, or offline.</p>
         </div>
         {inv.characters.length > 1 && (
-          <div className="loadouts__picker" role="tablist" aria-label="Character">
-            {inv.characters.map((c) => (
-              <button
-                key={c.id}
-                role="tab"
-                aria-selected={c.id === character.id}
-                className={`store-switcher__tab${c.id === character.id ? ' is-selected' : ''}`}
-                onClick={() => onCharacter(c.id)}
-              >
-                <span className="store-switcher__emblem" style={c.emblemBackground ? { backgroundImage: `url(${c.emblemBackground})` } : undefined} aria-hidden />
-                <span className="store-switcher__text">
-                  <span className="store-switcher__name">{c.className}</span>
-                  <span className="store-switcher__meta"><Icon name="power" filled />{c.light}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <CharacterPicker className="loadouts__picker" characters={inv.characters} value={character.id} onChange={onCharacter} />
         )}
       </header>
 

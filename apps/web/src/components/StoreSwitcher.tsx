@@ -1,4 +1,6 @@
 import type { CharacterRow } from '@triumvirate/core/browser';
+import { Segment } from '../ui/Segmented.tsx';
+import { CharacterPicker } from './CharacterPicker.tsx';
 import { Icon } from './Icon.tsx';
 
 const fmt = new Intl.NumberFormat('en-US');
@@ -15,41 +17,14 @@ export function StoreSwitcher({ characters, vaultCount, value, onChange }: {
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="store-switcher" role="tablist" aria-label="Show">
-      {characters.map((c) => (
-        <button
-          key={c.id}
-          role="tab"
-          aria-selected={value === c.id}
-          aria-controls="store-panel"
-          className={`store-switcher__tab${value === c.id ? ' is-selected' : ''}`}
-          onClick={() => onChange(c.id)}
-        >
-          {/* The emblem's left square is its icon; the banner art is cropped to show just that. */}
-          <span
-            className="store-switcher__emblem"
-            style={c.emblemBackground ? { backgroundImage: `url(${c.emblemBackground})` } : undefined}
-            aria-hidden
-          />
-          <span className="store-switcher__text">
-            <span className="store-switcher__name">{c.className}</span>
-            <span className="store-switcher__meta"><Icon name="power" filled />{c.light}</span>
-          </span>
-        </button>
-      ))}
-      <button
-        role="tab"
-        aria-selected={value === 'vault'}
-        aria-controls="store-panel"
-        className={`store-switcher__tab store-switcher__tab--vault${value === 'vault' ? ' is-selected' : ''}`}
-        onClick={() => onChange('vault')}
-      >
+    <CharacterPicker className="store-switcher" label="Show" characters={characters} value={value} onChange={onChange}>
+      <Segment id="vault" className="store-switcher__tab store-switcher__tab--vault">
         <span className="store-switcher__emblem store-switcher__emblem--vault" aria-hidden><Icon name="vault" /></span>
         <span className="store-switcher__text">
           <span className="store-switcher__name">Vault</span>
           {vaultCount !== undefined && <span className="store-switcher__meta">{fmt.format(vaultCount)}</span>}
         </span>
-      </button>
-    </div>
+      </Segment>
+    </CharacterPicker>
   );
 }

@@ -8,6 +8,7 @@ import { Icon } from './Icon.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards, SkPerks } from './Skeleton.tsx';
+import { Segment, Segmented } from '../ui/Segmented.tsx';
 
 /** "Kill Clip Enhanced" and "Kill Clip" are the same choice. */
 const base = (name: string) => name.replace(/\s+Enhanced$/i, '').trim();
@@ -168,19 +169,9 @@ export function WatchEditor({ weapon, onClose, onSaved }: {
           </div>
           <div className="watch-editor__grade">
             <span className="field__label" id="watch-grade">Community grade</span>
-            <div className="segmented" role="radiogroup" aria-labelledby="watch-grade">
-              {GRADE_FLOORS.map((g) => (
-                <button
-                  key={g.label}
-                  role="radio"
-                  aria-checked={minGrade === g.value}
-                  className={`segmented__option${minGrade === g.value ? ' is-selected' : ''}`}
-                  onClick={() => setMinGrade(g.value)}
-                >
-                  {g.label}
-                </button>
-              ))}
-            </div>
+            <Segmented labelledBy="watch-grade" value={minGrade ?? 'any'} onChange={(v) => setMinGrade(v === 'any' ? undefined : v as Grade)}>
+              {GRADE_FLOORS.map((g) => <Segment key={g.label} id={g.value ?? 'any'}>{g.label}</Segment>)}
+            </Segmented>
           </div>
         </div>
       )}

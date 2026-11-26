@@ -17,6 +17,7 @@ import { timeAgo } from '../inventory.ts';
 import { useCompact } from '../media.ts';
 import { FarmingSheet } from './FarmingSheet.tsx';
 import { Sk } from './Skeleton.tsx';
+import { Tab as TabButton, TabList, TabPanel, Tabs } from '../ui/Tabs.tsx';
 
 const VERDICTS: { value: Verdict; label: string }[] = [
   { value: 'god', label: 'Wish list god roll' },
@@ -165,6 +166,7 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
         {...(compact ? { role: 'dialog', 'aria-modal': true } : {})}
       >
         {compact && <span className="sheet__handle" aria-hidden />}
+        <Tabs value={panel} onChange={setPanel}>
         <header className="rolls__rail-head">
           {!compact && (
             <button className="button button--quiet" onClick={() => setRailOpen((v) => !v)} aria-expanded={railOpen} title={railOpen ? 'Hide options' : 'Show options'}>
@@ -173,28 +175,20 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
             </button>
           )}
           {open && (
-            <div className="rolls__panels" role="tablist" aria-label="Options">
+            <TabList label="Options" className="rolls__panels">
               {PANELS.map((p) => (
-                <button
-                  key={p.id}
-                  role="tab"
-                  aria-selected={panel === p.id}
-                  className={`rolls__panel-tab${panel === p.id ? ' is-selected' : ''}`}
-                  onClick={() => setPanel(p.id)}
-                  title={p.label}
-                >
+                <TabButton key={p.id} id={p.id} className="rolls__panel-tab" label={p.label} title={p.label}>
                   <Icon name={p.icon} />
-                  <span className="visually-hidden">{p.label}</span>
                   {p.id === 'filters' && changed && <span className="rolls__dot" aria-hidden />}
                   {p.id === 'activity' && activityCount > 0 && <span className="rolls__count">{activityCount}</span>}
-                </button>
+                </TabButton>
               ))}
-            </div>
+            </TabList>
           )}
           {compact && <button className="button button--quiet rolls__done" onClick={() => setSheetOpen(false)}>Done</button>}
         </header>
         {open && (
-          <div className="rolls__rail-body" role="tabpanel">
+          <TabPanel id={panel} className="rolls__rail-body">
             <div className="rolls__panel-head">
               <h3>{PANELS.find((p) => p.id === panel)!.label}</h3>
               {panel === 'filters' && changed && <button className="button button--quiet" onClick={() => setFilters(defaultFilters())}>Reset</button>}
@@ -313,8 +307,9 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged, o
                 </FilterGroup>
               </>
             )}
-          </div>
+          </TabPanel>
         )}
+        </Tabs>
       </aside>
       )}
 

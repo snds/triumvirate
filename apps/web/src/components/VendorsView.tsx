@@ -7,6 +7,7 @@ import type { AppraisedItem, CharacterRow, VendorCard, VendorSale } from '@trium
 import { fetchVendors, type VendorsResponse } from '../api.ts';
 import { timeAgo, type Kind } from '../inventory.ts';
 import { usePref } from '../prefs.ts';
+import { CharacterPicker } from './CharacterPicker.tsx';
 import { Icon } from './Icon.tsx';
 import { ItemTile, artLoaded, artReady } from './ItemTile.tsx';
 import { Reveal, Sk } from './Skeleton.tsx';
@@ -71,23 +72,7 @@ export function VendorsView({ characters, characterId, onCharacter, compact, que
           </p>
         </div>
         {characters.length > 1 && (
-          <div className="vendors__picker" role="tablist" aria-label="Character">
-            {characters.map((c) => (
-              <button
-                key={c.id}
-                role="tab"
-                aria-selected={c.id === characterId}
-                className={`store-switcher__tab${c.id === characterId ? ' is-selected' : ''}`}
-                onClick={() => onCharacter(c.id)}
-              >
-                <span className="store-switcher__emblem" style={c.emblemBackground ? { backgroundImage: `url(${c.emblemBackground})` } : undefined} aria-hidden />
-                <span className="store-switcher__text">
-                  <span className="store-switcher__name">{c.className}</span>
-                  <span className="store-switcher__meta"><Icon name="power" filled />{c.light}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <CharacterPicker className="vendors__picker" characters={characters} value={characterId ?? ''} onChange={onCharacter} />
         )}
       </header>
 

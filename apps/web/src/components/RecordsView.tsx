@@ -6,6 +6,8 @@ import type { CharacterRow, ExoticGap, NodeView, RecordView, TitleView } from '@
 import { fetchRecords, trackRecord, type RecordsResponse } from '../api.ts';
 import { timeAgo } from '../inventory.ts';
 import { usePref } from '../prefs.ts';
+import { CharacterPicker } from './CharacterPicker.tsx';
+import { Tab as TabButton, TabList, TabPanel, Tabs } from '../ui/Tabs.tsx';
 import { Icon } from './Icon.tsx';
 import { Reveal, Sk } from './Skeleton.tsx';
 
@@ -100,41 +102,20 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
           </p>
         </div>
         {characters.length > 1 && (
-          <div className="records__picker" role="tablist" aria-label="Character">
-            {characters.map((c) => (
-              <button
-                key={c.id}
-                role="tab"
-                aria-selected={c.id === characterId}
-                className={`store-switcher__tab${c.id === characterId ? ' is-selected' : ''}`}
-                onClick={() => onCharacter(c.id)}
-              >
-                <span className="store-switcher__emblem" style={c.emblemBackground ? { backgroundImage: `url(${c.emblemBackground})` } : undefined} aria-hidden />
-                <span className="store-switcher__text">
-                  <span className="store-switcher__name">{c.className}</span>
-                  <span className="store-switcher__meta"><Icon name="power" filled />{c.light}</span>
-                </span>
-              </button>
-            ))}
-          </div>
+          <CharacterPicker className="records__picker" characters={characters} value={characterId ?? ''} onChange={onCharacter} />
         )}
       </header>
 
+      <Tabs value={tab} onChange={(t) => { setTab(t); setOpenTitle(undefined); }}>
       <div className="records__tools">
-        <div className="segmented" role="tablist" aria-label="Records section">
+        <TabList label="Records section" className="segmented">
           {TABS.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              aria-selected={tab === t.id}
-              className={`segmented__option${tab === t.id ? ' is-selected' : ''}`}
-              onClick={() => { setTab(t.id); setOpenTitle(undefined); }}
-            >
+            <TabButton key={t.id} id={t.id} className="segmented__option">
               {t.label}
               {t.id === 'tracked' && tracked.length > 0 && <span className="muted"> {tracked.length}</span>}
-            </button>
+            </TabButton>
           ))}
-        </div>
+        </TabList>
         <button className={`chip${hideComplete ? ' is-selected' : ''}`} aria-pressed={hideComplete} onClick={() => setHideComplete((v) => !v)}>
           <Icon name="checkCircle" /> Hide completed
         </button>
@@ -145,6 +126,7 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
 
       {error && <p className="records__error" role="alert"><Icon name="warning" /> {error}</p>}
 
+      <TabPanel id={tab}>
       <Reveal loading={!shownFor && !error} skeleton={<RecordsSkeleton />} label="Loading records">
         {data && tab === 'titles' && (
           openTitle !== undefined && data.titles.find((t) => t.hash === openTitle)
@@ -190,6 +172,8 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
           </>
         )}
       </Reveal>
+      </TabPanel>
+      </Tabs>
     </section>
   );
 }
