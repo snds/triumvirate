@@ -5,6 +5,7 @@ import { fetchDigest, runDigest, type DigestResponse } from '../api.ts';
 import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { Sheet } from './Sheet.tsx';
+import { Reveal, SkText } from './Skeleton.tsx';
 import { alertState, clearDigestAlerts, disableAlerts, enableAlerts, sendTestAlert, type AlertState } from '../push.ts';
 
 const longDate = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
@@ -55,7 +56,7 @@ export function DigestSheet({ items, onSelect, onClose, onSeen }: {
         </div>
       )}
     >
-      {!data && !error && <p className="muted">Loading…</p>}
+      <Reveal loading={!data && !error} skeleton={<SkText groups={3} />} label="Loading the digest">
       {data && !d && (
         <div className="digest__empty">
           <p>No digest yet. Build one now, or set <code>DIGEST_HOUR</code> on the server to get one every morning.</p>
@@ -87,6 +88,7 @@ export function DigestSheet({ items, onSelect, onClose, onSeen }: {
         </article>
       )}
       {data && <MorningAlert />}
+      </Reveal>
     </Sheet>
   );
 }
