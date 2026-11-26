@@ -15,6 +15,7 @@ import { ItemTile } from './ItemTile.tsx';
 import { Icon } from './Icon.tsx';
 import { timeAgo } from '../inventory.ts';
 import { useCompact } from '../media.ts';
+import { FarmingSheet } from './FarmingSheet.tsx';
 
 const VERDICTS: { value: Verdict; label: string }[] = [
   { value: 'god', label: 'Wish list god roll' },
@@ -74,6 +75,7 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
   // On a phone the rail becomes a bottom sheet, opened from a toolbar above the cards.
   const compact = useCompact();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [farming, setFarming] = useState(false);
   const open = compact ? sheetOpen : railOpen;
   const openSheet = (p: Panel) => { setPanel(p); setSheetOpen(true); };
   useEffect(() => {
@@ -315,7 +317,13 @@ export function RollsView({ items, syncedAt, activeClass, onSelect, onChanged }:
 
       <div className="rolls__main">
         <header className="rolls__head">
-          <h2 className="vault__title">Roll appraiser <span className="vault__count">{shown.length} of {weapons.length}</span></h2>
+          <div className="rolls__title-row">
+            <h2 className="vault__title">Roll appraiser <span className="vault__count">{shown.length} of {weapons.length}</span></h2>
+            <button className="button rolls__targets" onClick={() => setFarming(true)} aria-haspopup="dialog">
+              <Icon name="target" /> Farming targets
+            </button>
+          </div>
+          {farming && <FarmingSheet onClose={() => setFarming(false)} />}
           {compact && (
             <div className="rolls__toolbar" role="toolbar" aria-label="Roll appraiser options">
               {PANELS.map((p) => (
