@@ -3,6 +3,7 @@ import { Icon, type IconName } from './Icon.tsx';
 import type { ChatStatus } from './AgentPanel.tsx';
 import type { Kind } from '../inventory.ts';
 import { useKeyboardInset } from '../keyboard.ts';
+import { Menu } from '../ui/Menu.tsx';
 
 export type View = 'inventory' | 'cleanup' | 'rolls' | 'loadouts' | 'vendors' | 'records';
 
@@ -19,6 +20,10 @@ const MORE_VIEWS: { id: View; label: string; icon: IconName }[] = [
   { id: 'records', label: 'Records', icon: 'records' },
 ];
 const ALL_VIEWS = [...VIEWS, ...MORE_VIEWS];
+/** The desktop top bar: every view, in its own order. Mid-width shows the phone's split (primary + More). */
+export const DESKTOP_VIEWS = (['inventory', 'cleanup', 'rolls', 'loadouts', 'vendors', 'records'] as const).map((id) => ALL_VIEWS.find((v) => v.id === id)!);
+export const PRIMARY_VIEWS = VIEWS;
+export const QUIET_VIEWS = MORE_VIEWS;
 
 export const KIND_SCOPES: { value: Kind; label: string }[] = [
   { value: 'all', label: 'All' },
@@ -50,18 +55,6 @@ export function TabBar({ view, onView, onSettings, cleanupCount, chatOpen, onCha
   onKind: (k: Kind) => void;
 }) {
   const [searching, setSearching] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLDivElement>(null);
-  // The menu closes on a tap anywhere else, or Escape.
-  useEffect(() => {
-    if (!moreOpen) return;
-    // The More tab toggles itself, so a tap on it isn't "elsewhere".
-    const away = (e: PointerEvent) => { if (!moreRef.current?.contains(e.target as Node) && !(e.target as Element).closest?.('.tabbar__more-tab')) setMoreOpen(false); };
-    const key = (e: KeyboardEvent) => { if (e.key === 'Escape') setMoreOpen(false); };
-    document.addEventListener('pointerdown', away);
-    document.addEventListener('keydown', key);
-    return () => { document.removeEventListener('pointerdown', away); document.removeEventListener('keydown', key); };
-  }, [moreOpen]);
   const inputRef = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
   useKeyboardInset(searching && focused);
@@ -117,26 +110,6 @@ export function TabBar({ view, onView, onSettings, cleanupCount, chatOpen, onCha
 
   return (
     <div className="tabbar">
-        {moreOpen && (
-          <div className="tabbar__menu glass" ref={moreRef} role="menu" aria-label="More">
-            {MORE_VIEWS.map((v) => (
-              <button
-                key={v.id}
-                role="menuitem"
-                className={`tabbar__menu-item${view === v.id && !chatOpen ? ' is-selected' : ''}`}
-                onClick={() => { setMoreOpen(false); onView(v.id); }}
-              >
-                <Icon name={v.icon} filled={view === v.id && !chatOpen} />
-                <span className="tabbar__menu-label">{v.label}</span>
-                {v.id === 'cleanup' && cleanupCount > 0 && <span className="count-badge count-badge--neutral">{cleanupCount > 99 ? '99+' : cleanupCount}</span>}
-              </button>
-            ))}
-            <button role="menuitem" className="tabbar__menu-item" onClick={() => { setMoreOpen(false); onSettings(); }}>
-              <Icon name="settings" />
-              <span className="tabbar__menu-label">Settings</span>
-            </button>
-          </div>
-        )}
       <div className="tabbar__row">
         <nav className="tabbar__tabs glass" aria-label="View">
           {VIEWS.map((v) => {
@@ -155,21 +128,32 @@ export function TabBar({ view, onView, onSettings, cleanupCount, chatOpen, onCha
               </button>
             );
           })}
-          <button
-            className={`tabbar__tab tabbar__more-tab${inMore || moreOpen ? ' is-selected' : ''}`}
-            aria-haspopup="menu"
-            aria-expanded={moreOpen}
-            aria-current={inMore ? 'page' : undefined}
-            aria-label={inMore ? `More: ${current.label}` : 'More'}
-            onClick={() => setMoreOpen((o) => !o)}
-          >
-            <span className="tabbar__icon">
-              {/* The tab shows the view you're on when it lives here, so you can still tell where you are. */}
-              <Icon name={inMore ? current.icon : 'more'} filled={inMore} />
-              {cleanupCount > 0 && view !== 'cleanup' && <span className="tabbar__count count-badge count-badge--neutral">{cleanupCount > 99 ? '99+' : cleanupCount}</span>}
-            </span>
-            <span className="tabbar__label">{inMore ? current.label : 'More'}</span>
-          </button>
+          <Menu
+            label="More"
+            triggerClassName={`tabbar__tab tabbar__more-tab${inMore ? ' is-selected' : ''}`}
+            triggerLabel={inMore ? `More: ${current.label}` : 'More'}
+            trigger={<>
+              <span className="tabbar__icon">
+                {/* The tab shows the view you're on when it lives here, so you can still tell where you are. */}
+                <Icon name={inMore ? current.icon : 'more'} filled={inMore} />
+                {cleanupCount > 0 && view !== 'cleanup' && <span className="tabbar__count count-badge count-badge--neutral">{cleanupCount > 99 ? '99+' : cleanupCount}</span>}
+              </span>
+              <span className="tabbar__label">{inMore ? current.label : 'More'}</span>
+            </>}
+            placement="top end"
+            offset={12}
+            className="tabbar__menu glass"
+            itemClassName="tabbar__menu-item"
+            items={[
+              ...MORE_VIEWS.map((v) => ({
+                id: v.id, label: v.label, selected: view === v.id && !chatOpen,
+                icon: <Icon name={v.icon} filled={view === v.id && !chatOpen} />,
+                end: v.id === 'cleanup' && cleanupCount > 0 ? <span className="count-badge count-badge--neutral">{cleanupCount > 99 ? '99+' : cleanupCount}</span> : undefined,
+              })),
+              { id: 'settings', label: 'Settings', icon: <Icon name="settings" /> },
+            ]}
+            onAction={(id) => (id === 'settings' ? onSettings() : onView(id as View))}
+          />
           <button
             className={`tabbar__tab tabbar__tab--chat${chatOpen ? ' is-selected' : ''}${chatStatus.busy ? ' is-busy' : ''}`}
             aria-expanded={chatOpen}

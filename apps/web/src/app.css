@@ -34,6 +34,9 @@ body {
   text-transform: uppercase;
   color: var(--accent);
 }
+.brand { display: flex; align-items: center; }
+/* The mark sits on the text's optical center, not its box. */
+.brand__mark { width: 32px; height: 24px; fill: var(--accent); }
 
 /* Buttons */
 .button {
@@ -133,12 +136,10 @@ html, body, #root { height: 100%; overflow: clip; }
 .profile__text { display: grid; line-height: var(--leading-snug); }
 .profile__name { color: var(--text-primary); font-weight: var(--font-weight-semibold); }
 .profile__synced { font-size: var(--font-size-12); color: var(--text-muted); }
+/* Menus are React Aria popovers: positioned next to their trigger in a layer above the page. */
 .menu {
-  position: absolute;
-  top: calc(100% + var(--space-1));
-  right: 0;
-  z-index: 4;
-  min-width: 100%;
+  z-index: 20;
+  min-width: var(--trigger-width);
   display: grid;
   gap: var(--space-1);
   padding: var(--space-2);
@@ -162,9 +163,16 @@ html, body, #root { height: 100%; overflow: clip; }
   text-align: left;
   cursor: pointer;
 }
-.menu__item:hover { background: var(--surface-hover); }
+.menu__item:hover, .menu__item[data-focused] { background: var(--surface-hover); outline: none; }
+.menu__item[data-focus-visible] { box-shadow: var(--ring-focus); }
+.menu__item.is-selected { color: var(--accent-text); }
+.menu__list { display: grid; gap: var(--space-1); outline: none; }
+.menu__text { flex: 1; }
+.profile__synced.is-stale { color: var(--status-warning-text); }
+.topbar__more { display: inline-flex; align-items: center; gap: var(--space-1); }
+.topbar__more .icon { font-size: var(--font-size-16); }
 .search {
-  flex: 0 1 320px;
+  flex: 1 1 200px; min-width: 140px; max-width: 320px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
@@ -2409,19 +2417,19 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 
 /* The More tab's menu floats just above the tab bar, at its right, like a context menu. */
 .tabbar__menu {
-  justify-self: end; pointer-events: auto;
+  z-index: 20;
   display: grid; min-width: 200px; padding: var(--space-1);
   border-radius: var(--radius-lg);
   animation: bar-morph var(--motion-normal) var(--motion-surface);
-  margin-right: calc(var(--tabbar-height) + var(--target-gap));
 }
+.tabbar__menu .menu__list { gap: 0; }
+.tabbar__menu-item[data-focused] { outline: none; background: var(--fill-glass-selected); }
 .tabbar__menu-item {
   display: flex; align-items: center; gap: var(--space-3);
   min-height: var(--control-size); padding: 0 var(--space-3);
   border: 0; border-radius: var(--radius-md); background: none;
   color: var(--text-primary); font: inherit; font-size: var(--font-size-16); text-align: left; cursor: pointer;
 }
-.tabbar__menu-label { flex: 1; }
 .tabbar__menu-item .icon { font-size: var(--font-size-24); color: var(--text-secondary); }
 .tabbar__menu-item.is-selected { background: var(--fill-glass-selected); }
 .tabbar__menu-item.is-selected .icon { color: var(--accent); }
