@@ -271,15 +271,20 @@ test('a weapon carries its large render, or its ornament\'s; none when the ornam
   assert.equal(summarizeProfile(p(9), m)[0]?.screenshot, undefined);
 });
 
-test('slimItems keeps weapon and weapon-ornament renders, not armor ornament ones', () => {
+test('slimItems keeps weapon, armor, and ornament renders, and armor\'s ornament socket', () => {
   const x = slimItems({
     1: { itemType: 3, screenshot: '/s/1.jpg', equippingBlock: { ammoType: 2 } },
     2: { itemType: 19, screenshot: '/s/2.jpg', plug: { plugCategoryIdentifier: 'v400.new_bow0_skins' } },
     3: { itemType: 19, screenshot: '/s/3.jpg', plug: { plugCategoryIdentifier: 'armor_skins_titan_head' } },
+    4: { itemType: 2, screenshot: '/s/4.jpg', sockets: { socketEntries: [{ singleInitialItemHash: 9 }, { singleInitialItemHash: 5, reusablePlugSetHash: 77 }] } },
+    5: { itemType: 19, plug: { plugCategoryIdentifier: 'armor_skins_empty' } },
+    9: { itemType: 19, plug: { plugCategoryIdentifier: 'enhancements.v2_general' } },
   } as never);
   assert.equal(x[1]?.screenshot, '/s/1.jpg');
   assert.equal(x[2]?.screenshot, '/s/2.jpg');
-  assert.equal(x[3]?.screenshot, undefined);
+  assert.equal(x[3]?.screenshot, '/s/3.jpg');
+  assert.equal(x[4]?.screenshot, '/s/4.jpg');
+  assert.deepEqual(x[4]?.ornamentSocket, [1, 77, 5]);
 });
 
 test('reads a weapon\'s champion stun from the instance or the definition', () => {

@@ -1,4 +1,4 @@
-// Weapon ornaments for the item dialog's preview strip: every ornament the weapon's ornament
+// Ornaments for the item dialog's preview strip: every ornament a weapon's or armor piece's ornament
 // socket can take, which you've unlocked, which is applied, and each one's studio render.
 // Pure logic over the saved profile and the slim manifest.
 import type { DestinyProfileResponse } from 'bungie-api-ts/destiny2';
@@ -24,23 +24,27 @@ export interface WeaponOrnaments {
   options: OrnamentOption[];
 }
 
-/** Ornament sockets take plugs whose category ends in "skins" (e.g. v400_repackage_hand_cannon0_skins). */
-const SKINS = /skins$/;
+/** Ornament plugs' categories hold "skins": v400_repackage_hand_cannon0_skins for weapons,
+ *  armor_skins_titan_head (and armor_skins_empty for the default) for armor. */
+const SKINS = /skins/;
 
 /**
- * The ornaments one weapon copy can wear, default first, then unlocked, then the rest by name.
- * Undefined when the weapon has no ornament socket or only the default.
+ * The ornaments one weapon or armor copy can wear, default first, then unlocked, then the rest by
+ * name. Undefined when the item has no ornament socket or only the default.
  */
-export function weaponOrnaments(
+export function itemOrnaments(
   profile: DestinyProfileResponse,
   manifest: Pick<ManifestTables, 'items' | 'extras' | 'plugSets'>,
   instanceId: string,
   itemHash: number,
 ): WeaponOrnaments | undefined {
-  const entries = manifest.extras?.[itemHash]?.socketEntries ?? [];
-  const socketIndex = entries.findIndex(([, initial]) => SKINS.test(manifest.extras?.[initial]?.plugCategory ?? ''));
-  if (socketIndex < 0) return undefined;
-  const [plugSet, initial] = entries[socketIndex]!;
+  const extra = manifest.extras?.[itemHash];
+  // Weapons keep every socket; armor keeps just its ornament socket.
+  const entries = extra?.socketEntries ?? [];
+  const weaponAt = entries.findIndex(([, initial]) => SKINS.test(manifest.extras?.[initial]?.plugCategory ?? ''));
+  const socket: [number, number, number] | undefined = weaponAt >= 0 ? [weaponAt, ...entries[weaponAt]!] : extra?.ornamentSocket;
+  if (!socket) return undefined;
+  const [socketIndex, plugSet, initial] = socket;
   const current = profile.itemComponents?.sockets?.data?.[instanceId]?.sockets?.[socketIndex]?.plugHash;
 
   // Unlocked: the account's plug set for this socket (ornaments unlock account-wide), any
@@ -80,3 +84,6 @@ export function weaponOrnaments(
   options.sort((a, b) => Number(!!b.isDefault) - Number(!!a.isDefault) || Number(b.unlocked) - Number(a.unlocked) || a.name.localeCompare(b.name));
   return { socketIndex, options };
 }
+
+/** The earlier, weapons-only name. */
+export const weaponOrnaments = itemOrnaments;
