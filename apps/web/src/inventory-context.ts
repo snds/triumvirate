@@ -1,7 +1,7 @@
 // Lets components deep in the tree (chat chips, build cards, tiles, drop zones) look up owned
 // items, open the item panel, and move items.
 import { createContext, useContext } from 'react';
-import type { AppraisedItem, CharacterRow } from '@triumvirate/core/browser';
+import type { AppraisedItem, ArmorSet, CharacterRow } from '@triumvirate/core/browser';
 
 export type MoveCheck = { ok: true } | { ok: false; reason: string; quiet?: boolean };
 
@@ -26,12 +26,18 @@ export interface InventoryApi {
   selection: { active: boolean; ids: Set<string> };
   /** Picks or unpicks an item, starting select mode if it's off. */
   pick: (item: AppraisedItem) => void;
+  /** Pulls everything from a character's postmaster (making room in the vault). Resolves when done. */
+  collectPostmaster: (characterId: string) => Promise<void>;
+  /** Armor sets you own pieces of, for set bonus badges. */
+  itemSets?: Record<string, ArmorSet>;
+  /** Every item you own, unfiltered by search, for max power. */
+  allItems: AppraisedItem[];
 }
 
 export const InventoryContext = createContext<InventoryApi>({
   byId: new Map(), select: () => {}, characters: [], moving: new Set(),
   check: () => ({ ok: false, reason: 'Not ready' }), move: () => {}, recentMoves: {},
   checkEquip: () => ({ ok: false, reason: 'Not ready' }), equip: () => {}, setLocked: () => {}, quick: () => {},
-  selection: { active: false, ids: new Set() }, pick: () => {},
+  selection: { active: false, ids: new Set() }, pick: () => {}, collectPostmaster: async () => {}, allItems: [],
 });
 export const useInventory = () => useContext(InventoryContext);

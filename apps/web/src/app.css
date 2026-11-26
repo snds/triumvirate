@@ -2081,3 +2081,107 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   .watch-column__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .watch-list__note { flex-basis: 100%; }
 }
+
+/* ── Info cards: power breakdown, set bonuses, materials ─────────────────
+   A mouse opens them on hover as a card; touch opens the same content in a sheet (InfoPopover). */
+.info-trigger { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.info-trigger:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
+.character__light.info-trigger {
+  color: var(--accent); font-size: 20px; font-weight: 700;
+  padding: var(--space-1) var(--space-2); margin-right: calc(-1 * var(--space-2)); border-radius: var(--radius-sm);
+}
+.character__light.info-trigger:hover, .character__light.info-trigger[aria-expanded="true"] { background: var(--surface-glass); }
+.info-card {
+  position: fixed; z-index: 6; max-width: calc(100vw - 16px);
+  background: var(--info-card-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md);
+  box-shadow: var(--info-card-shadow);
+  animation: info-card-in 120ms ease-out;
+}
+/* A small notch pointing at the trigger. */
+.info-card::before {
+  content: ''; position: absolute; top: -6px; left: calc(var(--arrow-x, 50%) - 6px);
+  width: 10px; height: 10px; background: var(--info-card-section);
+  border: 1px solid var(--border-subtle); border-right: 0; border-bottom: 0; transform: rotate(45deg);
+}
+.info-card--above::before { top: auto; bottom: -6px; background: var(--info-card-surface); transform: rotate(225deg); }
+@keyframes info-card-in { from { opacity: 0; transform: translateY(-4px); } }
+.info-card--above { animation-name: info-card-in-up; }
+@keyframes info-card-in-up { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) { .info-card { animation: none; } }
+.info-card__title {
+  margin: 0; border-radius: var(--radius-md) var(--radius-md) 0 0; position: relative; padding: var(--space-3) var(--space-4) var(--space-2); background: var(--info-card-section);
+  font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.info-card__body { display: grid; gap: var(--space-3); padding: var(--space-3) var(--space-4) var(--space-4); max-height: min(70vh, 640px); overflow-y: auto; }
+.info-card__label { margin: 0 0 var(--space-1); font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+.info-card__note { margin: 0; font-size: 12px; color: var(--text-muted); }
+
+/* Power breakdown */
+.power-card__head { display: flex; align-items: center; gap: var(--space-3); }
+.power-card__max { font-size: 32px; font-weight: 700; color: var(--accent); line-height: 1; }
+.power-card__sub { font-size: 12px; color: var(--text-secondary); }
+.power-card__rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.power-row { display: grid; grid-template-columns: 24px 72px minmax(0, 1fr) auto; align-items: center; gap: var(--space-2); font-size: 13px; min-height: 28px; }
+.power-row__icon { width: 24px; height: 24px; border-radius: 3px; background: var(--surface-raised); overflow: hidden; border: 1px solid var(--tile-tier, var(--border-subtle)); }
+.power-row__icon img { width: 100%; height: 100%; display: block; }
+.power-row__slot { color: var(--text-secondary); }
+.power-row__item { color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.power-row__value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.power-card__account { display: flex; justify-content: space-between; margin: 0; padding-top: var(--space-2); border-top: 1px solid var(--border-subtle); font-weight: 600; }
+.power-card__account strong { color: var(--accent); }
+
+/* Set bonus badges in the character header */
+.character__meta { display: flex; align-items: center; gap: var(--space-2); background: var(--surface-raised); padding-right: var(--space-3); }
+.character__meta .character__stats { flex: 1; background: none; }
+.set-badges { display: flex; gap: var(--space-1); margin-left: auto; }
+.set-badge {
+  position: relative; display: grid; place-items: center;
+  width: var(--set-badge-size); height: var(--set-badge-size); border-radius: 50%;
+  background: var(--surface-hover); border: 1px solid var(--border-subtle); color: var(--text-secondary);
+}
+.set-badge:hover, .set-badge[aria-expanded='true'] { border-color: var(--accent); }
+.set-badge img { width: 80%; height: 80%; border-radius: 50%; }
+.set-badge .icon { font-size: 16px; }
+.set-badge__count {
+  position: absolute; right: -4px; bottom: -4px; min-width: 14px; height: 14px; padding: 0 2px; border-radius: 7px;
+  background: var(--accent); color: var(--on-accent); font-size: 10px; font-weight: 700; line-height: 14px; text-align: center;
+}
+.set-card__perks { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.set-perk__head { display: flex; align-items: center; gap: var(--space-2); font-size: 13px; }
+.set-perk__head img, .set-perk__head .icon { width: 20px; height: 20px; font-size: 20px; border-radius: 50%; }
+.set-perk__count { color: var(--text-muted); font-size: 12px; }
+.set-perk__text { margin: var(--space-1) 0 0; font-size: 13px; color: var(--text-secondary); }
+.set-card__pieces { display: flex; gap: var(--space-1); }
+.mini-tile { width: 40px; height: 40px; padding: 0; border: 2px solid var(--tile-tier, var(--border-subtle)); border-radius: var(--radius-sm); background: var(--surface-raised); cursor: pointer; overflow: hidden; }
+.mini-tile img { width: 100%; height: 100%; display: block; }
+
+/* Postmaster: engram slots and Collect */
+.postmaster__engrams { margin-left: auto; }
+/* Ten cells that share the column's width, never wider than --engram-size, so the row never wraps. */
+.engrams { display: grid; grid-template-columns: repeat(10, minmax(0, var(--engram-size))); gap: 3px; margin-bottom: var(--space-2); }
+.engram {
+  width: 100%; aspect-ratio: 1; padding: 0; border: 0; background: none; cursor: pointer;
+  /* A hexagon, the engram's silhouette seen face on. */
+  clip-path: polygon(50% 0, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+}
+.engram img { width: 100%; height: 100%; display: block; }
+.engram--empty { cursor: default; background: var(--engram-empty); position: relative; }
+/* Inner cut leaves a 1.5px outline. */
+.engram--empty::after { content: ''; position: absolute; inset: 1.5px; background: var(--surface-panel); clip-path: inherit; }
+.postmaster__collect { margin-top: var(--space-2); }
+.postmaster__badge {
+  min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--accent); color: var(--on-accent);
+  font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+}
+.postmaster__collect:disabled .icon { animation: spin 1s linear infinite; }
+
+/* Materials */
+.materials-chip { align-self: center; }
+.materials__list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 2px var(--space-4); }
+.material { display: grid; grid-template-columns: 48px 24px minmax(0, 1fr); align-items: center; gap: var(--space-2); font-size: 13px; min-height: 28px; }
+.material__count { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.material__icon { width: 24px; height: 24px; border-radius: 3px; overflow: hidden; background: var(--surface-raised); }
+.material__icon img { width: 100%; height: 100%; display: block; }
+.material__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.materials__group + .materials__group { padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
+.info-sheet .materials__list { grid-template-columns: 1fr; }

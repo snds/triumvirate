@@ -9,6 +9,8 @@ export * from './vault.ts'; // type-only imports from manifest.ts, so no Node bu
 export type * from './subclass.ts';
 export * from './transfer.ts';
 export * from './loadouts.ts';
+export * from './postmaster.ts';
+export * from './power.ts';
 export * from './optimizer.ts';
 export * from './builds.ts';
 export * from './digest.ts';

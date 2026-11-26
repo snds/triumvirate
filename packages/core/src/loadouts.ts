@@ -49,7 +49,8 @@ export function checkEquip(item: Row, characterId: string, characters: Char[]): 
 }
 
 export type ActionStep =
-  | (MoveStep & { instanceId: string; itemHash: number })
+  // `instanceId` is '' for a stack (materials, consumables), pulled by item hash with `stackSize`.
+  | (MoveStep & { instanceId: string; itemHash: number; stackSize?: number })
   | { kind: 'equip'; characterId: string; instanceIds: string[] };
 
 export interface EquipPlan {

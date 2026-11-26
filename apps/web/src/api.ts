@@ -213,6 +213,13 @@ async function act<T extends { error?: string }>(path: string, body: unknown, wh
 }
 const sameOriginJson = <T>(text: string): T => { try { return JSON.parse(sameOriginImages(text)) as T; } catch { return {} as T; } };
 
+export interface CollectResult extends ActionResult {
+  /** Postmaster items pulled, and spares sent to the vault to make room. */
+  pulled?: number;
+  toVault?: number;
+}
+export const collectPostmaster = (characterId: string) => act<CollectResult>('/api/postmaster/collect', { characterId }, 'collect the postmaster');
+
 export const equipItem = (instanceId: string, characterId: string) => act<ActionResult>('/api/equip', { instanceId, characterId }, 'equip items');
 /** Several items at once (e.g. an optimizer result): moved over first, then equipped together. */
 export const equipItems = (instanceIds: string[], characterId: string) => act<ActionResult>('/api/equip', { instanceIds, characterId }, 'equip items');

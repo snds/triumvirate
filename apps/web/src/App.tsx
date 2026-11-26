@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { equipItem, fetchDigest, fetchInventory, logout, moveItem, setLocked, type ActionResult, type Inventory } from './api.ts';
+import { collectPostmaster, equipItem, fetchDigest, fetchInventory, logout, moveItem, setLocked, type ActionResult, type Inventory } from './api.ts';
 import { matches, timeAgo, type Kind } from './inventory.ts';
 import type { AppraisedItem } from '@triumvirate/core';
 import { checkEquip, checkMove, POSTMASTER_BUCKET } from '@triumvirate/core/browser';
@@ -286,6 +286,24 @@ export function App() {
     if (res.error) setToast({ id: Date.now(), text: `Couldn't ${locked ? 'lock' : 'unlock'} ${item.name}: ${res.error}` });
   }, [patchItem]);
 
+  /** Empties a character's postmaster, then reloads the view (stacks have no ids to patch by). */
+  const collect = useCallback(async (characterId: string) => {
+    const res = await collectPostmaster(characterId);
+    await load(false);
+    const pulled = res.pulled ?? 0;
+    const vaulted = res.toVault ?? 0;
+    const made = vaulted ? ` and sent ${vaulted} ${vaulted === 1 ? 'spare' : 'spares'} to the vault to make room` : '';
+    const skipped = res.skipped ?? [];
+    if (res.error) {
+      const sofar = pulled ? `Pulled ${pulled}${made}, then stopped. ` : vaulted ? `Sent ${vaulted} to the vault, then stopped. ` : 'Couldn\'t collect the postmaster. ';
+      setToast({ id: Date.now(), text: `${sofar}${res.error}` });
+    } else if (skipped.length) {
+      setToast({ id: Date.now(), text: `Pulled ${pulled}${made}. ${skipped.length === 1 ? `${skipped[0]!.name ?? 'One item'} stayed` : `${skipped.length} items stayed`}: ${skipped[0]!.reason}` });
+    } else {
+      setToast({ id: Date.now(), ok: true, text: `Pulled ${pulled} ${pulled === 1 ? 'item' : 'items'} from the postmaster${made}.` });
+    }
+  }, [load]);
+
   const inventoryApi = useMemo<InventoryApi>(() => {
     const inv = state.status === 'ready' ? state.inv : undefined;
     return {
@@ -307,8 +325,11 @@ export function App() {
         setSelecting(true);
         setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
       },
+      collectPostmaster: collect,
+      itemSets: inv?.itemSets,
+      allItems: inv?.items ?? [],
     };
-  }, [state, moving, move, recentMoves, equip, lock, selecting, picked]);
+  }, [state, moving, move, recentMoves, equip, lock, selecting, picked, collect]);
 
   // Bulk moves go one at a time through the latest `move`, so each sees where the last one landed.
   const moveRef = useRef(move);

@@ -132,6 +132,7 @@ test('summarizes currencies and vault space', () => {
   } as unknown as ManifestTables;
   assert.deepEqual(summarizeAccount(p, m), {
     currencies: [{ name: 'Glimmer', quantity: 500000, icon: 'https://www.bungie.net/g.png' }],
+    materials: [],
     vault: { used: 2, capacity: 700 },
   });
 });
@@ -297,4 +298,14 @@ test('reads a weapon\'s champion stun from the instance or the definition', () =
   const [a, b] = summarizeProfile(p, m);
   assert.deepEqual(a?.breaker, { name: 'Overload', icon: 'https://www.bungie.net/over.png' });
   assert.equal(b?.breaker?.name, 'Unstoppable');
+});
+
+test('materials sort into groups by name and type', async () => {
+  const { materialGroup } = await import('./vault.ts');
+  assert.equal(materialGroup('Enhancement Prism'), 'Upgrade materials');
+  assert.equal(materialGroup('Exotic Cipher'), 'Upgrade materials');
+  assert.equal(materialGroup('Vanguard Cipher'), 'Currencies and keys');
+  assert.equal(materialGroup('Synthweave Plate'), 'Synthweave');
+  assert.equal(materialGroup('Vanguard Boost', 'Consumable'), 'Consumables');
+  assert.equal(materialGroup('Alkane Mutation', 'Material'), 'Materials');
 });
