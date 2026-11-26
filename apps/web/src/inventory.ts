@@ -9,6 +9,18 @@ export const SLOT_ORDER = [
   'Kinetic Weapons', 'Energy Weapons', 'Power Weapons',
   'Helmet', 'Gauntlets', 'Chest Armor', 'Leg Armor', 'Class Armor', 'Ghost',
 ];
+/**
+ * Rows of the inventory grid, shared by every character column and the vault so each slot lines
+ * up across them, like DIM: a helmet sent to the vault lands in the same row it left, so nothing
+ * scrolls. Columns place each part with `gridRow: rowOf(...)`.
+ */
+export const INVENTORY_ROWS = ['header', 'top', ...SLOT_ORDER, 'Other', 'postmaster'] as const;
+/** 1-based CSS grid row for a header, slot name, or 'postmaster'. */
+export const rowOf = (name: string): number => {
+  const i = (INVENTORY_ROWS as readonly string[]).indexOf(name);
+  return (i < 0 ? INVENTORY_ROWS.indexOf('Other') : i) + 1;
+};
+
 const WEAPON = 3;
 const ARMOR = 2;
 

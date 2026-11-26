@@ -20,11 +20,13 @@ export interface InventoryApi {
   checkEquip: (item: AppraisedItem, characterId: string) => MoveCheck;
   equip: (item: AppraisedItem, characterId: string) => void;
   setLocked: (item: AppraisedItem, locked: boolean) => void;
+  /** Opens the quick-move sheet: the touch way to move, from a long-press or right-click. */
+  quick: (item: AppraisedItem) => void;
 }
 
 export const InventoryContext = createContext<InventoryApi>({
   byId: new Map(), select: () => {}, characters: [], moving: new Set(),
   check: () => ({ ok: false, reason: 'Not ready' }), move: () => {}, recentMoves: {},
-  checkEquip: () => ({ ok: false, reason: 'Not ready' }), equip: () => {}, setLocked: () => {},
+  checkEquip: () => ({ ok: false, reason: 'Not ready' }), equip: () => {}, setLocked: () => {}, quick: () => {},
 });
 export const useInventory = () => useContext(InventoryContext);

@@ -187,9 +187,18 @@ html, body, #root { height: 100%; overflow: clip; }
 .inventory {
   display: grid;
   grid-template-columns: repeat(var(--character-count, 3), var(--column-min-width)) minmax(var(--vault-min-width), 1fr);
-  gap: var(--space-4);
-  align-items: start;
+  /* One row per slot, shared by every column through subgrid, so a slot lines up across the
+     characters and the vault (like DIM). Rows nobody fills collapse to nothing. */
+  grid-template-rows: repeat(var(--inventory-rows, 13), auto);
+  column-gap: var(--space-4);
+  row-gap: 0;
   padding: var(--space-4) var(--page-gutter);
+}
+.inventory > .column {
+  display: grid;
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+  align-content: start;
 }
 
 
@@ -247,11 +256,15 @@ html, body, #root { height: 100%; overflow: clip; }
 }
 .vault__name { display: grid; line-height: 1.15; }
 .vault__title { font-size: 16px; margin: 0; }
-.vault__body { padding: 0 var(--space-3) var(--space-3); }
+/* Vault cells: each sits in its slot's row, ruled like the character slots beside it. */
+.vault__top { padding: var(--space-2) var(--space-3) 0; }
+.vault__top:empty { display: none; }
+.vault__top .postmaster__note, .vault__top .empty { margin-top: var(--space-2); }
+.vault__group { padding: var(--space-2) var(--space-3); border-top: 1px solid var(--border-subtle); min-width: 0; }
 .currencies { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); margin: 0 0 0 auto; padding: 0; list-style: none; }
 .currency { display: flex; align-items: center; gap: var(--space-1); font-size: 13px; font-weight: 600; }
 .currency img { width: 18px; height: 18px; }
-.vault__slot { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin: var(--space-4) 0 var(--space-2); }
+.vault__slot { font-size: 13px; color: var(--text-secondary); font-weight: 600; margin: 0 0 var(--space-2); }
 .vault__count { color: var(--text-muted); font-weight: 400; }
 .grid { display: flex; flex-wrap: wrap; gap: var(--tile-gap); }
 
@@ -783,7 +796,7 @@ body.is-dragging-item .tile { pointer-events: none; }
 .menu__hint { font-size: 11px; color: var(--text-muted); }
 .profile__auto { font-size: 12px; vertical-align: -2px; }
 
-.vault__filters { display: flex; gap: var(--space-1); padding: var(--space-2) 0 0; }
+.vault__filters { display: flex; gap: var(--space-1); padding: 0; }
 .chip {
   display: inline-flex; align-items: center; gap: 4px; padding: 2px var(--space-2); border-radius: 999px;
   border: 1px solid var(--border-subtle); background: none; color: var(--text-secondary); font: inherit; font-size: 12px; cursor: pointer;
@@ -1126,7 +1139,8 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
 .dialog { container: item-dialog / inline-size; }
 .agent { container: chat / inline-size; }
 .rolls__main { container: rolls / inline-size; }
-.column { container: store / inline-size; }
+/* On the header, not the column: containment on the column would stop it joining the inventory's row grid. */
+.vault__header { container: store / inline-size; }
 .cleanup { container: cleanup / inline-size; }
 .loadouts { container: loadouts / inline-size; }
 
@@ -1806,3 +1820,18 @@ button, a, label, summary, select, [role='button'] { touch-action: manipulation;
   .cleanup-queue__actions .segmented { flex-basis: 100%; }
   .cleanup-queue__actions .segmented__option { flex: 1; }
 }
+/* ── Quick move ────────────────────────────────────────────
+   The touch way to move an item (long-press a tile, or right-click one). Place buttons reuse the
+   store tabs, so moving to a character looks like switching to it. */
+.tile { -webkit-touch-callout: none; } /* no iOS link preview on a long-press */
+.quick-move__item { display: flex; align-items: center; gap: var(--space-3); }
+.quick-move__meta { display: grid; gap: 2px; margin: 0; font-size: 13px; }
+.quick-move__section { display: grid; gap: var(--space-2); }
+.quick-move__label { margin: 0; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.quick-move__places { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: var(--target-gap); }
+.quick-move__place:disabled { cursor: default; }
+.quick-move__place:disabled:not(.is-selected) { opacity: 0.45; }
+.quick-move__place:not(:disabled):hover { border-color: var(--accent); color: var(--text-primary); }
+.quick-move__place.is-selected .store-switcher__meta { color: var(--text-secondary); }
+.quick-move__note { margin: 0; font-size: 12px; color: var(--text-secondary); }
+.quick-move__actions { display: grid; gap: var(--space-2); justify-items: start; }
