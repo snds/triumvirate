@@ -11,6 +11,7 @@ import { TOUCH_QUERY, useMediaQuery } from '../media.ts';
 import { WatchButton } from './WatchSheet.tsx';
 import { Reveal, SkPerks } from './Skeleton.tsx';
 import { ItemDialog } from '../ui/ItemDialog.tsx';
+import { Tab as TabButton, TabList, TabPanel, Tabs } from '../ui/Tabs.tsx';
 
 interface Props {
   item: AppraisedItem;
@@ -75,23 +76,12 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
           </div>
         </div>
 
-        <div className="tabs" role="tablist" aria-label="Item information">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              role="tab"
-              id={`item-tab-${t.id}`}
-              aria-selected={tab === t.id}
-              aria-controls={`item-panel-${t.id}`}
-              className={`tabs__tab${tab === t.id ? ' is-selected' : ''}`}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <Tabs value={tab} onChange={setTab}>
+        <TabList label="Item information" className="tabs">
+          {tabs.map((t) => <TabButton key={t.id} id={t.id} className="tabs__tab">{t.label}</TabButton>)}
+        </TabList>
 
-        <div className="item-dialog__body" role="tabpanel" id={`item-panel-${tab}`} aria-labelledby={`item-tab-${tab}`}>
+        <TabPanel id={tab} className="item-dialog__body">
           {tab === 'roll' && (
             <div className="item-dialog__roll">
               <div className="item-dialog__main">
@@ -145,7 +135,8 @@ export function ItemDetail({ item, onClose, onAsk, copies, onSelect, chatOpen = 
           )}
           {tab === 'all' && <AllRolls item={item} />}
           {tab === 'details' && <Details item={item} />}
-        </div>
+        </TabPanel>
+        </Tabs>
     </ItemDialog>
   );
 }

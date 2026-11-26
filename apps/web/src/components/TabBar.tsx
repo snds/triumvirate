@@ -4,6 +4,7 @@ import type { ChatStatus } from './AgentPanel.tsx';
 import type { Kind } from '../inventory.ts';
 import { useKeyboardInset } from '../keyboard.ts';
 import { Menu } from '../ui/Menu.tsx';
+import { Segment, Segmented } from '../ui/Segmented.tsx';
 
 export type View = 'inventory' | 'cleanup' | 'rolls' | 'loadouts' | 'vendors' | 'records';
 
@@ -66,19 +67,9 @@ export function TabBar({ view, onView, onSettings, cleanupCount, chatOpen, onCha
   if (searching) {
     return (
       <div className="tabbar tabbar--searching">
-        <div className="tabbar__scopes glass" role="radiogroup" aria-label="Item kind">
-          {KIND_SCOPES.map((k) => (
-            <button
-              key={k.value}
-              role="radio"
-              aria-checked={kind === k.value}
-              className={`tabbar__scope${kind === k.value ? ' is-selected' : ''}`}
-              onClick={() => onKind(k.value)}
-            >
-              {k.label}
-            </button>
-          ))}
-        </div>
+        <Segmented className="tabbar__scopes glass" label="Item kind" value={kind} onChange={onKind}>
+          {KIND_SCOPES.map((k) => <Segment key={k.value} id={k.value} className="tabbar__scope">{k.label}</Segment>)}
+        </Segmented>
         <div className="tabbar__row">
           <button className="tabbar__round glass" onClick={() => setSearching(false)} aria-label={`Back to ${current.label}`}>
             <Icon name={current.icon} filled />

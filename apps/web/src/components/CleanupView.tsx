@@ -8,6 +8,7 @@ import { decideCleanup, fetchCleanup, pullCleanup, type CleanupStatus } from '..
 import { Icon } from './Icon.tsx';
 import { ItemTile } from './ItemTile.tsx';
 import { ACTIVITY_HINT, ACTIVITY_ICON, BuildsSheet } from './BuildsSheet.tsx';
+import { Segment, Segmented } from '../ui/Segmented.tsx';
 
 const VERDICT_LABEL = { god: 'God roll', good: 'Good roll', meh: 'No match', trash: 'Trash roll', unrated: 'Unrated' } as const;
 
@@ -144,13 +145,9 @@ export function CleanupView({ characters, items, itemSets, characterId, onCharac
           </ul>
           <div className="cleanup-queue__actions">
             {characters.length > 1 && (
-              <div className="segmented" role="group" aria-label="Pull to">
-                {characters.map((c) => (
-                  <button key={c.id} className={`segmented__option${c.id === character?.id ? ' is-selected' : ''}`} aria-pressed={c.id === character?.id} onClick={() => onCharacter(c.id)}>
-                    {c.className}
-                  </button>
-                ))}
-              </div>
+              <Segmented label="Pull to" value={character?.id ?? ''} onChange={(id) => onCharacter(String(id))}>
+                {characters.map((c) => <Segment key={c.id} id={c.id}>{c.className}</Segment>)}
+              </Segmented>
             )}
             <button className="button button--primary" disabled={!inVault || busy.has('pull')} onClick={() => void pull()}>
               <Icon name={busy.has('pull') ? 'autorenew' : 'pull'} /> {inVault ? `Pull ${inVault} to ${character?.className ?? 'character'}` : 'All pulled'}

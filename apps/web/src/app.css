@@ -2686,3 +2686,6 @@ li.title-card { cursor: default; }
 .agent__off p { margin: 0; }
 .agent__off code { padding: 0 var(--space-1); border-radius: var(--radius-sm); background: var(--surface-hover); color: var(--text-primary); }
 .agent__off-mark { width: var(--size-36); height: var(--size-28); fill: var(--border-subtle); }
+
+/* React Aria tab roots and titled segment content draw nothing; the caller's layout holds. */
+.tabs-root, .segment__inner { display: contents; }

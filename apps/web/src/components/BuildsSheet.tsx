@@ -7,6 +7,7 @@ import { fetchBuilds, saveBuilds, type BuildsResponse } from '../api.ts';
 import { Icon, type IconName } from './Icon.tsx';
 import { Sheet } from '../ui/Sheet.tsx';
 import { Reveal, SkCards } from './Skeleton.tsx';
+import { Segment, Segmented } from '../ui/Segmented.tsx';
 
 const CLASSES = ['Titan', 'Hunter', 'Warlock'] as const;
 export const ACTIVITY_ICON: Record<BuildActivity, IconName> = { endgame: 'endgame', pvp: 'pvp', casual: 'casual' };
@@ -95,13 +96,13 @@ export function BuildsSheet({ items, itemSets, classType: startClass = 0, onClos
       </p>
       {/* A plain wrapper: the grid would squash the overflow-hidden control to nothing. */}
       <div className="builds__classes-wrap">
-        <div className="segmented builds__classes" role="group" aria-label="Class">
+        <Segmented className="segmented builds__classes" label="Class" value={classType} onChange={setClassType}>
           {CLASSES.map((name, i) => (
-            <button key={name} className={`segmented__option${i === classType ? ' is-selected' : ''}`} aria-pressed={i === classType} onClick={() => setClassType(i)}>
+            <Segment key={name} id={i}>
               {name} <span className="muted">{builds?.filter((b) => b.classType === i && !b.off).length ?? ''}</span>
-            </button>
+            </Segment>
           ))}
-        </div>
+        </Segmented>
       </div>
       {error && <p className="builds__error" role="alert">{error}</p>}
 
