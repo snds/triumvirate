@@ -12,6 +12,7 @@ import { CleanupView } from './components/CleanupView.tsx';
 import { RollsView } from './components/RollsView.tsx';
 import { LoadoutsView } from './components/LoadoutsView.tsx';
 import { VendorsView } from './components/VendorsView.tsx';
+import { RecordsView } from './components/RecordsView.tsx';
 import { AgentPanel, type ChatStatus } from './components/AgentPanel.tsx';
 import { ProfileMenu } from './components/ProfileMenu.tsx';
 import { DigestSheet } from './components/DigestSheet.tsx';
@@ -455,6 +456,13 @@ export function App() {
           >
             Vendors
           </button>
+          <button
+            className={`segmented__option${view === 'records' ? ' is-selected' : ''}`}
+            aria-current={view === 'records' ? 'page' : undefined}
+            onClick={() => setView('records')}
+          >
+            Records
+          </button>
         </nav>}
         {!compact && <><input
           className="search"
@@ -579,6 +587,14 @@ export function App() {
             query={query}
             kind={kind}
             onSelect={setSelected}
+          />
+        ) : view === 'records' ? (
+          <RecordsView
+            characters={inv.characters}
+            characterId={inv.characters.some((c) => c.id === store) ? store : inv.characters[0]?.id ?? ''}
+            onCharacter={setStore}
+            query={query}
+            onToast={(text) => setToast({ id: Date.now(), text })}
           />
         ) : view === 'rolls' ? (
           <RollsView items={visible} syncedAt={inv.syncedAt} activeClass={inv.characters[0]?.className} onSelect={setSelected} onChanged={() => void load(false)} onWatchList={() => setWatchOpen(true)} />

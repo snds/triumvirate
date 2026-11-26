@@ -4,7 +4,7 @@ import type { ChatStatus } from './AgentPanel.tsx';
 import type { Kind } from '../inventory.ts';
 import { useKeyboardInset } from '../keyboard.ts';
 
-export type View = 'inventory' | 'cleanup' | 'rolls' | 'loadouts' | 'vendors';
+export type View = 'inventory' | 'cleanup' | 'rolls' | 'loadouts' | 'vendors' | 'records';
 
 /** Views with their own tab on a phone. */
 const VIEWS: { id: View; label: string; icon: IconName }[] = [
@@ -16,6 +16,7 @@ const VIEWS: { id: View; label: string; icon: IconName }[] = [
 const MORE_VIEWS: { id: View; label: string; icon: IconName }[] = [
   { id: 'cleanup', label: 'Cleanup', icon: 'cleanup' },
   { id: 'vendors', label: 'Vendors', icon: 'vendor' },
+  { id: 'records', label: 'Records', icon: 'records' },
 ];
 const ALL_VIEWS = [...VIEWS, ...MORE_VIEWS];
 
@@ -30,7 +31,7 @@ export const KIND_SCOPES: { value: Kind; label: string }[] = [
  * edges, with search as its own round button beside it. Tapping search turns the bar into a search
  * field: the tabs fold into one round button (the current tab, tap to go back), the field takes the
  * rest of the row, and the All / Weapons / Armor scopes float just above it.
- * The chat is the last tab, so nothing else floats over the tiles. Less-used views (Cleanup, Vendors)
+ * The chat is the last tab, so nothing else floats over the tiles. Less-used views (Cleanup, Vendors, Records)
  * and Settings sit behind a More tab, which opens a small menu just above the bar.
  */
 export function TabBar({ view, onView, onSettings, cleanupCount, chatOpen, onChat, chatStatus, chatNote, query, onQuery, kind, onKind }: {

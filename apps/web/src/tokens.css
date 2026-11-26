@@ -305,6 +305,21 @@
   --vendor-owned: var(--verdict-good);
   --vendor-locked-opacity: 0.55;
 
+  /* Records: seal cards in a grid, a category rail beside the triumphs on a wide screen, and
+     triumph cards. Progress bars share one track and fill; an earned title takes the gold. */
+  --record-card-min: var(--size-320);
+  --title-card-min: 260px;
+  --title-icon-size: var(--size-56);
+  --record-icon-size: var(--size-40);
+  --records-rail-width: 260px;
+  --record-bar-height: 4px;
+  --record-bar-track: var(--surface-hover);
+  --record-bar-fill: var(--accent);
+  --record-bar-done: var(--verdict-good);
+  --record-done: var(--verdict-good);
+  --title-earned: var(--gold-400);
+  --title-gilded: var(--gold-300);
+
   /* At a glance: subclass setup, set bonuses, and artifact perks under each loadout. Abilities and
      aspects read first, fragments a step smaller; the super is the one big glyph, as in game. */
   --glance-label-width: var(--size-72);
