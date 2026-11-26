@@ -9,13 +9,14 @@ import { usePref } from '../prefs.ts';
 import { Icon } from './Icon.tsx';
 import { Reveal, Sk } from './Skeleton.tsx';
 
-type Tab = 'titles' | 'triumphs' | 'nearly' | 'tracked' | 'catalysts' | 'exotics';
+type Tab = 'titles' | 'triumphs' | 'nearly' | 'tracked' | 'catalysts' | 'patterns' | 'exotics';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'titles', label: 'Titles' },
   { id: 'triumphs', label: 'Triumphs' },
   { id: 'nearly', label: 'Nearly done' },
   { id: 'tracked', label: 'Tracked' },
   { id: 'catalysts', label: 'Catalysts' },
+  { id: 'patterns', label: 'Patterns' },
   { id: 'exotics', label: 'Exotics' },
 ];
 const CLASS_NAMES: Record<number, string> = { 0: 'Titan', 1: 'Hunter', 2: 'Warlock' };
@@ -39,6 +40,8 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
   const [openTitle, setOpenTitle] = useState<number>();
   const [category, setCategory] = useState<number>();
   const [catalystType, setCatalystType] = useState<number>();
+  const [patternGroup, setPatternGroup] = useState<number>();
+  const [deepsightOnly, setDeepsightOnly] = usePref('records.deepsightOnly', false);
 
   const load = useCallback(async (refresh = false) => {
     setBusy(true);
@@ -60,7 +63,7 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
     const m = new Map<number, RecordView>();
     if (!data) return m;
     const walk = (n: NodeView) => { for (const r of n.records ?? []) m.set(r.hash, r); for (const k of n.nodes ?? []) walk(k); };
-    [...data.triumphs, ...data.legacy, ...(data.catalysts ?? [])].forEach(walk);
+    [...data.triumphs, ...data.legacy, ...(data.catalysts ?? []), ...(data.patterns ?? [])].forEach(walk);
     for (const t of data.titles) for (const r of t.records) if (!m.has(r.hash)) m.set(r.hash, r);
     for (const r of [...data.tracked, ...data.nearly]) if (!m.has(r.hash)) m.set(r.hash, r);
     return m;
@@ -162,6 +165,17 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
         {data && tab === 'catalysts' && (
           <Triumphs active={filterNodes(data.catalysts ?? [], f)} legacy={[]} selected={catalystType} onSelect={setCatalystType} card={card} />
         )}
+        {data && tab === 'patterns' && (
+          <Patterns
+            groups={data.patterns ?? []}
+            filters={f}
+            deepsightOnly={deepsightOnly}
+            onDeepsightOnly={setDeepsightOnly}
+            selected={patternGroup}
+            onSelect={setPatternGroup}
+            card={card}
+          />
+        )}
         {data && tab === 'exotics' && <Exotics gaps={data.exotics ?? []} query={query} />}
         {data && tab === 'nearly' && (
           <>
@@ -177,6 +191,56 @@ export function RecordsView({ characters, characterId, onCharacter, query, onToa
         )}
       </Reveal>
     </section>
+  );
+}
+
+/**
+ * Weapon patterns by ammo type. The summary counts what you can shape now and the Deepsight
+ * copies you hold, and "Has Deepsight" narrows the tree to patterns you can progress today.
+ */
+function Patterns({ groups, filters, deepsightOnly, onDeepsightOnly, selected, onSelect, card }: {
+  groups: NodeView[];
+  filters: { hideComplete: boolean; query: string };
+  deepsightOnly: boolean;
+  onDeepsightOnly: (v: boolean) => void;
+  selected?: number;
+  onSelect: (hash: number | undefined) => void;
+  card: (r: RecordView) => React.ReactNode;
+}) {
+  const all: RecordView[] = [];
+  const walk = (n: NodeView) => { all.push(...(n.records ?? [])); n.nodes?.forEach(walk); };
+  groups.forEach(walk);
+  if (!all.length) return <p className="empty">No weapon patterns to show.</p>;
+  const ready = all.filter((r) => r.complete).length;
+  const withCopies = all.filter((r) => r.deepsight);
+  const copies = withCopies.reduce((n, r) => n + (r.deepsight ?? 0), 0);
+  // Keep only patterns with a Deepsight copy; recount each node from what's left.
+  const onlyDeepsight = (n: NodeView): NodeView | null => {
+    const records = (n.records ?? []).filter((r) => r.deepsight);
+    const nodes = (n.nodes ?? []).map(onlyDeepsight).filter((x): x is NodeView => !!x);
+    if (!records.length && !nodes.length) return null;
+    return { ...n, records: records.length ? records : undefined, nodes: nodes.length ? nodes : undefined };
+  };
+  const shown = filterNodes(deepsightOnly ? groups.map(onlyDeepsight).filter((x): x is NodeView => !!x) : groups, filters);
+  return (
+    <>
+      <div className="patterns__summary">
+        <p className="muted records__hint">
+          <strong>{ready}</strong> of {all.length} patterns ready to shape.
+          {copies > 0
+            ? <> You hold <strong>{copies}</strong> Deepsight {copies === 1 ? 'weapon' : 'weapons'} for {withCopies.length} {withCopies.length === 1 ? 'pattern' : 'patterns'}.</>
+            : ' No Deepsight weapons waiting.'}
+        </p>
+        {copies > 0 && (
+          <button className={`chip${deepsightOnly ? ' is-selected' : ''}`} aria-pressed={deepsightOnly} onClick={() => onDeepsightOnly(!deepsightOnly)}>
+            <Icon name="deepsight" /> Has Deepsight
+          </button>
+        )}
+      </div>
+      {shown.length
+        ? <Triumphs active={shown} legacy={[]} selected={selected} onSelect={onSelect} card={card} />
+        : <p className="empty">No patterns match.</p>}
+    </>
   );
 }
 
@@ -358,6 +422,7 @@ function RecordCard({ record: r, tracked, onTrack, withPath }: { record: RecordV
           {r.steps && <span>Step {Math.min(r.steps.done + 1, r.steps.total)} of {r.steps.total}</span>}
           {r.score ? <span>{r.score} pts</span> : null}
           {r.trackedInGame && <span className="record__ingame"><Icon name="game" /> Tracked in game</span>}
+          {r.deepsight ? <span className="record__deepsight"><Icon name="deepsight" /> {r.deepsight} Deepsight {r.deepsight === 1 ? 'copy' : 'copies'} to extract</span> : null}
         </div>
       </div>
       {!r.complete && (

@@ -132,6 +132,8 @@ export interface RecordView {
   trackedInGame?: boolean;
   /** Names of the categories above it, top first ("Destinations › Pale Heart"). */
   path?: string[];
+  /** Weapon patterns: Deepsight copies you hold that still have a pattern to extract. */
+  deepsight?: number;
 }
 
 export interface NodeView {
@@ -169,6 +171,8 @@ export interface RecordsScreen {
   legacy: NodeView[];
   /** Exotic catalysts, by weapon type. */
   catalysts: NodeView[];
+  /** Weapon patterns (shaping), by ammo type, each split by weapon type. */
+  patterns: NodeView[];
   /** Hashes of the game's tracked triumph and the ones you track here, as views. */
   tracked: RecordView[];
   /** Incomplete triumphs at least `nearlyAt` done, most done first. */
@@ -312,7 +316,7 @@ export function recordsScreen(input: RecordsInput): RecordsScreen {
   const triumphs = children(pr.recordCategoriesRootNodeHash);
   const legacy = children(tables.roots.legacyTriumphs);
   // Catalysts come last, so a record also listed elsewhere keeps that path.
-  const catalysts = children(tables.roots.catalysts);
+  const { catalysts, patterns } = splitPatterns(children(tables.roots.catalysts));
   const titles = [...sealsFrom(pr.recordSealsRootNodeHash, false), ...sealsFrom(tables.roots.legacySeals, true)];
 
   // Everything visible, once, for the tracked and nearly-done lists.
@@ -328,8 +332,44 @@ export function recordsScreen(input: RecordsInput): RecordsScreen {
 
   return {
     score: { active: pr.activeScore ?? pr.score ?? 0, legacy: pr.legacyScore ?? 0, lifetime: pr.lifetimeScore ?? 0 },
-    titles, triumphs, legacy, catalysts, tracked, nearly,
+    titles, triumphs, legacy, catalysts, patterns, tracked, nearly,
   };
+}
+
+/**
+ * Bungie keeps catalysts and weapon patterns under one root: "Patterns & Catalysts", holding
+ * Primary, Special, and Heavy Weapon Patterns beside Exotic Catalysts. Wrapper nodes with one
+ * child are skipped. Catalysts come back by weapon type; patterns by ammo type.
+ */
+export function splitPatterns(list: NodeView[]): { catalysts: NodeView[]; patterns: NodeView[] } {
+  let top = list;
+  while (top.length === 1 && top[0]!.nodes?.length && !top[0]!.records?.length) top = top[0]!.nodes!;
+  const isCatalyst = (n: NodeView) => /catalyst/i.test(n.name);
+  const groups = top.filter(isCatalyst);
+  const patterns = top.filter((n) => !isCatalyst(n));
+  // No catalyst group by name (an older layout): everything is catalysts, as before.
+  if (!groups.length) return { catalysts: top, patterns: [] };
+  const catalysts = groups.flatMap((g) => (g.nodes?.length && !g.records?.length ? g.nodes : [g]));
+  return { catalysts, patterns };
+}
+
+/**
+ * Counts the Deepsight weapons you hold for each unfinished pattern, matched by weapon name (a
+ * pattern record carries the weapon's name). Sets `deepsight` on those records, in place.
+ */
+export function markDeepsight(patterns: NodeView[], items: { name: string; deepsight?: boolean }[]): number {
+  const counts = new Map<string, number>();
+  for (const i of items) if (i.deepsight) counts.set(i.name, (counts.get(i.name) ?? 0) + 1);
+  let total = 0;
+  const walk = (n: NodeView) => {
+    for (const r of n.records ?? []) {
+      const c = counts.get(r.name);
+      if (c && !r.complete) { r.deepsight = c; total += c; }
+    }
+    n.nodes?.forEach(walk);
+  };
+  patterns.forEach(walk);
+  return total;
 }
 
 export interface RecordFilters {

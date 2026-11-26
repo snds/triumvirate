@@ -2522,6 +2522,10 @@ li.title-card { cursor: default; }
 .record__meta:empty { display: none; }
 .record__ingame { display: inline-flex; align-items: center; gap: 3px; color: var(--accent); }
 .record__ingame .icon { font-size: 14px; }
+.record__deepsight { display: inline-flex; align-items: center; gap: 3px; color: var(--deepsight); }
+.record__deepsight .icon { font-size: 14px; }
+.patterns__summary { margin-bottom: var(--space-3); display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.patterns__summary .records__hint { margin: 0; }
 .record__pin { position: absolute; top: var(--space-1); right: var(--space-1); color: var(--text-muted); }
 .record__pin.is-active { color: var(--accent); }
 
