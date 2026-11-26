@@ -102,14 +102,17 @@ export function followCharacter(f: RollFilters, from: string | undefined, to: st
   return { ...f, locations };
 }
 
-export type GroupBy = 'type' | 'slot' | 'element' | 'location' | 'grade' | 'none';
+export type GroupBy = 'type' | 'slot' | 'element' | 'location' | 'grade' | 'use' | 'none';
 export type SortBy = 'grade' | 'name' | 'power' | 'newest';
 export const GROUP_LABEL: Record<GroupBy, string> = {
-  type: 'Weapon type', slot: 'Slot', element: 'Element', location: 'Location', grade: 'Grade', none: 'No grouping',
+  type: 'Weapon type', slot: 'Slot', element: 'Element', location: 'Location', grade: 'Grade', use: 'Best activity', none: 'No grouping',
 };
 export const SORT_LABEL: Record<SortBy, string> = { grade: 'Grade', name: 'Item name', power: 'Power', newest: 'Newest first' };
 
-export interface TypeGroup { type: string; items: AppraisedItem[] }
+/** `role` is set when grouped by best activity, so the head can show that mode's glyph and banner. */
+export interface TypeGroup { type: string; items: AppraisedItem[]; role?: Role }
+
+const NO_PICK = 'No clear pick';
 
 const SLOT_ORDER = ['Kinetic Weapons', 'Energy Weapons', 'Power Weapons'];
 
@@ -128,6 +131,7 @@ export function groupItems(
       case 'element': return i.damage || 'Other';
       case 'location': return locationKey(i);
       case 'grade': return grade(i) ? `Grade ${grade(i)}` : 'Not graded';
+      case 'use': { const r = i.instanceId ? grades[i.instanceId]?.usedFor : undefined; return r ? ROLE_LABEL[r] : NO_PICK; }
       case 'none': return 'All weapons';
       default: return i.type;
     }
@@ -137,6 +141,10 @@ export function groupItems(
     if (groupBy === 'grade') {
       const g = (s: string) => (s.startsWith('Grade ') ? GRADE_ORDER.indexOf(s.slice(6) as Grade) : -1);
       return g(b) - g(a);
+    }
+    if (groupBy === 'use') {
+      const r = (x: string) => { const n = Object.values(ROLE_LABEL).indexOf(x); return n < 0 ? 99 : n; };
+      return r(a) - r(b);
     }
     if (groupBy === 'location') return (a === 'Vault' ? 1 : 0) - (b === 'Vault' ? 1 : 0) || a.localeCompare(b);
     return a.localeCompare(b);
@@ -155,7 +163,11 @@ export function groupItems(
       : rank(b) - rank(a) || byName(a, b);
   const by = new Map<string, AppraisedItem[]>();
   for (const i of items) by.set(key(i), [...(by.get(key(i)) ?? []), i]);
-  return [...by.keys()].sort(order).map((type) => ({ type, items: by.get(type)!.sort(cmp) }));
+  const roleOf = (label: string) => (Object.keys(ROLE_LABEL) as Role[]).find((r) => ROLE_LABEL[r] === label);
+  return [...by.keys()].sort(order).map((type) => {
+    const role = groupBy === 'use' ? roleOf(type) : undefined;
+    return { type, items: by.get(type)!.sort(cmp), ...(role ? { role } : {}) };
+  });
 }
 
 /** Groups by weapon type (A to Z); inside a group, best grade first, then name. */

@@ -52,6 +52,35 @@ export interface ManifestTables {
   season?: SeasonTables;
   /** Guardian Rank names and art, and the commendation groups' colors. */
   identity?: IdentityTables;
+  /** Activity modes the app marks things with (PvE, Crucible, Raid…), by modeType. */
+  modes?: Record<string, ActivityMode>;
+}
+
+export interface ActivityMode {
+  name: string;
+  /** Monochrome glyph, full bungie.net URL. */
+  icon?: string;
+  /** 1920×590 stats banner, full bungie.net URL. */
+  banner?: string;
+}
+
+/** modeType values the app uses: Strike, Raid, Crucible, Explore, PvE, Nightfall, Gambit, Dungeon, Trials. */
+export const MODE = { strike: 3, raid: 4, crucible: 5, explore: 6, pve: 7, nightfall: 46, gambit: 63, dungeon: 82, trials: 84 } as const;
+
+/** Keeps the handful of modes in MODE: name, glyph, and banner. */
+export function slimModes(full: Record<string, { modeType?: number; displayProperties?: { name?: string; icon?: string }; pgcrImage?: string }>) {
+  const wanted = new Set<number>(Object.values(MODE));
+  const out: Record<string, ActivityMode> = {};
+  for (const d of Object.values(full)) {
+    if (d.modeType === undefined || !wanted.has(d.modeType) || out[d.modeType]) continue;
+    const url = (p?: string) => (p ? `https://www.bungie.net${p}` : undefined);
+    out[d.modeType] = {
+      name: d.displayProperties?.name ?? '',
+      ...(d.displayProperties?.icon ? { icon: url(d.displayProperties.icon) } : {}),
+      ...(d.pgcrImage ? { banner: url(d.pgcrImage) } : {}),
+    };
+  }
+  return out;
 }
 
 export interface ProgressionInfo {
@@ -298,6 +327,7 @@ const TABLES = {
   artifacts: 'DestinyArtifactDefinition',
   guardianRanks: 'DestinyGuardianRankDefinition',
   commendationNodes: 'DestinySocialCommendationNodeDefinition',
+  modes: 'DestinyActivityModeDefinition',
 } as const;
 
 /** Bump when a slim table keeps new fields, so cached slim files are rebuilt. */
@@ -393,6 +423,8 @@ export async function loadManifest(
   const identity = await Promise.all([
     load<Record<string, any>>(TABLES.guardianRanks), load<Record<string, any>>(TABLES.commendationNodes),
   ]).then(([r, n]) => slimIdentity(r, n)).catch(() => undefined);
+  // Activity mode glyphs and banners: one small table, cosmetic, never blocking.
+  const modes = await load(TABLES.modes, slimModes).catch(() => undefined);
   // The full item table is huge; load it after the others so peak memory stays lower.
   const extras = await load(TABLES.fullItems, slimItems);
   // Aspects and fragments describe themselves through sandbox perks; keep only those perks' text.
@@ -401,7 +433,7 @@ export async function loadManifest(
     Object.fromEntries(Object.entries(full).filter(([h]) => wanted.has(h)).map(([h, p]) => [h, { displayProperties: p.displayProperties }])), 'parts')
     .then((perks) => fillPartDescriptions(extras, perks))
     .catch(() => fillPartDescriptions(extras, {}));
-  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources, season, identity };
+  return { version: m.version, items, buckets, stats, damageTypes, statGroups, objectives, breakerTypes, plugSets, extras, loadoutStyles, itemSets, sources, season, identity, modes };
 }
 
 /**
