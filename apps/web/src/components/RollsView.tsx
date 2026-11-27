@@ -458,7 +458,7 @@ function RollCard({ item, c, onSelect, onChanged }: {
   };
 
   const gradeTitle = grade
-    ? `Popularity grade ${grade}${previewing ? ' (preview)' : ''}${!previewing && c?.betterPossible ? `, ${c.bestGrade} possible with this copy's other perks` : ''} · from ${c?.copies} copies`
+    ? `Popularity grade ${grade}${c?.gradeGroup ? ` among ${c.gradeGroup === 'pve' ? 'PvE' : 'PvP'} players` : ''}${previewing ? ' (preview)' : ''}${!previewing && c?.betterPossible ? `, ${c.bestGrade} possible with this copy's other perks` : ''} · from ${c?.copies} copies`
     : `Not enough community data yet (${c?.copies ?? 0} copies seen)`;
   return (
     <article className={`roll-card tier-${item.tier.toLowerCase()}${previewing ? ' is-previewing' : ''}`}>

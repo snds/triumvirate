@@ -135,7 +135,8 @@ test('appraiseCommunity grades a roll, marks PvE/PvP perks, and spots a better o
   assert.ok(meh.grade && meh.bestGrade);
   assert.equal(meh.betterPossible, true);
   assert.equal(meh.perks[3]![0]!.better, true);
-  assert.equal(meh.perks[0]![0]!.rel, 0);
+  // Never seen: only the smoothing pseudo-copy, well under the top barrel.
+  assert.ok(meh.perks[0]![0]!.rel < 0.2);
   // No data: no grade.
   assert.equal(appraiseCommunity(manifest, undefined, GUN, [[{ hash: 1, active: true }]]).grade, undefined);
 });
@@ -150,4 +151,60 @@ test('bestPicks and scoreRoll agree with the best grade', async () => {
   assert.deepEqual(a.traitColumns, [false, false, true, true]);
   assert.equal(toGrade(scoreRoll(a.perks, a.traitColumns, a.bestPicks)), a.bestGrade);
   assert.equal(a.bestGrade, 'S');
+});
+
+test('a PvE roll is graded against PvE players, not dragged down by PvP picks', async () => {
+  const { appraiseCommunity } = await import('./community.ts');
+  const at = '2026-11-24T20:00:00Z';
+  const s = (copy: string, role: Sample['role'], perks: number[]): Sample =>
+    ({ match: copy, at, role, itemHash: GUN, copy, perks, kills: 1, precisionKills: 0 });
+  // PvP is the bigger crowd and runs Rewind + Frenzy; PvE runs Explosive Payload + Firefly.
+  const samples: Sample[] = [
+    ...['a', 'b', 'c', 'd', 'e', 'f'].map((c) => s(c, 'pve', [1, 3, 5, 7])),
+    ...['g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r'].map((c) => s(c, 'pvp', [2, 4, 6, 8])),
+  ];
+  const w = rollup(manifest, samples).weapons[GUN];
+  const a = appraiseCommunity(manifest, w, GUN, [[{ hash: 1, active: true }], [{ hash: 3, active: true }], [{ hash: 5, active: true }], [{ hash: 7, active: true }]]);
+  assert.equal(a.gradeGroup, 'pve');
+  assert.equal(a.grade, 'S');
+});
+
+test('communityFor pools reissued versions of a weapon by name, lining perks up by name', async () => {
+  const { appraiseCommunity, communityFor, weaponFamily } = await import('./community.ts');
+  const OLD = 200, NEW = 201, OTHER = 202;
+  // The reissue rolls an enhanced Explosive Payload (57) with its own hash, in a pool that also
+  // holds a new perk (58); the old version has the plain perks.
+  const gun = (name: string) => ({ ...named(name, 'Hand Cannon'), itemType: 3, inventory: { tierType: 5 } });
+  const m = {
+    ...manifest,
+    items: { ...manifest.items, [OLD]: gun('Fatebringer'), [NEW]: gun('Fatebringer'), [OTHER]: gun('Ace'), 57: named('Explosive Payload Enhanced', 'Enhanced Trait'), 58: named('Kill Clip') },
+    extras: {
+      ...manifest.extras,
+      [OLD]: manifest.extras![GUN],
+      [NEW]: { socketCategories: [[PERKS, [1, 2, 3, 4]]], socketEntries: [[0, 0], [11, 0], [12, 0], [15, 0], [14, 0]] },
+      57: { plugCategory: 'frames' }, 58: { plugCategory: 'frames' },
+    },
+    plugSets: { ...manifest.plugSets, 15: [5, 57, 58] },
+  } as unknown as ManifestTables;
+  assert.deepEqual(weaponFamily(m, NEW).sort(), [OLD, NEW]);
+  const at = '2026-11-24T20:00:00Z';
+  const s = (copy: string, itemHash: number, perks: number[]): Sample =>
+    ({ match: copy, at, role: 'pve', itemHash, copy, perks, kills: 1, precisionKills: 0 });
+  // Three copies of each version: alone, neither reaches the 5 copies a grade needs.
+  const samples = [
+    ...['a', 'b', 'c'].map((c) => s(c, OLD, [1, 3, 56, 7])),
+    ...['d', 'e', 'f'].map((c) => s(c, NEW, [1, 3, 57, 7])),
+  ];
+  const r = rollup(m, samples);
+  const slotted = [[{ hash: 1, active: true }], [{ hash: 3, active: true }], [{ hash: 57, active: true }], [{ hash: 7, active: true }]];
+  assert.equal(appraiseCommunity(m, r.weapons[NEW], NEW, slotted).grade, undefined);
+  const pooled = communityFor(m, r.weapons, NEW)!;
+  assert.equal(pooled.roles[0]!.copies, 6);
+  // Old copies' Explosive Payload lands on the new version's base perk in the same column.
+  assert.equal(pooled.roles[0]!.columns[2]![0]!.copies, 6);
+  const a = appraiseCommunity(m, pooled, NEW, slotted);
+  assert.equal(a.grade, 'S');
+  assert.equal(a.copies, 6);
+  // A weapon with one version gets its own entry back untouched.
+  assert.equal(communityFor(m, r.weapons, OTHER), undefined);
 });

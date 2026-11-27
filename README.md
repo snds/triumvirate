@@ -91,7 +91,7 @@ Only legendary and exotic weapons are counted, and only item hashes are saved, n
   On Unraid: `docker logs triumvirate-app-1 2>&1 | grep community`. If a key appears twice in `.env`, the last line wins.
 - Data for one weapon: `GET /api/community/items/<itemHash>`.
 
-Files live in `.data/community/`. A crawl makes at most 3,000 requests at 4 per second (about 15 minutes).
+Files live in `.data/community/`. A crawl makes at most 10,000 requests at 4 per second (about 45 minutes).
 A crawl only samples matches from the last 6 hours. When it runs out of players to visit (say, a fresh
 start when you haven't played tonight), it uses older matches only to find more players.
 

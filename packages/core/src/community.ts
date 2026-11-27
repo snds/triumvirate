@@ -324,6 +324,117 @@ function statLean(manifest: ManifestTables, list: Sample[], pools: number[][], s
 }
 
 // ---------------------------------------------------------------------------------------------
+// Weapon families: Bungie gives a reissued weapon (new season, holofoil, adept, new origin trait) a
+// new item hash, so the crawl files its copies apart. Players treat them as one gun with one perk
+// meta, so appraisals pool every version that shares the name and weapon type.
+
+const familyIndex = new WeakMap<ManifestTables, Map<string, number[]>>();
+const familyKey = (manifest: ManifestTables, hash: number): string | undefined => {
+  const def = manifest.items[hash];
+  const name = def?.displayProperties?.name;
+  if (!name || def.itemType !== 3) return undefined;
+  return `${name.replace(/\s*\((Adept|Timelost|Harrowed)\)$/i, '').toLowerCase()}|${def.itemTypeDisplayName ?? ''}`;
+};
+
+/** Every item hash that is a version of this weapon (itself included). */
+export function weaponFamily(manifest: ManifestTables, itemHash: number): number[] {
+  let index = familyIndex.get(manifest);
+  if (!index) {
+    index = new Map();
+    for (const h of Object.keys(manifest.items)) {
+      const k = familyKey(manifest, Number(h));
+      if (!k) continue;
+      const list = index.get(k);
+      if (list) list.push(Number(h)); else index.set(k, [Number(h)]);
+    }
+    familyIndex.set(manifest, index);
+  }
+  const k = familyKey(manifest, itemHash);
+  return (k && index.get(k)) || [itemHash];
+}
+
+/**
+ * Community usage for a weapon with every version of it pooled, in this hash's perk columns.
+ * Perks are matched to columns by name (enhanced folded in), so a reissue with a different socket
+ * layout or new perk hashes still lines up. Returns the weapon's own entry when no other version has data.
+ */
+export function communityFor(
+  manifest: ManifestTables,
+  weapons: Record<string, WeaponCommunity> | undefined,
+  itemHash: number,
+): WeaponCommunity | undefined {
+  if (!weapons) return undefined;
+  const members = weaponFamily(manifest, itemHash).filter((h) => weapons[h]);
+  if (!members.length) return undefined;
+  if (members.length === 1 && members[0] === itemHash) return weapons[itemHash];
+
+  const pools = columnPools(manifest, itemHash);
+  const bases = pools.map((p) => baseOf(manifest, p));
+  const poolSizes = pools.map((p, i) => new Set(p.map(bases[i]!)).size || 1);
+  const plain = (h: number) => (manifest.items[h]?.displayProperties.name ?? '').replace(/\s+Enhanced$/i, '').toLowerCase();
+  const byName = new Map<string, [number, number][]>();
+  pools.forEach((pool, ci) => {
+    for (const h of pool) {
+      const n = plain(h);
+      if (!n) continue;
+      const list = byName.get(n) ?? [];
+      if (!list.some(([c]) => c === ci)) list.push([ci, bases[ci]!(h)]);
+      byName.set(n, list);
+    }
+  });
+  /** Target column and base hash for a perk seen in column `ci` of another version. */
+  const place = (hash: number, ci: number): [number, number] => {
+    const hits = byName.get(plain(hash)) ?? [];
+    return hits.find(([c]) => c === ci) ?? hits[0] ?? [ci, hash];
+  };
+
+  const merged = new Map<Role, { copies: number; kills: number; shareOfRole: number; cols: Map<number, number>[]; combos: Map<string, number>; mw: Map<number, number>; mods: Map<number, number>; lean: { n: number; lean: StatLean[] } }>();
+  for (const h of members) {
+    for (const r of weapons[h]!.roles) {
+      let m = merged.get(r.role);
+      if (!m) merged.set(r.role, (m = { copies: 0, kills: 0, shareOfRole: 0, cols: pools.map(() => new Map()), combos: new Map(), mw: new Map(), mods: new Map(), lean: { n: 0, lean: [] } }));
+      m.copies += r.copies;
+      m.kills += r.kills;
+      m.shareOfRole += r.shareOfRole;
+      r.columns.forEach((col, ci) => {
+        for (const p of col) {
+          const [tc, base] = place(p.hash, ci);
+          const target = (m.cols[tc] ??= new Map());
+          target.set(base, (target.get(base) ?? 0) + p.copies);
+        }
+      });
+      for (const c of r.combos) {
+        const key = c.hashes.map((x) => place(x, -1)[1]).join(':');
+        m.combos.set(key, (m.combos.get(key) ?? 0) + c.copies);
+      }
+      for (const x of r.masterworks) m.mw.set(x.hash, (m.mw.get(x.hash) ?? 0) + x.copies);
+      for (const x of r.mods) m.mods.set(x.hash, (m.mods.get(x.hash) ?? 0) + x.copies);
+      // Stat lean is an average; keep the best-sampled version's.
+      if (r.copies > m.lean.n) m.lean = { n: r.copies, lean: r.statLean };
+    }
+  }
+
+  const roles: RoleUsage[] = [...merged].map(([role, m]) => {
+    const n = m.copies;
+    const shares = (map: Map<number, number>) => sortShare([...map].map(([hash, k]) => ({ hash, copies: k, share: k / n })));
+    return {
+      role, copies: n, kills: m.kills, shareOfRole: m.shareOfRole,
+      columns: m.cols.map((col, ci) => {
+        const chance = 1 / (poolSizes[ci] ?? 1);
+        return sortShare([...col].map(([hash, k]) => ({ hash, copies: k, share: k / n, chance, lift: k / n / chance })));
+      }),
+      combos: sortShare([...m.combos].map(([key, k]) => ({ hashes: key.split(':').map(Number) as [number, number], copies: k, share: k / n }))).slice(0, 10),
+      masterworks: shares(m.mw),
+      mods: shares(m.mods),
+      statLean: m.lean.lean,
+    };
+  }).sort((a, b) => ROLES.indexOf(a.role) - ROLES.indexOf(b.role));
+  const avg = roles.reduce((t, r) => t + r.shareOfRole, 0) / (roles.length || 1);
+  const best = [...roles].filter((r) => r.copies >= 5).sort((a, b) => b.shareOfRole / avg - a.shareOfRole / avg)[0];
+  return { itemHash, ...(best ? { bestRole: best.role } : {}), roles };
+}
+
+// ---------------------------------------------------------------------------------------------
 // Appraisal: grades one copy against what the community runs, like a popularity roll appraiser.
 
 export type Grade = 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
@@ -333,6 +444,8 @@ const GROUP_ROLES: Record<UseGroup, Role[]> = { pve: ['pve-endgame', 'pve', 'pat
 
 /** Fewer copies than this and a weapon (or role) gets no grade: too little to go on. */
 export const MIN_COPIES = 5;
+/** Pseudo-copies added to every perk before comparing popularity (see appraiseCommunity). */
+const SMOOTHING = 1;
 
 export interface PerkMark {
   /** Where the community favors this perk on this weapon. */
@@ -356,7 +469,9 @@ export interface CommunityAppraisal {
   usedFor?: Role;
   /** Whether the slotted traits are favored for PvE, PvP, or both. */
   rollType?: UseGroup | 'both';
-  /** Copies of this weapon behind the numbers. */
+  /** Which crowd the grade is measured against: PvE or PvP players (absent: everyone, too few on either side). */
+  gradeGroup?: UseGroup;
+  /** Copies of this weapon behind the numbers (all versions of it combined). */
   copies: number;
   /** One entry per perk option, aligned with the item's perk columns. */
   perks: PerkMark[][];
@@ -435,10 +550,12 @@ export function appraiseCommunity(
 
   const all = mergeRoles(weapon.roles);
   const groups = { pve: mergeRoles(weapon.roles.filter((r) => GROUP_ROLES.pve.includes(r.role))), pvp: mergeRoles(weapon.roles.filter((r) => GROUP_ROLES.pvp.includes(r.role))) };
+  // Popularity next to the column's top pick. One pseudo-copy per perk (add-one smoothing) keeps a
+  // handful of copies from reading as "everyone avoids this perk"; with real volume it fades out.
   const rel = (b: Bucket, ci: number, base: number) => {
     const col = b.columns[ci];
     if (!col?.size) return 0;
-    return (col.get(base) ?? 0) / Math.max(...col.values());
+    return ((col.get(base) ?? 0) + SMOOTHING) / (Math.max(...col.values()) + SMOOTHING);
   };
   const share = (b: Bucket, ci: number, base: number) => (b.copies ? (b.columns[ci]?.get(base) ?? 0) / b.copies : 0);
   /** Favored: at least half as common as the column's top pick, and above luck. */
@@ -446,16 +563,6 @@ export function appraiseCommunity(
     b.copies >= MIN_COPIES && rel(b, ci, base) >= 0.5 && share(b, ci, base) >= 1 / (new Set(pools[ci]!.map(bases[ci]!)).size || 1);
 
   const located = perks.map((col) => col.map((p) => (p.hash ? locate(p.hash) : undefined)));
-  const marks: PerkMark[][] = located.map((col) => col.map((loc) => {
-    if (!loc) return { rel: 0 };
-    const [ci, base] = loc;
-    const m: PerkMark = { rel: rel(all, ci, base) };
-    if (groups.pve.copies) m.pve = share(groups.pve, ci, base);
-    if (groups.pvp.copies) m.pvp = share(groups.pvp, ci, base);
-    const e = favored(groups.pve, ci, base), v = favored(groups.pvp, ci, base);
-    if (e || v) m.use = e && v ? 'both' : e ? 'pve' : 'pvp';
-    return m;
-  }));
 
   /** Score of a roll in a bucket: traits count double. `pick` chooses the option per column. */
   const score = (b: Bucket, pick: (col: number) => number) => {
@@ -470,6 +577,27 @@ export function appraiseCommunity(
     return weight ? total / weight : 0;
   };
   const slotted = (i: number) => Math.max(0, perks[i]!.findIndex((p) => p.active));
+
+  // Grade against the crowd this roll belongs to: a PvE roll is judged by what PvE players run,
+  // not by a blend where PvP favorites drag it down. Falls back to everyone when neither side has enough copies.
+  const fits = (['pve', 'pvp'] as const)
+    .filter((g) => groups[g].copies >= MIN_COPIES)
+    .map((g) => ({ g, s: score(groups[g], slotted) }))
+    .sort((a, b) => b.s - a.s || groups[b.g].copies - groups[a.g].copies);
+  const gradeGroup: UseGroup | undefined = fits[0]?.g;
+  const graded = gradeGroup ? groups[gradeGroup] : all;
+
+  const marks: PerkMark[][] = located.map((col) => col.map((loc) => {
+    if (!loc) return { rel: 0 };
+    const [ci, base] = loc;
+    const m: PerkMark = { rel: rel(graded, ci, base) };
+    if (groups.pve.copies) m.pve = share(groups.pve, ci, base);
+    if (groups.pvp.copies) m.pvp = share(groups.pvp, ci, base);
+    const e = favored(groups.pve, ci, base), v = favored(groups.pvp, ci, base);
+    if (e || v) m.use = e && v ? 'both' : e ? 'pve' : 'pvp';
+    return m;
+  }));
+
   const bestPick = (i: number) => {
     let best = slotted(i), bestRel = -1;
     marks[i]!.forEach((m, k) => { if (m.rel > bestRel) { bestRel = m.rel; best = k; } });
@@ -485,8 +613,9 @@ export function appraiseCommunity(
     betterPossible: false, copies: all.copies, perks: marks, traitColumns, bestPicks: marks.map((_, i) => bestPick(i)),
   };
   if (all.copies < MIN_COPIES) return out;
-  out.grade = toGrade(score(all, slotted));
-  out.bestGrade = toGrade(score(all, bestPick));
+  if (gradeGroup) out.gradeGroup = gradeGroup;
+  out.grade = toGrade(score(graded, slotted));
+  out.bestGrade = toGrade(score(graded, bestPick));
   out.betterPossible = GRADES.indexOf(out.bestGrade) < GRADES.indexOf(out.grade);
 
   let bestRole: { role: Role; s: number; copies: number } | undefined;
