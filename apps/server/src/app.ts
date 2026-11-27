@@ -8,7 +8,7 @@ import { getMembershipDataForCurrentUser } from 'bungie-api-ts/user';
 import { equipItem, equipItems, equipLoadout, getDestinyEntityDefinition, getProfile, getPublicMilestones, getVendors, insertSocketPlugFree, pullFromPostmaster, setItemLockState, snapshotLoadout, transferItem, updateLoadoutIdentifiers, type DestinyProfileResponse, type DestinyRecordDefinition, type DestinyVendorDefinition, type DestinyVendorGroupDefinition, type DestinyDestinationDefinition, type DestinyProgressionDefinition } from 'bungie-api-ts/destiny2';
 import Anthropic from '@anthropic-ai/sdk';
 import {
-  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, suggestBuilds, itemOrnaments, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
+  applyEquip, applyLock, applyPlug, applyStep, applyPullStack, planCollectPostmaster, appraise, cleanLoadout, planEquip, summarizeGameLoadouts, type ActionStep, type EquipPlan, appraiseCommunity, communityFor, authorizeUrl, planMove, rollOptions, cleanupCandidates, armorKeeps, cleanBuilds, type PopularBuild, farmTargets, decideCleanup, openPicks, planPull, queuedItems, reconcileCleanup, clearedSince, type CleanupAction, type GradeLookup, createHttpClient, exchangeCode, loadManifest, loadRecordTables, recordsScreen, exoticGaps, markDeepsight, suggestBuilds, itemOrnaments, hiddenVendorCategory, type RecordTables, needsRefresh, seasonSummary, trackedProgressions,
   refreshTokens, buildSubclassIndex, withSubclassArt, cosmetics, thisWeek, weekHashes, weekModifierHashes, type EventCardDef, type ThisWeek, type WeekDefs, summarizeAccount, summarizeCharacters, summarizeProfile, vendorWeapons, type AppraisedItem, type VendorRow, type BungieConfig,
   type ManifestTables, type Tokens, type WishList, buildDigest, digestFacts, digestNotice, type Digest,
   applyWatchCheck, bungieUrl, cleanWantedPerks, findWatchHits, forgetWatch, watchNotice, GRADES, type Grade, type WatchState,
@@ -455,7 +455,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const items: Record<string, ReturnType<typeof appraiseCommunity>> = {};
     for (const i of lastView.items) {
       if (i.itemType !== 3 || !i.perks || !i.instanceId) continue;
-      items[i.instanceId] = appraiseCommunity(manifest, r?.weapons[i.itemHash], i.itemHash, i.perks);
+      items[i.instanceId] = appraiseCommunity(manifest, communityFor(manifest, r?.weapons, i.itemHash), i.itemHash, i.perks);
     }
     return c.json({ builtAt: r?.builtAt, samples: r?.samples ?? 0, from: r?.from, to: r?.to, items });
   });
@@ -495,7 +495,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     }
     const r = await community.rollup();
     const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
-    for (const i of vendorCache.rows) if (i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest, r?.weapons[i.itemHash], i.itemHash, i.perks);
+    for (const i of vendorCache.rows) if (i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest, communityFor(manifest, r?.weapons, i.itemHash), i.itemHash, i.perks);
     return { fetchedAt: new Date(vendorCache.at).toISOString(), items: vendorCache.rows, grades };
   }
   app.get('/api/community/vendors', async (c) => {
@@ -608,7 +608,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       const id = row.instanceId!;
       if (row.itemType === 3 && row.perks) {
         items[id] = { ...row, appraisal: appraise(row.itemHash, new Set(row.perks.flat().map((p) => p.name)), list, manifest) };
-        grades[id] = appraiseCommunity(manifest, r?.weapons[row.itemHash], row.itemHash, row.perks);
+        grades[id] = appraiseCommunity(manifest, communityFor(manifest, r?.weapons, row.itemHash), row.itemHash, row.perks);
       } else {
         items[id] = row;
         // Armor that would be best in slot for a build, against everything you own.
@@ -1180,7 +1180,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
     const characters = summarizeCharacters(snap.profile, manifest!, snap.titles);
     const account = summarizeAccount(snap.profile, manifest!);
     const grades: GradeLookup = {};
-    if (r) for (const i of items) if (i.itemType === 3 && i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest!, r.weapons[i.itemHash], i.itemHash, i.perks);
+    if (r) for (const i of items) if (i.itemType === 3 && i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest!, communityFor(manifest!, r.weapons, i.itemHash), i.itemHash, i.perks);
     // Armor picks respect armor sets and the popular builds list (see builds.ts).
     const sets = manifest!.itemSets ?? {};
     const cleanup = cleanupCandidates(items, grades, { builds, sets });
@@ -1215,7 +1215,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       const date = localDate();
       const r = await community.rollup();
       const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
-      for (const i of view.items) if (i.itemType === 3 && i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest!, r?.weapons[i.itemHash], i.itemHash, i.perks);
+      for (const i of view.items) if (i.itemType === 3 && i.perks && i.instanceId) grades[i.instanceId] = appraiseCommunity(manifest!, communityFor(manifest!, r?.weapons, i.itemHash), i.itemHash, i.perks);
       // Vendors are a bonus: a Bungie hiccup there shouldn't cost the whole digest.
       const vendors = await vendorOffers(t, true).catch((e) => { console.error('Digest vendors failed:', e); return undefined; });
       const digest = buildDigest({
@@ -1314,7 +1314,7 @@ export function createApp(cfg: BungieConfig, store: Store, deps: AppDeps) {
       const r = await community.rollup();
       const owned = view.items.filter((i) => watched.has(i.itemHash) && i.instanceId);
       const grades: Record<string, ReturnType<typeof appraiseCommunity>> = {};
-      for (const i of owned) if (i.perks) grades[i.instanceId!] = appraiseCommunity(manifest!, r?.weapons[i.itemHash], i.itemHash, i.perks);
+      for (const i of owned) if (i.perks) grades[i.instanceId!] = appraiseCommunity(manifest!, communityFor(manifest!, r?.weapons, i.itemHash), i.itemHash, i.perks);
       // A vendor hiccup still lets drops count.
       const vendors = entries.length ? await vendorOffers(t, true).catch((e) => { console.error('Watch vendors failed:', e); return undefined; }) : undefined;
       const { state, fresh } = await watch.update((s) => {

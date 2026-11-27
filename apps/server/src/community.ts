@@ -18,7 +18,7 @@ import {
   getActivityHistory, getPostGameCarnageReport, getProfile,
   type DestinyPostGameCarnageReportData, type DestinyProfileResponse,
 } from 'bungie-api-ts/destiny2';
-import { buildUsage, extractArmorSamples, extractSamples, rollup, type ArmorSample, type BuildUsageRollup, type CommunityRollup, type ManifestTables, type Sample } from '@triumvirate/core';
+import { buildUsage, communityFor, extractArmorSamples, extractSamples, rollup, type ArmorSample, type BuildUsageRollup, type CommunityRollup, type ManifestTables, type Sample } from '@triumvirate/core';
 
 // DestinyComponentType numbers: Profiles (character ids), Characters (class, stat totals),
 // CharacterEquipment, ItemSockets.
@@ -32,7 +32,7 @@ const CALL_TIMEOUT_MS = 30_000;
 export interface Player { membershipType: number; membershipId: string }
 
 export interface CrawlOptions {
-  /** Bungie calls this run may make. Default 3000 (about 15 minutes at the default rate). */
+  /** Bungie calls this run may make. Default 10,000 (about 45 minutes at the default rate). */
   maxRequests?: number;
   /** Only matches newer than this, so equipped gear still matches what was used. Default 6. */
   maxAgeHours?: number;
@@ -130,7 +130,7 @@ export function createCommunity(deps: CommunityDeps) {
       log(`Crawl (${trigger}) not started: another crawl has been running since ${status.startedAt}.`);
       return status;
     }
-    const o: Required<CrawlOptions> = { maxRequests: 3000, maxAgeHours: 6, ratePerSecond: 4, ...opts };
+    const o: Required<CrawlOptions> = { maxRequests: 10_000, maxAgeHours: 6, ratePerSecond: 4, ...opts };
     stopRequested = false;
     const started = now();
     status = { running: true, startedAt: started.toISOString(), requests: 0, matches: 0, samples: 0, lastRun: status.lastRun };
@@ -371,11 +371,14 @@ export function createCommunity(deps: CommunityDeps) {
     /** Usage for one weapon: the last 30 days, plus a per-month summary for trends. */
     async weapon(itemHash: number) {
       await loadRollups();
+      // Every version of the weapon (reissues get new hashes) pooled, when the manifest is loaded.
+      const manifest = await deps.manifest().catch(() => undefined);
+      const of = (r: CommunityRollup | undefined) => (manifest ? communityFor(manifest, r?.weapons, itemHash) : r?.weapons[itemHash]);
       const trend = Object.entries(history ?? {}).map(([m, r]) => ({
         month: m,
-        roles: (r.weapons[itemHash]?.roles ?? []).map((x) => ({ role: x.role, copies: x.copies, shareOfRole: x.shareOfRole })),
+        roles: (of(r)?.roles ?? []).map((x) => ({ role: x.role, copies: x.copies, shareOfRole: x.shareOfRole })),
       }));
-      return { builtAt: current?.builtAt, samples: current?.samples ?? 0, weapon: current?.weapons[itemHash] ?? null, trend };
+      return { builtAt: current?.builtAt, samples: current?.samples ?? 0, weapon: of(current) ?? null, trend };
     },
     /**
      * Runs a crawl once a day at `hour` (local time) while the server is up. Checks every 5 minutes,
